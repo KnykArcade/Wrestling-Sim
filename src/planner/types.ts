@@ -1,5 +1,6 @@
 import type { ChampionshipMatchPurpose, ChampionshipUniverse, TitleResultDecision } from "../championships/types";
 import type { CreativeControlData } from "../control/types";
+import type { HandoffUniverse } from "../handoff/types";
 import type { TrackerStoryline } from "../storylines/types";
 import type { WorkerUniverse } from "../workers/types";
 
@@ -125,13 +126,14 @@ export interface PlannedShow {
 
 export interface PlannerBackup {
   product: "TEW IX Story Tracker";
-  version: 7;
+  version: 8;
   exportedAt: string;
   shows: PlannedShow[];
   storylines: TrackerStoryline[];
   workers: WorkerUniverse;
   control: CreativeControlData;
   championships: ChampionshipUniverse;
+  handoff: HandoffUniverse;
 }
 
 export interface PlannerBackupBundle {
@@ -140,4 +142,5 @@ export interface PlannerBackupBundle {
   workers: WorkerUniverse;
   control: CreativeControlData;
   championships: ChampionshipUniverse;
+  handoff: HandoffUniverse;
 }
