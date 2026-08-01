@@ -60,7 +60,7 @@ test("creates a storyline and builds its timeline from planned segments", async 
   await expect(page.getByRole("heading", { name: "Storyline Hub and Timeline" })).toBeVisible();
   await page.getByRole("button", { name: "Create Storyline" }).first().click();
   await page.getByLabel("Storyline name").fill("World Title Rivalry");
-  await page.getByLabel("Status").selectOption("Active");
+  await page.getByLabel("Status", { exact: true }).selectOption("Active");
   await page.getByLabel("Manual participant name").fill("Bret Hart");
   await page.getByRole("button", { name: "Add Manual Participant" }).click();
   await page.getByRole("button", { name: "Add Milestone" }).click();
