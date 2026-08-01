@@ -1,10 +1,12 @@
-import { Buffer } from "buffer/";
-import MDBReader from "mdb-reader";
+import { Buffer } from "buffer";
+import processShim from "process";
 import { mapTewTables, relevantTableCandidates } from "./mapper";
 import type { LoadedTable, TableSummary, TewSnapshot } from "./types";
 
 const MAX_FILE_SIZE = 256 * 1024 * 1024;
 const MAX_ROWS_PER_RELEVANT_TABLE = 100_000;
+
+type MdbReaderInstance = InstanceType<(typeof import("mdb-reader"))["default"]>;
 
 function normalizeName(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -15,6 +17,30 @@ function formatError(error: unknown): string {
     return error.message;
   }
   return "The database could not be read.";
+}
+
+function installBrowserCompatibility(): void {
+  const runtime = globalThis as typeof globalThis & {
+    Buffer?: typeof Buffer;
+    global?: typeof globalThis;
+    process?: typeof processShim;
+  };
+
+  runtime.Buffer ??= Buffer;
+  runtime.global ??= globalThis;
+  runtime.process ??= processShim;
+}
+
+async function openAccessDatabase(file: File): Promise<MdbReaderInstance> {
+  const arrayBuffer = await file.arrayBuffer();
+
+  // mdb-reader and its browser crypto dependencies still expect the Node-style
+  // Buffer, global, and process objects. They must exist before the parser
+  // module is evaluated.
+  installBrowserCompatibility();
+  const { default: MDBReader } = await import("mdb-reader");
+
+  return new MDBReader(Buffer.from(arrayBuffer));
 }
 
 export async function readTewSnapshot(file: File): Promise<TewSnapshot> {
@@ -29,10 +55,9 @@ export async function readTewSnapshot(file: File): Promise<TewSnapshot> {
     throw new Error("The selected database is larger than the 256 MB Phase 1 safety limit.");
   }
 
-  let reader: MDBReader;
+  let reader: MdbReaderInstance;
   try {
-    const arrayBuffer = await file.arrayBuffer();
-    reader = new MDBReader(Buffer.from(arrayBuffer));
+    reader = await openAccessDatabase(file);
   } catch (error) {
     throw new Error(`Unable to open the Access database: ${formatError(error)}`);
   }
