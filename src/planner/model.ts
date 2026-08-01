@@ -82,6 +82,7 @@ export function createPlannedSegment(type: PlannedSegmentType): PlannedSegment {
     segmentOutput: "",
     audienceTakeaway: "",
 
+    bookingIdeaId: "",
     workflowStatus: "Planned",
     reconciliation: createEmptySegmentReconciliation(),
   };
@@ -104,6 +105,7 @@ export function duplicatePlannedShow(show: PlannedShow): PlannedShow {
     segments: show.segments.map((segment) => ({
       ...segment,
       id: createPlannerId(),
+      bookingIdeaId: "",
       workflowStatus: "Planned",
       reconciliation: createEmptySegmentReconciliation(),
       workers: segment.workers.map((worker) => ({ ...worker, id: createPlannerId() })),
