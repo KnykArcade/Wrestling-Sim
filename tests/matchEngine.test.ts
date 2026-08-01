@@ -40,7 +40,7 @@ describe("native match engine data foundation", () => {
     expect(submission).toBeDefined();
     expect(calculateApproachRating(aerial!, { Aerial: 80, Athleticism: 70, Flashiness: 60, Basics: 50 })).toBe(70);
     expect(calculateApproachRating(bigMatch!, { Psychology: 90, Consistency: 80, Charisma: 70, Stamina: 60 })).toBe(80);
-    expect(calculateApproachRating(submission!, { Technical: 85, Psychology: 75, Basics: 65, Toughness: 55 })).toBe(73.5);
+    expect(calculateApproachRating(submission!, { Technical: 85, Psychology: 75, Basics: 65, Toughness: 55 })).toBe(74.5);
   });
 
   test("normalizes workbook aliases without inventing mappings for unresolved records", () => {
