@@ -77,6 +77,33 @@ test("creates a storyline and builds its timeline from planned segments", async 
   await expect(page.getByText("Bret Hart", { exact: true })).toBeVisible();
 });
 
+test("creates worker profiles character arcs and a relationship network", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Worker Hub" }).click();
+  await expect(page.getByRole("heading", { name: "Worker Creative Profiles and Relationship Network" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Create Manual Worker" }).first().click();
+  await page.getByLabel("Display name").fill("Bret Hart");
+  await page.getByLabel("Worker alignment").selectOption("Face");
+  await page.getByLabel("Current creative direction").fill("Pursuing the world championship through technical wrestling.");
+  await page.getByRole("button", { name: "Add Character Arc" }).click();
+  await page.getByLabel("Arc name").fill("Road to the Championship");
+  await page.getByLabel("Arc status").selectOption("Active");
+
+  await page.getByRole("button", { name: "Create Manual Worker" }).first().click();
+  await page.getByLabel("Display name").fill("Shawn Michaels");
+  await page.getByLabel("Worker alignment").selectOption("Heel");
+  await page.getByLabel("Relationship worker").selectOption({ label: "Bret Hart" });
+  await page.getByRole("button", { name: "Add Relationship" }).click();
+  await expect(page.getByText("Rival · Planned")).toBeVisible();
+
+  await page.reload();
+  await page.getByRole("button", { name: "Worker Hub" }).click();
+  await page.getByRole("button", { name: /Shawn Michaels/ }).click();
+  await expect(page.getByLabel("Display name")).toHaveValue("Shawn Michaels");
+  await expect(page.getByText("Rival · Planned")).toBeVisible();
+});
+
 test("loads MDB browser shims before evaluating the parser", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "TEW Show History" }).click();

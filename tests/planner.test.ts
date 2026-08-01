@@ -81,7 +81,7 @@ describe("planned show workspace", () => {
     expect(duplicate.segments[0].reconciliation.actualMatch).toBeNull();
   });
 
-  test("saves, loads, exports, and imports Phase 3A data", () => {
+  test("saves, loads, exports, and imports Phase 3B data", () => {
     const storage = new MemoryStorage();
     const show = createPlannedShow(1);
     const match = createPlannedSegment("match");
@@ -89,11 +89,13 @@ describe("planned show workspace", () => {
     show.segments = [match];
     savePlannedShows(storage, [show]);
     expect(loadPlannedShows(storage)).toEqual([show]);
-    const backup = createPlannerBackup([show], []);
-    expect(backup.version).toBe(4);
+    const workers = { profiles: [], relationships: [] };
+    const backup = createPlannerBackup([show], [], workers);
+    expect(backup.version).toBe(5);
     expect(backup.storylines).toEqual([]);
+    expect(backup.workers).toEqual(workers);
     expect(parsePlannerBackup(JSON.stringify(backup))).toEqual([show]);
-    expect(parsePlannerBackupBundle(JSON.stringify(backup))).toEqual({ shows: [show], storylines: [] });
+    expect(parsePlannerBackupBundle(JSON.stringify(backup))).toEqual({ shows: [show], storylines: [], workers });
   });
 
   test("migrates Phase 2A planned shows without losing the card", () => {
@@ -110,6 +112,7 @@ describe("planned show workspace", () => {
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":1,"shows":[]}')).toEqual([]);
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":2,"shows":[]}')).toEqual([]);
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":3,"shows":[]}')).toEqual([]);
-    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":5,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
+    expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":4,"shows":[],"storylines":[]}')).toEqual([]);
+    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":6,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
   });
 });

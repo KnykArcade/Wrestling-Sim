@@ -1,4 +1,5 @@
 import type { TrackerStoryline } from "../storylines/types";
+import type { WorkerUniverse } from "../workers/types";
 
 export type PlannedSegmentType = "match" | "angle";
 export type PlannedSegmentSection = "Pre-Show" | "Main Show" | "Post-Show";
@@ -113,13 +114,15 @@ export interface PlannedShow {
 
 export interface PlannerBackup {
   product: "TEW IX Story Tracker";
-  version: 4;
+  version: 5;
   exportedAt: string;
   shows: PlannedShow[];
   storylines: TrackerStoryline[];
+  workers: WorkerUniverse;
 }
 
 export interface PlannerBackupBundle {
   shows: PlannedShow[];
   storylines: TrackerStoryline[];
+  workers: WorkerUniverse;
 }

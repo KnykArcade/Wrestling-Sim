@@ -3,8 +3,9 @@ import PlannedShowWorkspace from "./planner/PlannedShowWorkspace";
 import StorylineHub from "./storylines/StorylineHub";
 import { readTewSnapshot } from "./tew/reader";
 import type { MatchRecord, ShowRecord, StorylineRecord, TewSnapshot } from "./tew/types";
+import WorkerHub from "./workers/WorkerHub";
 
-type ViewName = "planner" | "storyline-hub" | "shows" | "tew-storylines" | "schema";
+type ViewName = "planner" | "storyline-hub" | "worker-hub" | "shows" | "tew-storylines" | "schema";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -100,29 +101,36 @@ export default function App() {
     }
   }
 
+  function openPlannedSegment(showId: string, segmentId: string): void {
+    setPlannerTarget({ showId, segmentId, key: Date.now() });
+    setView("planner");
+  }
+
   const needsSnapshot = (view === "shows" || view === "tew-storylines" || view === "schema") && snapshot === null;
 
   return <div className="app-shell">
-    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>TEW IX Story Tracker</h1></div><div className="phase-badge">PHASE 3A · STORYLINE HUB</div></header>
+    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>TEW IX Story Tracker</h1></div><div className="phase-badge">PHASE 3B · WORKER PROFILES</div></header>
     <nav className="global-tabbar" aria-label="Story Tracker sections">
       <button className={view === "planner" ? "active" : ""} onClick={() => setView("planner")} type="button">Planned Shows</button>
       <button className={view === "storyline-hub" ? "active" : ""} onClick={() => setView("storyline-hub")} type="button">Storyline Hub</button>
+      <button className={view === "worker-hub" ? "active" : ""} onClick={() => setView("worker-hub")} type="button">Worker Hub</button>
       <button className={view === "shows" ? "active" : ""} onClick={() => setView("shows")} type="button">TEW Show History</button>
       <button className={view === "tew-storylines" ? "active" : ""} onClick={() => setView("tew-storylines")} type="button">TEW Storylines</button>
       <button className={view === "schema" ? "active" : ""} onClick={() => setView("schema")} type="button">Import Diagnostics</button>
     </nav>
     <main>
       {view === "planner" && <PlannedShowWorkspace key={plannerTarget?.key ?? 0} snapshot={snapshot} snapshotLoading={loading} snapshotError={error} onSnapshotFile={(file) => void handleFile(file, "planner")} onCloseSnapshot={closeSnapshot} initialShowId={plannerTarget?.showId ?? ""} initialSegmentId={plannerTarget?.segmentId ?? ""} />}
-      {view === "storyline-hub" && <StorylineHub snapshot={snapshot} onOpenShow={(showId, segmentId) => { setPlannerTarget({ showId, segmentId, key: Date.now() }); setView("planner"); }} />}
+      {view === "storyline-hub" && <StorylineHub snapshot={snapshot} onOpenShow={openPlannedSegment} />}
+      {view === "worker-hub" && <WorkerHub snapshot={snapshot} onOpenShow={openPlannedSegment} />}
       {needsSnapshot && <ImportPanel onFile={(file) => void handleFile(file, view)} />}
-      {loading && view !== "planner" && view !== "storyline-hub" && <div className="status-banner" role="status">Reading the database and matching TEW history tables…</div>}
-      {error && view !== "planner" && view !== "storyline-hub" && <div className="status-banner error" role="alert"><strong>Import failed</strong><span>{error}</span></div>}
+      {loading && view !== "planner" && view !== "storyline-hub" && view !== "worker-hub" && <div className="status-banner" role="status">Reading the database and matching TEW history tables…</div>}
+      {error && view !== "planner" && view !== "storyline-hub" && view !== "worker-hub" && <div className="status-banner error" role="alert"><strong>Import failed</strong><span>{error}</span></div>}
       {snapshot && (view === "shows" || view === "tew-storylines" || view === "schema") && <><SnapshotHeader snapshot={snapshot} onClose={closeSnapshot} />
         {view === "shows" && <div className="history-layout"><aside className="show-list" aria-label="Previous shows"><div className="panel-heading"><span>Previous Shows</span><strong>{snapshot.shows.length}</strong></div>{snapshot.shows.length > 0 ? snapshot.shows.map((show) => <button type="button" className={selectedShow?.id === show.id ? "selected" : ""} key={show.id} onClick={() => setSelectedShowId(show.id)}><strong>{show.name}</strong><span>{formatDate(show.date)}</span><small>{show.matches.length} match{show.matches.length === 1 ? "" : "es"}</small></button>) : <div className="empty-state compact">No previous shows were mapped.</div>}</aside>{selectedShow ? <ShowDetails show={selectedShow} /> : <section className="details-panel empty-state">No show record is available to display. Open Import Diagnostics to review the detected tables.</section>}</div>}
         {view === "tew-storylines" && <section className="content-panel"><div className="panel-heading large"><div><span>Stored TEW Storylines</span><p>These imported records remain read-only. Link them to tracker storylines inside the Storyline Hub.</p></div><strong>{snapshot.storylines.length}</strong></div>{snapshot.storylines.length > 0 ? <div className="storyline-grid">{snapshot.storylines.map((storyline) => <StorylineCard key={`${storyline.sourceTable}-${storyline.id}`} storyline={storyline} />)}</div> : <div className="empty-state">No supported storyline records were mapped from this snapshot.</div>}</section>}
         {view === "schema" && <section className="diagnostics-layout"><div className="content-panel"><div className="panel-heading large"><div><span>Matched TEW Tables</span><p>These mappings drive the read-only show, match, worker, and storyline views.</p></div></div><dl className="mapping-list">{Object.entries(snapshot.diagnostics.matchedTables).map(([purpose, table]) => <div key={purpose}><dt>{purpose}</dt><dd className={table ? "matched" : "missing"}>{table ?? "Not found"}</dd></div>)}</dl><div className="warning-list"><h3>Warnings</h3>{snapshot.diagnostics.warnings.length > 0 ? snapshot.diagnostics.warnings.map((warning, index) => <p key={`${warning}-${index}`}>{warning}</p>) : <p>No mapping warnings were generated.</p>}</div></div><div className="content-panel table-inventory"><div className="panel-heading large"><div><span>Database Table Inventory</span><p>Only recognized history tables are loaded into memory.</p></div><strong>{snapshot.tables.length}</strong></div><div className="inventory-list">{snapshot.tables.map((table) => <details key={table.name}><summary><span>{table.name}</span><small>{table.rowCount.toLocaleString()} rows · {table.columnCount} columns</small><b>{table.loaded ? "Mapped" : "Metadata only"}</b></summary><p>{table.columns.join(", ") || "No column names were returned."}</p>{table.truncated && <p className="truncate-warning">This table exceeded the Phase 1 row limit.</p>}</details>)}</div></div></section>}
       </>}
     </main>
-    <footer>Planned narratives and storyline history are stored in this browser. TEW snapshot access remains read-only.</footer>
+    <footer>Planned narratives, storyline history, and worker creative profiles are stored in this browser. TEW snapshot access remains read-only.</footer>
   </div>;
 }

@@ -1,5 +1,7 @@
 import { loadTrackerStorylines, parseTrackerStorylines, saveTrackerStorylines } from "../storylines/storage";
 import type { TrackerStoryline } from "../storylines/types";
+import { emptyWorkerUniverse, loadWorkerUniverse, parseWorkerUniverse, saveWorkerUniverse } from "../workers/storage";
+import type { WorkerUniverse } from "../workers/types";
 import { createEmptySegmentReconciliation, createPlannedSegment } from "./model";
 import type {
   ActualMatchSnapshot,
@@ -265,16 +267,25 @@ function browserStorylines(): TrackerStoryline[] {
   return loadTrackerStorylines(window.localStorage);
 }
 
+function browserWorkers(): WorkerUniverse {
+  if (typeof window === "undefined") {
+    return emptyWorkerUniverse();
+  }
+  return loadWorkerUniverse(window.localStorage);
+}
+
 export function createPlannerBackup(
   shows: PlannedShow[],
   storylines: TrackerStoryline[] = browserStorylines(),
+  workers: WorkerUniverse = browserWorkers(),
 ): PlannerBackup {
   return {
     product: "TEW IX Story Tracker",
-    version: 4,
+    version: 5,
     exportedAt: new Date().toISOString(),
     shows,
     storylines,
+    workers,
   };
 }
 
@@ -288,13 +299,14 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
   if (
     !isRecord(value) ||
     value.product !== "TEW IX Story Tracker" ||
-    (value.version !== 1 && value.version !== 2 && value.version !== 3 && value.version !== 4)
+    (value.version !== 1 && value.version !== 2 && value.version !== 3 && value.version !== 4 && value.version !== 5)
   ) {
     throw new Error("The selected file is not a supported TEW Story Tracker backup.");
   }
   return {
     shows: parsePlannerShows(value.shows),
-    storylines: value.version === 4 ? parseTrackerStorylines(value.storylines ?? []) : [],
+    storylines: value.version === 4 || value.version === 5 ? parseTrackerStorylines(value.storylines ?? []) : [],
+    workers: value.version === 5 ? parseWorkerUniverse(value.workers ?? emptyWorkerUniverse()) : emptyWorkerUniverse(),
   };
 }
 
@@ -302,6 +314,7 @@ export function parsePlannerBackup(textValue: string): PlannedShow[] {
   const bundle = parsePlannerBackupBundle(textValue);
   if (typeof window !== "undefined") {
     saveTrackerStorylines(window.localStorage, bundle.storylines);
+    saveWorkerUniverse(window.localStorage, bundle.workers);
   }
   return bundle.shows;
 }
