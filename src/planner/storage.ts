@@ -2,6 +2,8 @@ import { emptyChampionshipUniverse, loadChampionshipUniverse, parseChampionshipU
 import type { ChampionshipUniverse } from "../championships/types";
 import { emptyCreativeControlData, loadCreativeControlData, parseCreativeControlData, saveCreativeControlData } from "../control/storage";
 import type { CreativeControlData } from "../control/types";
+import { emptyHandoffUniverse, loadHandoffUniverse, parseHandoffUniverse, saveHandoffUniverse } from "../handoff/storage";
+import type { HandoffUniverse } from "../handoff/types";
 import { loadTrackerStorylines, parseTrackerStorylines, saveTrackerStorylines } from "../storylines/storage";
 import type { TrackerStoryline } from "../storylines/types";
 import { emptyWorkerUniverse, loadWorkerUniverse, parseWorkerUniverse, saveWorkerUniverse } from "../workers/storage";
@@ -236,22 +238,28 @@ function browserChampionships(): ChampionshipUniverse {
   return typeof window === "undefined" ? emptyChampionshipUniverse() : loadChampionshipUniverse(window.localStorage);
 }
 
+function browserHandoff(): HandoffUniverse {
+  return typeof window === "undefined" ? emptyHandoffUniverse() : loadHandoffUniverse(window.localStorage);
+}
+
 export function createPlannerBackup(
   shows: PlannedShow[],
   storylines: TrackerStoryline[] = browserStorylines(),
   workers: WorkerUniverse = browserWorkers(),
   control: CreativeControlData = browserControl(),
   championships: ChampionshipUniverse = browserChampionships(),
+  handoff: HandoffUniverse = browserHandoff(),
 ): PlannerBackup {
   return {
     product: "TEW IX Story Tracker",
-    version: 7,
+    version: 8,
     exportedAt: new Date().toISOString(),
     shows,
     storylines,
     workers,
     control,
     championships,
+    handoff,
   };
 }
 
@@ -261,7 +269,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
   if (
     !isRecord(value) ||
     value.product !== "TEW IX Story Tracker" ||
-    ![1, 2, 3, 4, 5, 6, 7].includes(typeof value.version === "number" ? value.version : -1)
+    ![1, 2, 3, 4, 5, 6, 7, 8].includes(typeof value.version === "number" ? value.version : -1)
   ) throw new Error("The selected file is not a supported TEW Story Tracker backup.");
   const version = value.version as number;
   return {
@@ -270,6 +278,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
     workers: version >= 5 ? parseWorkerUniverse(value.workers ?? emptyWorkerUniverse()) : emptyWorkerUniverse(),
     control: version >= 6 ? parseCreativeControlData(value.control ?? emptyCreativeControlData()) : emptyCreativeControlData(),
     championships: version >= 7 ? parseChampionshipUniverse(value.championships ?? emptyChampionshipUniverse()) : emptyChampionshipUniverse(),
+    handoff: version >= 8 ? parseHandoffUniverse(value.handoff ?? emptyHandoffUniverse()) : emptyHandoffUniverse(),
   };
 }
 
@@ -280,6 +289,7 @@ export function parsePlannerBackup(textValue: string): PlannedShow[] {
     saveWorkerUniverse(window.localStorage, bundle.workers);
     saveCreativeControlData(window.localStorage, bundle.control);
     saveChampionshipUniverse(window.localStorage, bundle.championships);
+    saveHandoffUniverse(window.localStorage, bundle.handoff);
   }
   return bundle.shows;
 }
