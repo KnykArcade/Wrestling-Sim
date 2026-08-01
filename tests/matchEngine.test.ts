@@ -90,8 +90,8 @@ describe("native match engine data foundation", () => {
     expect(classifyMentalState(40).name).toBe("DISTRACTED");
     expect(classifyMentalState(39.99).name).toBe("OFF NIGHT");
     expect(calculateMentalStateScore({ health: 80, popularity: 70, experience: 60, fanReaction: 4, gimmick: 3, overall: 75, luck: 5, swing: -10 })).toBe(67);
-    expect(mentalSwingProbability(100)).toBe(0.05);
-    expect(mentalSwingProbability(50)).toBe(0.075);
+    expect(mentalSwingProbability(100)).toBeCloseTo(0.05, 10);
+    expect(mentalSwingProbability(50)).toBeCloseTo(0.075, 10);
   });
 
   test("preserves combined aim and legacy importance data with explicit conflicts", () => {
