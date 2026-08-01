@@ -8,6 +8,8 @@ test("creates and persists match and angle narratives without browser errors", a
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "TEW IX Story Tracker" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Run the whole booking universe from one workspace" })).toBeVisible();
+  await page.getByRole("button", { name: "Planned Shows" }).click();
   await expect(page.getByRole("heading", { name: "Plan the show, run it in TEW, then preserve what actually happened" })).toBeVisible();
 
   await page.getByRole("button", { name: "Create Show" }).first().click();
@@ -35,6 +37,7 @@ test("creates and persists match and angle narratives without browser errors", a
   await page.getByRole("button", { name: "Plan Card" }).click();
 
   await page.reload();
+  await page.getByRole("button", { name: "Planned Shows" }).click();
   await expect(page.getByLabel("Show name")).toHaveValue("Monday Night Test");
   await expect(page.locator('[data-segment-type="match"]').getByLabel("Full match story")).toContainText("Bret controls the knee");
   await expect(page.locator('[data-segment-type="angle"]').getByLabel("Full Segment Output")).toContainText("The champion opens the show");
@@ -45,6 +48,7 @@ test("creates and persists match and angle narratives without browser errors", a
 
 test("creates a storyline and builds its timeline from planned segments", async ({ page }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "Planned Shows" }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("Timeline Test Show");
   await page.getByRole("button", { name: "Add Angle" }).click();
@@ -102,6 +106,42 @@ test("creates worker profiles character arcs and a relationship network", async 
   await page.getByRole("button", { name: /Shawn Michaels/ }).click();
   await expect(page.getByLabel("Display name")).toHaveValue("Shawn Michaels");
   await expect(page.getByText("Rival · Planned")).toBeVisible();
+});
+
+test("creates schedules and searches a future booking idea", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Run the whole booking universe from one workspace" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Create Show" }).first().click();
+  await page.getByLabel("Show name").fill("Future Supercard");
+
+  await page.getByRole("button", { name: "Control Center" }).click();
+  await page.getByRole("button", { name: "Future Booking Board" }).click();
+  await page.getByRole("button", { name: "Create Booking Idea" }).first().click();
+  await page.getByLabel("Idea title").fill("World Championship Challenge");
+  await page.getByLabel("Booking idea type").selectOption("Match");
+  await page.getByLabel("Booking idea status", { exact: true }).selectOption("Ready");
+  await page.getByLabel("Target show").selectOption({ index: 1 });
+  await page.getByLabel("Full concept").fill("The top contender challenges the champion in the main event.");
+  await page.getByRole("button", { name: "Add to Target Show" }).click();
+  await expect(page.getByRole("button", { name: "Already Scheduled" })).toBeDisabled();
+  await page.getByRole("button", { name: "Open Scheduled Segment" }).click();
+  await expect(page.getByLabel("Show name")).toHaveValue("Future Supercard");
+  await expect(page.getByLabel("Segment name")).toHaveValue("World Championship Challenge");
+
+  await page.getByRole("button", { name: "Control Center" }).click();
+  await page.getByRole("button", { name: "Global Search" }).click();
+  await page.getByLabel("Global creative search").fill("World Championship Challenge");
+  await expect(
+    page.locator(".search-result-list button")
+      .filter({ hasText: "Booking Idea" })
+      .filter({ hasText: "World Championship Challenge" }),
+  ).toBeVisible();
+
+  await page.reload();
+  await page.getByRole("button", { name: "Future Booking Board" }).click();
+  await expect(page.getByLabel("Idea title")).toHaveValue("World Championship Challenge");
 });
 
 test("loads MDB browser shims before evaluating the parser", async ({ page }) => {

@@ -15,6 +15,7 @@ import {
   parsePlannerBackupBundle,
   savePlannedShows,
 } from "../src/planner/storage";
+import { emptyCreativeControlData } from "../src/control/storage";
 
 class MemoryStorage {
   private values = new Map<string, string>();
@@ -30,9 +31,9 @@ describe("planned show workspace", () => {
     show.segments = [match, angle];
     expect(show.name).toBe("Untitled Show 1");
     expect(show.reconciliation).toBeNull();
-    expect(match).toMatchObject({ title: "Untitled Match", matchType: "1 vs. 1", matchStory: "", workers: [], storylines: [], workflowStatus: "Planned" });
+    expect(match).toMatchObject({ title: "Untitled Match", matchType: "1 vs. 1", matchStory: "", workers: [], storylines: [], workflowStatus: "Planned", bookingIdeaId: "" });
     expect(match.reconciliation.actualMatch).toBeNull();
-    expect(angle).toMatchObject({ title: "Untitled Angle", angleLocation: "In The Ring", angleContentType: "Serious", segmentOutput: "", workflowStatus: "Planned" });
+    expect(angle).toMatchObject({ title: "Untitled Angle", angleLocation: "In The Ring", angleContentType: "Serious", segmentOutput: "", workflowStatus: "Planned", bookingIdeaId: "" });
     expect(totalPlannedMinutes(show)).toBe(17);
   });
 
@@ -57,11 +58,12 @@ describe("planned show workspace", () => {
     expect(movePlannedSegment(original, first.id, -1)).toBe(original);
   });
 
-  test("duplicates shows and nested narrative identifiers without actual results", () => {
+  test("duplicates shows and clears actual results and booking idea links", () => {
     const show = createPlannedShow(1);
     const match = createPlannedSegment("match");
     match.workers = [{ id: "worker-1", name: "Worker One", role: "Competitor", side: "Side 1", source: "tew" }];
     match.workflowStatus = "Reconciled";
+    match.bookingIdeaId = "idea-1";
     match.reconciliation.linkedMatchId = "actual-1";
     show.reconciliation = {
       linkedShowId: "show-actual",
@@ -78,10 +80,11 @@ describe("planned show workspace", () => {
     expect(duplicate.segments.map((item) => item.id)).not.toEqual(show.segments.map((item) => item.id));
     expect(duplicate.segments[0].workers[0].id).not.toBe(match.workers[0].id);
     expect(duplicate.segments[0].workflowStatus).toBe("Planned");
+    expect(duplicate.segments[0].bookingIdeaId).toBe("");
     expect(duplicate.segments[0].reconciliation.actualMatch).toBeNull();
   });
 
-  test("saves, loads, exports, and imports Phase 3B data", () => {
+  test("saves, loads, exports, and imports Phase 3C data", () => {
     const storage = new MemoryStorage();
     const show = createPlannedShow(1);
     const match = createPlannedSegment("match");
@@ -90,12 +93,14 @@ describe("planned show workspace", () => {
     savePlannedShows(storage, [show]);
     expect(loadPlannedShows(storage)).toEqual([show]);
     const workers = { profiles: [], relationships: [] };
-    const backup = createPlannerBackup([show], [], workers);
-    expect(backup.version).toBe(5);
+    const control = emptyCreativeControlData();
+    const backup = createPlannerBackup([show], [], workers, control);
+    expect(backup.version).toBe(6);
     expect(backup.storylines).toEqual([]);
     expect(backup.workers).toEqual(workers);
+    expect(backup.control).toEqual(control);
     expect(parsePlannerBackup(JSON.stringify(backup))).toEqual([show]);
-    expect(parsePlannerBackupBundle(JSON.stringify(backup))).toEqual({ shows: [show], storylines: [], workers });
+    expect(parsePlannerBackupBundle(JSON.stringify(backup))).toEqual({ shows: [show], storylines: [], workers, control });
   });
 
   test("migrates Phase 2A planned shows without losing the card", () => {
@@ -104,7 +109,7 @@ describe("planned show workspace", () => {
     const [show] = loadPlannedShows(storage);
     expect(show.name).toBe("Legacy Planned Show");
     expect(show.reconciliation).toBeNull();
-    expect(show.segments[0]).toMatchObject({ title: "Opening Promo", segmentOutput: "", workers: [], storylines: [], workflowStatus: "Planned" });
+    expect(show.segments[0]).toMatchObject({ title: "Opening Promo", segmentOutput: "", workers: [], storylines: [], workflowStatus: "Planned", bookingIdeaId: "" });
     expect(show.segments[0].reconciliation.actualMatch).toBeNull();
   });
 
@@ -113,6 +118,7 @@ describe("planned show workspace", () => {
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":2,"shows":[]}')).toEqual([]);
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":3,"shows":[]}')).toEqual([]);
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":4,"shows":[],"storylines":[]}')).toEqual([]);
-    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":6,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
+    expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":5,"shows":[],"storylines":[],"workers":{"profiles":[],"relationships":[]}}')).toEqual([]);
+    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":7,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
   });
 });

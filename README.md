@@ -1,102 +1,94 @@
 # TEW IX Story Tracker
 
-A focused companion for **Total Extreme Wrestling IX** that preserves match stories, angle outputs, planned-versus-actual show history, and long-term storyline continuity without changing TEW's simulation, executable, or save files.
+A browser-based companion for **Total Extreme Wrestling IX** that preserves booking plans, match stories, angle outputs, planned-versus-actual show history, storyline continuity, worker creative profiles, and future booking ideas without changing TEW's executable or save files.
 
-## Phase 3A status
+## Phase 3C: Creative Control Center
 
-Phase 3A adds the **Storyline Hub and Timeline**. The tracker can now organize individual planned and reconciled segments into long-running stories.
+The application now opens on a universe-wide control center that connects every existing planning system.
 
-### Storyline Hub
+### Universe dashboard
 
-Every tracker storyline stores:
+The dashboard surfaces:
 
-- Status: Idea, Planned, Active, Paused, Completed, or Abandoned
-- Start date and planned ending
-- Current creative phase
-- Linked championship
-- Premise and central conflict
-- Character motivations
-- Planned beginning, climax, ending, and aftermath
-- Private booking notes
-- Participants and their storyline roles
-- Milestones and payoff plans
+- Upcoming planned shows and readiness scores
+- Completed shows awaiting reconciliation
+- Active storylines and milestones due soon
+- Open booking ideas
+- Worker arcs without upcoming appearances
+- Cross-system continuity warnings
+- Recently completed shows
 
-Tracker storylines exist independently of TEW. Imported TEW storylines can be attached as references without writing anything back to the database.
+Every actionable item links back to its related show, storyline, worker, or booking idea.
 
-### Automatic timeline
+### Future Booking Board
 
-The hub finds planned and reconciled segments through their storyline references and builds a chronological timeline containing:
+Booking ideas can be created before they are assigned to a show. Supported types include matches, angles, promos, debuts, returns, turns, betrayals, title changes, challenges, reveals, mysteries, interference, injury stories, and custom concepts.
 
-- Show and date
-- Match or angle title
-- Planned narrative
-- Final reconciled narrative
-- TEW result and rating when available
-- Consequences and follow-up
-- Workflow and reconciliation status
+Each idea stores its status, priority, target date, target show, workers, storylines, championship, full concept, creative purpose, consequences, follow-up, and private notes.
 
-A timeline entry can open its related planned show and scroll directly to the segment.
+Ideas move through:
 
-### Participants and references
+`Inbox → Developing → Ready → Scheduled → Completed`
 
-- Add participants from the current TEW snapshot or enter them manually.
-- Assign roles such as Protagonist, Antagonist, Ally, Manager, or Authority figure.
-- Attach imported TEW storyline records.
-- Attach manual or TEW storyline references already used on planned-show segments.
-- Exact-name storyline references are detected automatically.
+They can also be delayed, cancelled, or archived.
 
-### Milestones and continuity health
+A ready idea can be converted directly into a planned match or angle. The tracker carries workers, roles, storyline links, narrative, purpose, consequences, follow-up, championship details, and the original booking-idea reference into the segment. Duplicate scheduling is blocked.
 
-Milestones can represent an inciting incident, escalation, betrayal, reveal, match, title change, turn, climax, aftermath, or another creative beat. Each milestone can be unassigned, assigned to a show, completed, delayed, or cancelled.
+### Creative calendar
 
-Continuity warnings identify:
+The calendar combines, in date order:
 
-- Active stories with no future follow-up
-- Overdue milestones
-- Assigned participants who disappear from the story
-- Completed stories with no aftermath
-- Previously linked segments that were deleted
-- Milestones assigned to deleted shows
-- Completed stories with unfinished payoff matches or climaxes
+- Planned and reconciled shows
+- Storyline milestones
+- Worker character-arc targets
+- Booking ideas
 
-Warnings never change TEW or block booking decisions.
+Filters can isolate shows, milestones, arcs, or ideas.
 
-## Phase 2C reconciliation
+### Show readiness and continuity
 
-After running a show in TEW, the tracker can connect the planned card to the completed TEW show, suggest match links, preserve planned-versus-actual differences, record final angle details, and finalize enhanced show history.
+Upcoming shows are checked for:
 
-The finalized record retains original plans, final narratives, TEW ratings and results, attendance, consequences, follow-ups, and the source MDB filename. It remains available after the TEW snapshot is closed.
+- Planned time versus expected time
+- Missing Match Stories or Segment Outputs
+- Segments without workers
+- Storyline consequences without storyline links
+- Ideas assigned to the show but not added to the card
+- Storyline milestones assigned to the show but absent from the card
 
-## Planned-show workspace
+The continuity center also identifies active storylines with no next segment, active character arcs without upcoming appearances, broken show links, completed ideas without segments, and title-change ideas without scheduled title matches. Warnings remain advisory and never block booking.
 
-- Create, rename, duplicate, and delete shows.
-- Add matches and angles in running order.
-- Write full Match Stories and Segment Outputs.
-- Link workers and storylines.
-- Track workflow status from Planned through Reconciled.
-- Reconcile completed TEW results.
-- Open a related segment directly from the Storyline Hub.
-- Save automatically in browser storage.
+### Global search
+
+Global search covers shows, segments, Match Stories, Segment Outputs, storylines, milestones, workers, character arcs, relationships, and booking ideas.
+
+## Existing systems
+
+- Planned-show workspace with ordered matches and angles
+- Full Match Story and Segment Output editors
+- Read-only TEW MDB/ACCDB import
+- Planned-to-actual show and match reconciliation
+- Permanent enhanced show history
+- Storyline Hub, milestones, and chronological timelines
+- Worker creative profiles, statistics, character arcs, relationships, and comparison history
 
 ## Backups
 
-Version 4 full backups contain:
+Version 6 backups include:
 
-- Planned shows
-- Reconciled enhanced history
-- Tracker storylines
-- Participants
-- Reference links
-- Milestones
-- Timeline-link memory used for deleted-segment warnings
+- Planned and reconciled shows
+- Tracker storylines and milestones
+- Worker profiles, arcs, and relationships
+- Booking ideas and Creative Control Center settings
 
-Version 1, 2, and 3 backups remain importable. They restore their show data with an empty storyline universe.
+Backup versions 1 through 5 remain importable with safe empty defaults for systems that did not yet exist.
 
-## TEW read-only import
+## Safety boundary
 
-The importer opens `.mdb` and `.accdb` snapshots in browser memory, inventories tables, reads previous shows, matches, participants, workers, and storylines, and exposes the mapped records to the planner and Storyline Hub.
-
-It never writes to the selected database and never uploads it to an application server.
+- TEW database access remains read-only.
+- No database is uploaded to an application server.
+- No TEW executable or save-file mutation is performed.
+- Browser data saves automatically to the current preview origin.
 
 ## Open in GitHub Codespaces
 
@@ -106,11 +98,9 @@ It never writes to the selected database and never uploads it to an application 
 4. Run `npm run dev`.
 5. Open the forwarded **TEW Story Tracker Preview** port.
 
-No TEW database should be committed to GitHub. `.mdb` and `.accdb` files are excluded by `.gitignore`.
+Export a full backup before deleting a Codespace or moving to another Codespaces URL. Never commit a TEW `.mdb` or `.accdb` file to GitHub.
 
-Browser storage belongs to the current preview origin. Export a full tracker backup before deleting a Codespace or moving to another Codespace URL.
-
-## Verification commands
+## Verification
 
 ```bash
 npm test
