@@ -8,6 +8,7 @@ import "./storylines.css";
 import "./workers.css";
 import "./control.css";
 import "./championships.css";
+import "./handoff.css";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
