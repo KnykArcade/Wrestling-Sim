@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import MatchApproachSetupEditor from "../matchEngine/MatchApproachSetup";
 import { loadMatchEngineUniverse, saveMatchEngineUniverse } from "../matchEngine/storage";
 import type { MatchEngineUniverse } from "../matchEngine/types";
+import NarrativeGenerator from "../narratives/NarrativeGenerator";
 import type { TewSnapshot } from "../tew/types";
 import {
   createPlannedSegment,
@@ -94,6 +95,7 @@ function SegmentEditor({
 
       {segment.type === "match" && <MatchApproachSetupEditor segment={segment} universe={matchEngine} onUniverseChange={onMatchEngineChange} onChange={onChange} />}
       <NarrativeEditor segment={segment} availableWorkers={snapshot?.workers ?? []} availableStorylines={snapshot?.storylines ?? []} onChange={onChange} />
+      <NarrativeGenerator segment={segment} universe={matchEngine} onChange={onChange} />
     </article>
   );
 }
