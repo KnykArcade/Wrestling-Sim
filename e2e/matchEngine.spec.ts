@@ -17,5 +17,5 @@ test("loads canonical match data and calculates an approach rating", async ({ pa
   await page.getByRole("button", { name: "Source Reconciliation" }).click();
   await expect(page.getByText("Counter Specialist", { exact: true })).toBeVisible();
   await expect(page.getByText("Ring General", { exact: true })).toBeVisible();
-  await expect(page.getByText("Duration-based slots", { exact: false })).toBeVisible();
+  await expect(page.getByText("Canonical: Duration-based slots", { exact: true })).toBeVisible();
 });
