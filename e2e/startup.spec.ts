@@ -22,11 +22,11 @@ test("creates and persists a planned show without browser errors", async ({ page
   await page.getByRole("button", { name: "Add Angle" }).click();
 
   await expect(page.getByText("2 planned segments")).toBeVisible();
-  await expect(page.getByDisplayValue("Untitled Match")).toBeVisible();
-  await expect(page.getByDisplayValue("Untitled Angle")).toBeVisible();
+  await expect(page.locator(".planned-segment--match input").first()).toHaveValue("Untitled Match");
+  await expect(page.locator(".planned-segment--angle input").first()).toHaveValue("Untitled Angle");
 
   await page.reload();
-  await expect(page.getByDisplayValue("Monday Night Test")).toBeVisible();
+  await expect(page.getByLabel("Show name")).toHaveValue("Monday Night Test");
   await expect(page.getByText("2 planned segments")).toBeVisible();
 
   expect(pageErrors).toEqual([]);
