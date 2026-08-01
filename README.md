@@ -1,112 +1,110 @@
 # TEW IX Story Tracker
 
-A browser-based **Total Extreme Wrestling IX companion** for planning cards, writing Match Stories and Angle Segment Outputs, selecting match approaches, preparing TEW handoff packages, and preserving creative history. TEW remains the game and the final authority for running every show.
+A browser-based **Total Extreme Wrestling IX companion** for planning cards, selecting match approaches, writing Match Stories and Angle Segment Outputs, preparing TEW handoff packages, and preserving creative history. TEW remains the game and the final authority for running every show.
 
-## Phase 4C3: Advisory Match Performance Preview
+## Phase 4C4: Generated Match Stories and Angle Outputs
 
-Every planned match can now produce an optional tracker-side preview after its wrestlers and approaches are configured.
+Every planned match and angle now includes an editable output assistant inside the Planned Show Workspace.
 
-### TEW remains authoritative
+### Generated Match Story drafts
 
-The default mode is **TEW authoritative**. In this mode the tracker:
+A match draft can use:
 
-- Evaluates each wrestler’s likely performance
-- Rolls mental state, luck, consistency variance, and rare performance swings
-- Shows stamina and pace effects
-- Produces an advisory 0–100 match score and star-rating preview
-- Identifies the strongest projected individual performance
-- Does **not** select a winner
+- The selected match aim and ideal pace
+- Each wrestler’s chosen approaches
+- Source-derived approach phrases from the uploaded phrase library
+- Stamina usage and pace evaluation
+- The optional saved performance preview
+- Mental state and projected execution differences
+- The booker-entered winner and finish
+- Interference, post-match events, consequences, and follow-up
 
-The actual winner and rating still come from TEW and can be reconciled into the tracker afterward.
+The draft is divided into:
 
-Two optional modes are also available:
+- Opening
+- Middle
+- Turning point
+- Finish
+- Aftermath
 
-- **Booker-selected winner:** the winner already entered on the card remains fixed while the tracker previews execution and match quality.
-- **Competitive preview:** the tracker shows an advisory projected winner and probability without changing the planned winner or the eventual TEW result.
+The complete draft remains editable before it is applied. It can replace or append to the existing Match Story, and its phase map can be copied into Key Moments.
 
-### Mental state and night-to-night variation
+The generator never promotes an advisory projected winner into the booking. When no planned winner is entered, the finish deliberately remains unresolved for TEW or later booking.
 
-The preview preserves the uploaded five-state structure:
+### Generated Angle Segment Outputs
 
-- Hot Night: +5
-- Focused: +2.5
-- Neutral: 0
-- Distracted: -5
-- Off Night: -10
+Angle drafts use only information already entered in the tracker:
 
-The source mental-state score continues to use health, popularity, experience, fan reaction, gimmick, overall ability, luck, and a rare performance swing. Wrestler Consistency controls the size of ordinary execution variance, so reliable wrestlers fluctuate less while inconsistent wrestlers have a wider range of nights.
+- Workers and roles
+- Location
+- Content type
+- Story purpose
+- Storyline consequences
+- Planned follow-up
+- Intended audience takeaway
 
-### Transparent performance preview
+No unsupplied dialogue or detailed action is presented as source material. The generator supplies editable structural connector text around the facts entered by the user.
 
-Each wrestler’s preview displays:
+### Source transparency
 
-- Average selected-approach rating
-- Approach execution
-- Presentation score
-- Mental-state score and modifier
-- Luck and rare swing
-- Consistency variance
-- Pace status
-- Stamina status
-- Final advisory performance score
-- Win probability only when Competitive Preview is selected
+The output assistant distinguishes between:
 
-The source workbook exposes final in-ring, booking, probability, score, and star outputs, but its final macro calculation is not preserved as a static worksheet formula. The tracker therefore keeps its additional presentation and star conversion formulas visible, deterministic, and explicitly advisory rather than presenting them as exact recovered workbook logic.
+- Source-derived approach wording
+- Existing tracker facts
+- Editable tracker template sentences
 
-### Reproducible nights
+When an approach has no dedicated phrase-library row, its source summary is used and a warning is displayed. Nothing is silently treated as recovered TEW text.
 
-- **Roll New Night** creates a new seed and new luck, mental-state, and consistency results.
-- **Recalculate Same Night** reuses the saved seed, allowing ratings or approaches to be adjusted without silently changing the random night.
-- Saved previews persist with the planned match.
-- Duplicating a show retains the creative approach setup but clears the old rolled preview.
+### Applying an output
 
-### TEW handoff integration
+Generated drafts can be:
 
-The TEW Entry Summary can include the advisory preview, clearly labeled as tracker-only, alongside:
+- Edited directly in the preview
+- Copied to the clipboard
+- Used to replace the permanent Match Story or Segment Output
+- Appended to existing writing
+- Applied to the match Key Moments phase map
 
-- Match aim and ideal pace
-- Selected approaches for every wrestler
-- Approach and road-agent notes
-- Championship, winner, finish, storyline, and Match Story details
+Once applied, the normal tracker systems already carry the output into:
 
-Nothing is written into TEW automatically.
+- TEW handoff packages
+- Storyline timelines
+- Worker appearance histories
+- Planned-versus-actual reconciliation
+- Permanent enhanced show history
+
+## Phase 4C3: Advisory Performance Preview
+
+The optional preview evaluates approaches, mental state, luck, consistency, pace, and stamina. It produces an advisory match score and star preview while TEW remains authoritative by default.
+
+Available result modes:
+
+- **TEW authoritative:** no winner is selected in the tracker.
+- **Booker-selected winner:** the booked winner remains fixed.
+- **Competitive preview:** an advisory probability is shown without changing the booking or TEW result.
 
 ## Phase 4C2: Match Setup and Approach AI
 
-Every planned match includes:
+Every planned match supports:
 
-- One of nineteen match aims
+- Nineteen match aims
 - Duration-controlled approach slots
-- Reusable tracker-side wrestler ratings
-- Fifteen source-derived wrestler styles
+- Tracker-side wrestler ratings and styles
 - Eighteen approach skills
-- Exact workbook stamina-rating and capacity bands
-- Combination-level approach AI
-- Manual approach selection and locks
+- Workbook stamina-rating and capacity bands
+- Combination-level approach selection
+- Manual approach choices and locks
 
-The approved slot rules remain authoritative:
+Approach slots remain:
 
 - 5 minutes or less: 1 approach per wrestler
 - 6–15 minutes: 2 approaches per wrestler
 - 16–24 minutes: 3 approaches per wrestler
 - 25 minutes or longer: 4 approaches per wrestler
 
-## Phase 4C1 foundation
-
-The Match Engine reference workspace retains:
-
-- Fifteen canonical approaches and weighted formulas
-- Nineteen match aims
-- Pace modifiers
-- Stamina penalties
-- Mental-state definitions
-- Source aliases and unresolved legacy names
-- Workbook reconciliation notes
-
 ## Existing systems
 
 - Planned shows with ordered matches and angles
-- Full Match Story and Angle Segment Output editors
 - TEW Show Handoff and guided Entry Assistant
 - Read-only MDB/ACCDB snapshot import
 - Planned-versus-actual reconciliation
@@ -115,29 +113,18 @@ The Match Engine reference workspace retains:
 - Championship lineage, rankings, and programs
 - Creative Control Center and Future Booking Board
 
-## Next match-engine phase
-
-**Phase 4C4** will turn selected approaches and preview results into generated opening, middle, turning-point, finish, and follow-up text. Generated text will remain editable and will feed Match Stories, Angle Segment Outputs, TEW handoff, reconciliation, and permanent creative history.
-
 ## Backups
 
-Version 10 backups include:
+Version 10 backups continue to include planned and reconciled shows, applied Match Stories and Segment Outputs, approach setup, wrestler match profiles, saved performance previews, storylines, workers, relationships, booking ideas, championships, and TEW handoff data.
 
-- Planned and reconciled shows
-- Match approach setup for every planned match
-- Reusable tracker-side wrestler match profiles
-- Performance-preview settings and saved rolled nights
-- Storylines, workers, relationships, booking ideas, and championships
-- TEW handoff versions, mappings, checklists, and entry progress
-
-Backup versions 1 through 9 remain importable.
+Generated drafts are temporary until the user applies them. Applied text is stored in the existing Match Story, Key Moments, or Segment Output fields, so no new backup format is required for Phase 4C4.
 
 ## Safety boundary
 
 - TEW database access remains read-only.
 - No database is uploaded to an application server.
 - No TEW executable or live save-file mutation is performed.
-- Match profiles, approaches, and previews are tracker-side companion data.
+- Generated text is editable companion data.
 - Advisory previews never overwrite TEW results.
 - Browser data saves automatically to the current preview origin.
 

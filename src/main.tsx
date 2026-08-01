@@ -12,6 +12,7 @@ import "./handoff.css";
 import "./match-engine.css";
 import "./match-setup.css";
 import "./match-performance.css";
+import "./narrative-generator.css";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
