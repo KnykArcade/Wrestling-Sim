@@ -6,6 +6,7 @@ import "./narrative.css";
 import "./reconciliation.css";
 import "./storylines.css";
 import "./workers.css";
+import "./control.css";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
