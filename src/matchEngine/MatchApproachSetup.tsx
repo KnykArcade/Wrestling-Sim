@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
+import type { PlannedSegment, PlannedWorkerReference } from "../planner/types";
 import { MATCH_AIMS, MATCH_APPROACHES } from "./catalog";
+import MatchPerformancePreviewEditor from "./MatchPerformancePreview";
 import {
   approachSlotsForDuration,
   calculateApproachRating,
@@ -20,7 +22,6 @@ import type {
   MatchWorkerApproachPlan,
   WrestlerSkill,
 } from "./types";
-import type { PlannedSegment, PlannedWorkerReference } from "../planner/types";
 
 function isLikelyCompetitor(worker: PlannedWorkerReference): boolean {
   const role = worker.role.trim().toLowerCase();
@@ -76,6 +77,7 @@ export default function MatchApproachSetupEditor({
       matchApproachSetup: {
         ...segment.matchApproachSetup,
         ...patch,
+        performancePreview: patch.performancePreview === undefined ? null : patch.performancePreview,
         updatedAt: new Date().toISOString(),
       },
     });
@@ -99,6 +101,7 @@ export default function MatchApproachSetupEditor({
         ? universe.profiles.map((item) => item.workerKey === profile.workerKey ? { ...profile, updatedAt: new Date().toISOString() } : item)
         : [...universe.profiles, profile],
     });
+    if (segment.matchApproachSetup.performancePreview) updateSetup({ performancePreview: null });
   }
 
   function ensureProfile(worker: PlannedWorkerReference): MatchEngineProfile {
@@ -289,9 +292,6 @@ export default function MatchApproachSetupEditor({
 
     <label className="field match-approach-notes"><span>Approach and road-agent notes</span><textarea rows={3} value={segment.matchApproachSetup.notes} placeholder="Explain why an approach is locked, how the styles should interact, or what should be copied into TEW road-agent notes." onChange={(event) => updateSetup({ notes: event.target.value })} /></label>
 
-    <footer className="match-approach-boundary">
-      <strong>Phase 4C2 boundary</strong>
-      <span>This chooses match strategy only. It does not replace TEW, decide the winner, or generate a star rating yet.</span>
-    </footer>
+    <MatchPerformancePreviewEditor segment={segment} universe={universe} onChange={onChange} />
   </section>;
 }
