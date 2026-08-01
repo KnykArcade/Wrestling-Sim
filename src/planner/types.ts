@@ -1,6 +1,7 @@
 import type { ChampionshipMatchPurpose, ChampionshipUniverse, TitleResultDecision } from "../championships/types";
 import type { CreativeControlData } from "../control/types";
 import type { HandoffUniverse } from "../handoff/types";
+import type { MatchApproachSetup, MatchEngineUniverse } from "../matchEngine/types";
 import type { TrackerStoryline } from "../storylines/types";
 import type { WorkerUniverse } from "../workers/types";
 
@@ -97,6 +98,7 @@ export interface PlannedSegment {
   keyMoments: string;
   interference: string;
   postMatch: string;
+  matchApproachSetup: MatchApproachSetup;
 
   angleLocation: string;
   angleContentType: string;
@@ -126,7 +128,7 @@ export interface PlannedShow {
 
 export interface PlannerBackup {
   product: "TEW IX Story Tracker";
-  version: 8;
+  version: 9;
   exportedAt: string;
   shows: PlannedShow[];
   storylines: TrackerStoryline[];
@@ -134,6 +136,7 @@ export interface PlannerBackup {
   control: CreativeControlData;
   championships: ChampionshipUniverse;
   handoff: HandoffUniverse;
+  matchEngine: MatchEngineUniverse;
 }
 
 export interface PlannerBackupBundle {
@@ -143,4 +146,5 @@ export interface PlannerBackupBundle {
   control: CreativeControlData;
   championships: ChampionshipUniverse;
   handoff: HandoffUniverse;
+  matchEngine: MatchEngineUniverse;
 }
