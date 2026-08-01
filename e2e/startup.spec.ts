@@ -144,6 +144,34 @@ test("creates schedules and searches a future booking idea", async ({ page }) =>
   await expect(page.getByLabel("Idea title")).toHaveValue("World Championship Challenge");
 });
 
+test("creates a championship lineage and contender ranking", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Championships" }).click();
+  await expect(page.getByRole("heading", { name: "Championship Hub, Rankings, and Competitive Records" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Create Championship" }).first().click();
+  await page.getByLabel("Championship name").fill("PWL Championship");
+  await page.getByLabel("Current champions").fill("Bret Hart");
+  await page.getByLabel("Championship status").selectOption("Active");
+  await page.getByLabel("Date won").fill("2026-08-01");
+  await page.getByRole("button", { name: "Lineage" }).click();
+  await page.getByRole("button", { name: "Add Current Reign" }).click();
+  await expect(page.getByText("Bret Hart", { exact: true }).first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Rankings" }).click();
+  await page.getByRole("button", { name: "Add Ranking" }).click();
+  await page.getByLabel("Rank 1 competitors").fill("Shawn Michaels");
+  await page.getByLabel("Rank 1 record").fill("4-1-0");
+  await page.getByLabel("Rank 1 reason").fill("Four wins in the last five recorded matches.");
+  await expect(page.getByText("Shawn Michaels", { exact: true })).toBeVisible();
+
+  await page.reload();
+  await page.getByRole("button", { name: "Championships" }).click();
+  await expect(page.getByLabel("Championship name")).toHaveValue("PWL Championship");
+  await page.getByRole("button", { name: "Rankings" }).click();
+  await expect(page.getByLabel("Rank 1 competitors")).toHaveValue("Shawn Michaels");
+});
+
 test("loads MDB browser shims before evaluating the parser", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "TEW Show History" }).click();
