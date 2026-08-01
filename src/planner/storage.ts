@@ -4,6 +4,14 @@ import { emptyCreativeControlData, loadCreativeControlData, parseCreativeControl
 import type { CreativeControlData } from "../control/types";
 import { emptyHandoffUniverse, loadHandoffUniverse, parseHandoffUniverse, saveHandoffUniverse } from "../handoff/storage";
 import type { HandoffUniverse } from "../handoff/types";
+import {
+  emptyMatchEngineUniverse,
+  loadMatchEngineUniverse,
+  normalizeMatchApproachSetup,
+  parseMatchEngineUniverse,
+  saveMatchEngineUniverse,
+} from "../matchEngine/storage";
+import type { MatchEngineUniverse } from "../matchEngine/types";
 import { loadTrackerStorylines, parseTrackerStorylines, saveTrackerStorylines } from "../storylines/storage";
 import type { TrackerStoryline } from "../storylines/types";
 import { emptyWorkerUniverse, loadWorkerUniverse, parseWorkerUniverse, saveWorkerUniverse } from "../workers/storage";
@@ -173,6 +181,7 @@ function normalizeSegment(value: unknown): PlannedSegment | null {
     keyMoments: text(value.keyMoments),
     interference: text(value.interference),
     postMatch: text(value.postMatch),
+    matchApproachSetup: normalizeMatchApproachSetup(value.matchApproachSetup),
     angleLocation: text(value.angleLocation, defaults.angleLocation),
     angleContentType: text(value.angleContentType, defaults.angleContentType),
     segmentOutput: text(value.segmentOutput),
@@ -242,6 +251,10 @@ function browserHandoff(): HandoffUniverse {
   return typeof window === "undefined" ? emptyHandoffUniverse() : loadHandoffUniverse(window.localStorage);
 }
 
+function browserMatchEngine(): MatchEngineUniverse {
+  return typeof window === "undefined" ? emptyMatchEngineUniverse() : loadMatchEngineUniverse(window.localStorage);
+}
+
 export function createPlannerBackup(
   shows: PlannedShow[],
   storylines: TrackerStoryline[] = browserStorylines(),
@@ -249,10 +262,11 @@ export function createPlannerBackup(
   control: CreativeControlData = browserControl(),
   championships: ChampionshipUniverse = browserChampionships(),
   handoff: HandoffUniverse = browserHandoff(),
+  matchEngine: MatchEngineUniverse = browserMatchEngine(),
 ): PlannerBackup {
   return {
     product: "TEW IX Story Tracker",
-    version: 8,
+    version: 9,
     exportedAt: new Date().toISOString(),
     shows,
     storylines,
@@ -260,6 +274,7 @@ export function createPlannerBackup(
     control,
     championships,
     handoff,
+    matchEngine,
   };
 }
 
@@ -269,7 +284,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
   if (
     !isRecord(value) ||
     value.product !== "TEW IX Story Tracker" ||
-    ![1, 2, 3, 4, 5, 6, 7, 8].includes(typeof value.version === "number" ? value.version : -1)
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(typeof value.version === "number" ? value.version : -1)
   ) throw new Error("The selected file is not a supported TEW Story Tracker backup.");
   const version = value.version as number;
   return {
@@ -279,6 +294,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
     control: version >= 6 ? parseCreativeControlData(value.control ?? emptyCreativeControlData()) : emptyCreativeControlData(),
     championships: version >= 7 ? parseChampionshipUniverse(value.championships ?? emptyChampionshipUniverse()) : emptyChampionshipUniverse(),
     handoff: version >= 8 ? parseHandoffUniverse(value.handoff ?? emptyHandoffUniverse()) : emptyHandoffUniverse(),
+    matchEngine: version >= 9 ? parseMatchEngineUniverse(value.matchEngine ?? emptyMatchEngineUniverse()) : emptyMatchEngineUniverse(),
   };
 }
 
@@ -290,6 +306,7 @@ export function parsePlannerBackup(textValue: string): PlannedShow[] {
     saveCreativeControlData(window.localStorage, bundle.control);
     saveChampionshipUniverse(window.localStorage, bundle.championships);
     saveHandoffUniverse(window.localStorage, bundle.handoff);
+    saveMatchEngineUniverse(window.localStorage, bundle.matchEngine);
   }
   return bundle.shows;
 }
