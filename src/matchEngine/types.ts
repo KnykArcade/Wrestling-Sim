@@ -149,3 +149,93 @@ export interface MentalStateInputs {
   luck: number;
   swing: number;
 }
+
+export type WrestlerStyleId =
+  | "all-rounder"
+  | "brawler"
+  | "comedy-performer"
+  | "daredevil"
+  | "entertainer"
+  | "high-flyer"
+  | "heavyweight-powerhouse"
+  | "hybrid-technician-flyer"
+  | "hybrid-technician-striker"
+  | "impact-striker"
+  | "luchador"
+  | "mma-crossover"
+  | "pure-technician"
+  | "resilient-underdog"
+  | "show-stealer-workhorse";
+
+export interface WrestlerStyleDefinition {
+  id: WrestlerStyleId;
+  name: string;
+  summary: string;
+  approachBoosts: MatchApproachId[];
+  aimBoosts: MatchAimId[];
+  aimStyleNames: string[];
+}
+
+export interface MatchEngineProfile {
+  id: string;
+  workerKey: string;
+  workerId: string;
+  workerName: string;
+  workerSource: "tew" | "manual";
+  styleId: WrestlerStyleId;
+  overall: number;
+  health: number;
+  popularity: number;
+  experience: number;
+  fanReaction: number;
+  gimmick: number;
+  skills: Record<WrestlerSkill, number>;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MatchEngineUniverse {
+  profiles: MatchEngineProfile[];
+}
+
+export type ApproachPlanMode = "AI" | "Manual";
+
+export interface MatchWorkerApproachPlan {
+  workerKey: string;
+  workerName: string;
+  selectedApproachIds: MatchApproachId[];
+  lockedApproachIds: MatchApproachId[];
+  mode: ApproachPlanMode;
+  generatedAt: string;
+}
+
+export interface MatchApproachSetup {
+  matchAimId: MatchAimId;
+  workerPlans: MatchWorkerApproachPlan[];
+  notes: string;
+  updatedAt: string;
+}
+
+export interface ApproachCandidateScore {
+  approachId: MatchApproachId;
+  rating: number;
+  styleBonus: number;
+  aimCompatibility: number;
+  paceBonus: number;
+  staminaEfficiency: number;
+  total: number;
+  reasons: string[];
+}
+
+export interface ApproachPlanResult {
+  selectedApproachIds: MatchApproachId[];
+  candidateScores: ApproachCandidateScore[];
+  totalScore: number;
+  usedStamina: number;
+  availableStamina: number;
+  stamina: StaminaEvaluation;
+  actualPace: number;
+  pace: PaceEvaluation;
+  explanation: string[];
+}
