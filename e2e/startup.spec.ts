@@ -122,7 +122,7 @@ test("creates schedules and searches a future booking idea", async ({ page }) =>
   await page.getByLabel("Idea title").fill("World Championship Challenge");
   await page.getByLabel("Booking idea type").selectOption("Match");
   await page.getByLabel("Booking idea status", { exact: true }).selectOption("Ready");
-  await page.getByLabel("Target show").selectOption({ label: /Future Supercard/ });
+  await page.getByLabel("Target show").selectOption({ index: 1 });
   await page.getByLabel("Full concept").fill("The top contender challenges the champion in the main event.");
   await page.getByRole("button", { name: "Add to Target Show" }).click();
   await expect(page.getByRole("button", { name: "Already Scheduled" })).toBeDisabled();
