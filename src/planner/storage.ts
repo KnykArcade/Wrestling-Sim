@@ -1,3 +1,5 @@
+import { emptyChampionshipUniverse, loadChampionshipUniverse, parseChampionshipUniverse, saveChampionshipUniverse } from "../championships/storage";
+import type { ChampionshipUniverse } from "../championships/types";
 import { emptyCreativeControlData, loadCreativeControlData, parseCreativeControlData, saveCreativeControlData } from "../control/storage";
 import type { CreativeControlData } from "../control/types";
 import { loadTrackerStorylines, parseTrackerStorylines, saveTrackerStorylines } from "../storylines/storage";
@@ -136,6 +138,8 @@ function normalizeSegment(value: unknown): PlannedSegment | null {
     ? value.storylines.map(normalizeStoryline).filter((item): item is PlannedStorylineReference => item !== null)
     : [];
   const workflowStatus = value.workflowStatus === "Entered in TEW" || value.workflowStatus === "Completed" || value.workflowStatus === "Reconciled" ? value.workflowStatus : "Planned";
+  const titlePurposes = ["", "Defense", "Vacant Title", "Tournament Final", "Unification", "Other"];
+  const titleDecisions = ["", "Retained", "Changed Hands", "Vacated", "Unresolved"];
 
   return {
     ...defaults,
@@ -153,6 +157,14 @@ function normalizeSegment(value: unknown): PlannedSegment | null {
     privateNotes: text(value.privateNotes),
     matchType: text(value.matchType, defaults.matchType),
     championship: text(value.championship),
+    championshipId: text(value.championshipId),
+    championshipMatchPurpose: titlePurposes.includes(text(value.championshipMatchPurpose)) ? value.championshipMatchPurpose as PlannedSegment["championshipMatchPurpose"] : "",
+    championEntering: text(value.championEntering),
+    challenger: text(value.challenger),
+    expectedTitleChange: nullableBoolean(value.expectedTitleChange),
+    championshipStakes: text(value.championshipStakes),
+    titleResultDecision: titleDecisions.includes(text(value.titleResultDecision)) ? value.titleResultDecision as PlannedSegment["titleResultDecision"] : "",
+    titleResultConfirmedAt: text(value.titleResultConfirmedAt),
     plannedWinner: text(value.plannedWinner),
     plannedFinish: text(value.plannedFinish),
     matchStory: text(value.matchStory),
@@ -220,20 +232,26 @@ function browserControl(): CreativeControlData {
   return typeof window === "undefined" ? emptyCreativeControlData() : loadCreativeControlData(window.localStorage);
 }
 
+function browserChampionships(): ChampionshipUniverse {
+  return typeof window === "undefined" ? emptyChampionshipUniverse() : loadChampionshipUniverse(window.localStorage);
+}
+
 export function createPlannerBackup(
   shows: PlannedShow[],
   storylines: TrackerStoryline[] = browserStorylines(),
   workers: WorkerUniverse = browserWorkers(),
   control: CreativeControlData = browserControl(),
+  championships: ChampionshipUniverse = browserChampionships(),
 ): PlannerBackup {
   return {
     product: "TEW IX Story Tracker",
-    version: 6,
+    version: 7,
     exportedAt: new Date().toISOString(),
     shows,
     storylines,
     workers,
     control,
+    championships,
   };
 }
 
@@ -243,7 +261,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
   if (
     !isRecord(value) ||
     value.product !== "TEW IX Story Tracker" ||
-    ![1, 2, 3, 4, 5, 6].includes(typeof value.version === "number" ? value.version : -1)
+    ![1, 2, 3, 4, 5, 6, 7].includes(typeof value.version === "number" ? value.version : -1)
   ) throw new Error("The selected file is not a supported TEW Story Tracker backup.");
   const version = value.version as number;
   return {
@@ -251,6 +269,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
     storylines: version >= 4 ? parseTrackerStorylines(value.storylines ?? []) : [],
     workers: version >= 5 ? parseWorkerUniverse(value.workers ?? emptyWorkerUniverse()) : emptyWorkerUniverse(),
     control: version >= 6 ? parseCreativeControlData(value.control ?? emptyCreativeControlData()) : emptyCreativeControlData(),
+    championships: version >= 7 ? parseChampionshipUniverse(value.championships ?? emptyChampionshipUniverse()) : emptyChampionshipUniverse(),
   };
 }
 
@@ -260,6 +279,7 @@ export function parsePlannerBackup(textValue: string): PlannedShow[] {
     saveTrackerStorylines(window.localStorage, bundle.storylines);
     saveWorkerUniverse(window.localStorage, bundle.workers);
     saveCreativeControlData(window.localStorage, bundle.control);
+    saveChampionshipUniverse(window.localStorage, bundle.championships);
   }
   return bundle.shows;
 }
