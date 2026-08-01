@@ -23,13 +23,18 @@ import {
   scoreApproachCandidate,
   staminaCapacityFromRating,
 } from "../src/matchEngine/model";
+import {
+  advisoryStarRating,
+  formatStarRating,
+  generateMatchPerformancePreview,
+} from "../src/matchEngine/performance";
 import { WRESTLER_STYLES } from "../src/matchEngine/profileCatalog";
 import {
   MATCH_ENGINE_STORAGE_KEY,
   loadMatchEngineUniverse,
   saveMatchEngineUniverse,
 } from "../src/matchEngine/storage";
-import type { MatchEngineProfile } from "../src/matchEngine/types";
+import type { MatchEngineProfile, MatchWorkerApproachPlan } from "../src/matchEngine/types";
 
 class MemoryStorage {
   private values = new Map<string, string>();
@@ -37,8 +42,8 @@ class MemoryStorage {
   setItem(key: string, value: string): void { this.values.set(key, value); }
 }
 
-function testProfile(): MatchEngineProfile {
-  const profile = createMatchEngineProfile({ id: "worker-1", name: "Test Wrestler", source: "tew" });
+function testProfile(name = "Test Wrestler", id = "worker-1"): MatchEngineProfile {
+  const profile = createMatchEngineProfile({ id, name, source: "tew" });
   return {
     ...profile,
     styleId: "show-stealer-workhorse",
@@ -59,6 +64,17 @@ function testProfile(): MatchEngineProfile {
       Technical: 76,
       Toughness: 70,
     },
+  };
+}
+
+function testPlan(profile: MatchEngineProfile, approaches: MatchWorkerApproachPlan["selectedApproachIds"]): MatchWorkerApproachPlan {
+  return {
+    workerKey: profile.workerKey,
+    workerName: profile.workerName,
+    selectedApproachIds: approaches,
+    lockedApproachIds: [],
+    mode: "AI",
+    generatedAt: "2026-08-01T00:00:00.000Z",
   };
 }
 
@@ -199,5 +215,68 @@ describe("Phase 4C2 match setup and approach AI", () => {
     saveMatchEngineUniverse(storage, { profiles: [profile] });
     expect(storage.getItem(MATCH_ENGINE_STORAGE_KEY)).toContain("Test Wrestler");
     expect(loadMatchEngineUniverse(storage)).toEqual({ profiles: [profile] });
+  });
+});
+
+describe("Phase 4C3 advisory match performance preview", () => {
+  const first = testProfile("Jay White", "jay");
+  const second = { ...testProfile("PAC", "pac"), overall: 82, popularity: 76, styleId: "high-flyer" as const };
+  const workers = [
+    { profile: first, plan: testPlan(first, ["psychological-manipulator", "opportunistic-schemer", "big-match-performer"]) },
+    { profile: second, plan: testPlan(second, ["aerial-showstopper", "high-tempo-hybrid", "resilient-underdog"]) },
+  ];
+
+  test("replays the same night deterministically from a saved seed", () => {
+    const input = {
+      workers,
+      aimId: "competitive-tv-match" as const,
+      durationMinutes: 20,
+      plannedWinner: "Jay White",
+      settings: { authority: "tew-authoritative" as const, volatility: 5, bookingInfluence: 0 },
+      seed: "phase-4c3-test-night",
+    };
+    const firstRun = generateMatchPerformancePreview(input)!;
+    const secondRun = generateMatchPerformancePreview(input)!;
+    expect(secondRun.workerResults).toEqual(firstRun.workerResults);
+    expect(secondRun.matchScore).toBe(firstRun.matchScore);
+    expect(firstRun.projectedWinnerName).toBe("");
+    expect(firstRun.summary).toContain("TEW remains authoritative");
+  });
+
+  test("keeps the booker-selected winner fixed while rating execution", () => {
+    const preview = generateMatchPerformancePreview({
+      workers,
+      aimId: "competitive-tv-match",
+      durationMinutes: 20,
+      plannedWinner: "PAC",
+      settings: { authority: "booker-selected", volatility: 5, bookingInfluence: 0 },
+      seed: "booker-fixed",
+    })!;
+    expect(preview.projectedWinnerName).toBe("PAC");
+    expect(preview.confidence).toBe(100);
+    expect(preview.summary).toContain("remains fixed by the booking");
+  });
+
+  test("can show an optional competitive projection without changing the booking", () => {
+    const preview = generateMatchPerformancePreview({
+      workers,
+      aimId: "competitive-tv-match",
+      durationMinutes: 20,
+      plannedWinner: "Jay White",
+      settings: { authority: "competitive-preview", volatility: 6, bookingInfluence: 0 },
+      seed: "competitive-night",
+    })!;
+    expect(["Jay White", "PAC"]).toContain(preview.projectedWinnerName);
+    expect(preview.confidence).toBeGreaterThan(50);
+    expect(preview.workerResults.reduce((sum, result) => sum + result.winProbability, 0)).toBeCloseTo(1, 3);
+    expect(preview.summary).toContain("does not change the planned winner or TEW result");
+  });
+
+  test("converts advisory match scores to quarter-star ratings", () => {
+    expect(advisoryStarRating(20)).toBe(0);
+    expect(advisoryStarRating(50)).toBe(2);
+    expect(advisoryStarRating(80)).toBe(4);
+    expect(advisoryStarRating(95)).toBe(5);
+    expect(formatStarRating(4)).toBe("4★");
   });
 });
