@@ -2,6 +2,7 @@ import { Component, StrictMode, type ErrorInfo, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import "./planned.css";
+import "./narrative.css";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
