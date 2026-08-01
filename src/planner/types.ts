@@ -1,3 +1,5 @@
+import type { TrackerStoryline } from "../storylines/types";
+
 export type PlannedSegmentType = "match" | "angle";
 export type PlannedSegmentSection = "Pre-Show" | "Main Show" | "Post-Show";
 export type PlannedShowStatus = "Draft" | "Ready" | "Completed" | "Reconciled";
@@ -111,7 +113,13 @@ export interface PlannedShow {
 
 export interface PlannerBackup {
   product: "TEW IX Story Tracker";
-  version: 3;
+  version: 4;
   exportedAt: string;
   shows: PlannedShow[];
+  storylines: TrackerStoryline[];
+}
+
+export interface PlannerBackupBundle {
+  shows: PlannedShow[];
+  storylines: TrackerStoryline[];
 }

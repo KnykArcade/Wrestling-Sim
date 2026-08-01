@@ -1,8 +1,11 @@
+import { loadTrackerStorylines, parseTrackerStorylines, saveTrackerStorylines } from "../storylines/storage";
+import type { TrackerStoryline } from "../storylines/types";
 import { createEmptySegmentReconciliation, createPlannedSegment } from "./model";
 import type {
   ActualMatchSnapshot,
   ActualShowSnapshot,
   PlannerBackup,
+  PlannerBackupBundle,
   PlannedSegment,
   PlannedShow,
   PlannedStorylineReference,
@@ -255,16 +258,27 @@ export function savePlannedShows(
   storage.setItem(PLANNER_STORAGE_KEY, JSON.stringify(shows));
 }
 
-export function createPlannerBackup(shows: PlannedShow[]): PlannerBackup {
+function browserStorylines(): TrackerStoryline[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  return loadTrackerStorylines(window.localStorage);
+}
+
+export function createPlannerBackup(
+  shows: PlannedShow[],
+  storylines: TrackerStoryline[] = browserStorylines(),
+): PlannerBackup {
   return {
     product: "TEW IX Story Tracker",
-    version: 3,
+    version: 4,
     exportedAt: new Date().toISOString(),
     shows,
+    storylines,
   };
 }
 
-export function parsePlannerBackup(textValue: string): PlannedShow[] {
+export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle {
   let value: unknown;
   try {
     value = JSON.parse(textValue) as unknown;
@@ -274,9 +288,20 @@ export function parsePlannerBackup(textValue: string): PlannedShow[] {
   if (
     !isRecord(value) ||
     value.product !== "TEW IX Story Tracker" ||
-    (value.version !== 1 && value.version !== 2 && value.version !== 3)
+    (value.version !== 1 && value.version !== 2 && value.version !== 3 && value.version !== 4)
   ) {
     throw new Error("The selected file is not a supported TEW Story Tracker backup.");
   }
-  return parsePlannerShows(value.shows);
+  return {
+    shows: parsePlannerShows(value.shows),
+    storylines: value.version === 4 ? parseTrackerStorylines(value.storylines ?? []) : [],
+  };
+}
+
+export function parsePlannerBackup(textValue: string): PlannedShow[] {
+  const bundle = parsePlannerBackupBundle(textValue);
+  if (typeof window !== "undefined") {
+    saveTrackerStorylines(window.localStorage, bundle.storylines);
+  }
+  return bundle.shows;
 }
