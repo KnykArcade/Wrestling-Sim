@@ -1,3 +1,5 @@
+import { Buffer } from "buffer";
+import processShim from "process";
 import { mapTewTables, relevantTableCandidates } from "./mapper";
 import type { LoadedTable, TableSummary, TewSnapshot } from "./types";
 
@@ -5,7 +7,6 @@ const MAX_FILE_SIZE = 256 * 1024 * 1024;
 const MAX_ROWS_PER_RELEVANT_TABLE = 100_000;
 
 type MdbReaderInstance = InstanceType<(typeof import("mdb-reader"))["default"]>;
-type BrowserProcess = (typeof import("process"))["default"];
 
 function normalizeName(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -18,16 +19,11 @@ function formatError(error: unknown): string {
   return "The database could not be read.";
 }
 
-async function installBrowserCompatibility(): Promise<void> {
-  const [{ Buffer }, { default: processShim }] = await Promise.all([
-    import("buffer"),
-    import("process"),
-  ]);
-
+function installBrowserCompatibility(): void {
   const runtime = globalThis as typeof globalThis & {
     Buffer?: typeof Buffer;
     global?: typeof globalThis;
-    process?: BrowserProcess;
+    process?: typeof processShim;
   };
 
   runtime.Buffer ??= Buffer;
@@ -40,9 +36,8 @@ async function openAccessDatabase(file: File): Promise<MdbReaderInstance> {
 
   // mdb-reader and its browser crypto dependencies still expect the Node-style
   // Buffer, global, and process objects. They must exist before the parser
-  // module is evaluated, so this cannot be loaded in the same Promise.all call.
-  await installBrowserCompatibility();
-  const { Buffer } = await import("buffer");
+  // module is evaluated.
+  installBrowserCompatibility();
   const { default: MDBReader } = await import("mdb-reader");
 
   return new MDBReader(Buffer.from(arrayBuffer));
