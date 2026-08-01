@@ -1,3 +1,4 @@
+import type { CreativeControlData } from "../control/types";
 import type { TrackerStoryline } from "../storylines/types";
 import type { WorkerUniverse } from "../workers/types";
 
@@ -92,6 +93,7 @@ export interface PlannedSegment {
   segmentOutput: string;
   audienceTakeaway: string;
 
+  bookingIdeaId: string;
   workflowStatus: SegmentWorkflowStatus;
   reconciliation: SegmentReconciliation;
 }
@@ -114,15 +116,17 @@ export interface PlannedShow {
 
 export interface PlannerBackup {
   product: "TEW IX Story Tracker";
-  version: 5;
+  version: 6;
   exportedAt: string;
   shows: PlannedShow[];
   storylines: TrackerStoryline[];
   workers: WorkerUniverse;
+  control: CreativeControlData;
 }
 
 export interface PlannerBackupBundle {
   shows: PlannedShow[];
   storylines: TrackerStoryline[];
   workers: WorkerUniverse;
+  control: CreativeControlData;
 }
