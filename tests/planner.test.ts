@@ -36,18 +36,22 @@ describe("planned show workspace", () => {
     show.segments = [match, angle];
 
     expect(show.name).toBe("Untitled Show 1");
+    expect(show.reconciliation).toBeNull();
     expect(match).toMatchObject({
       title: "Untitled Match",
       matchType: "1 vs. 1",
       matchStory: "",
       workers: [],
       storylines: [],
+      workflowStatus: "Planned",
     });
+    expect(match.reconciliation.actualMatch).toBeNull();
     expect(angle).toMatchObject({
       title: "Untitled Angle",
       angleLocation: "In The Ring",
       angleContentType: "Serious",
       segmentOutput: "",
+      workflowStatus: "Planned",
     });
     expect(totalPlannedMinutes(show)).toBe(17);
   });
@@ -80,25 +84,47 @@ describe("planned show workspace", () => {
     expect(movePlannedSegment(original, first.id, -1)).toBe(original);
   });
 
-  test("duplicates shows and nested narrative identifiers", () => {
+  test("duplicates shows and nested narrative identifiers without actual results", () => {
     const show = createPlannedShow(1);
     const match = createPlannedSegment("match");
     match.workers = [
       { id: "worker-1", name: "Worker One", role: "Competitor", side: "Side 1", source: "tew" },
     ];
+    match.workflowStatus = "Reconciled";
+    match.reconciliation.linkedMatchId = "actual-1";
+    show.reconciliation = {
+      linkedShowId: "show-actual",
+      actualShow: {
+        id: "show-actual",
+        name: "Actual Show",
+        date: "2026-08-01",
+        rating: 80,
+        attendance: 10000,
+        venue: "Arena",
+        company: "WWE",
+        broadcast: "Network",
+        sourceFile: "TEW9.mdb",
+      },
+      linkedAt: "2026-08-01T01:00:00.000Z",
+      completedAt: "2026-08-01T02:00:00.000Z",
+      notes: "",
+    };
     show.segments = [match, createPlannedSegment("angle")];
 
     const duplicate = duplicatePlannedShow(show);
 
     expect(duplicate.id).not.toBe(show.id);
     expect(duplicate.name).toBe(`${show.name} Copy`);
+    expect(duplicate.reconciliation).toBeNull();
     expect(duplicate.segments.map((item) => item.id)).not.toEqual(
       show.segments.map((item) => item.id),
     );
     expect(duplicate.segments[0].workers[0].id).not.toBe(match.workers[0].id);
+    expect(duplicate.segments[0].workflowStatus).toBe("Planned");
+    expect(duplicate.segments[0].reconciliation.actualMatch).toBeNull();
   });
 
-  test("saves, loads, exports, and imports Phase 2B data", () => {
+  test("saves, loads, exports, and imports Phase 2C data", () => {
     const storage = new MemoryStorage();
     const show = createPlannedShow(1);
     const match = createPlannedSegment("match");
@@ -109,7 +135,7 @@ describe("planned show workspace", () => {
     expect(loadPlannedShows(storage)).toEqual([show]);
 
     const backup = createPlannerBackup([show]);
-    expect(backup.version).toBe(2);
+    expect(backup.version).toBe(3);
     expect(parsePlannerBackup(JSON.stringify(backup))).toEqual([show]);
   });
 
@@ -146,16 +172,21 @@ describe("planned show workspace", () => {
 
     const [show] = loadPlannedShows(storage);
     expect(show.name).toBe("Legacy Planned Show");
+    expect(show.reconciliation).toBeNull();
     expect(show.segments[0]).toMatchObject({
       title: "Opening Promo",
       segmentOutput: "",
       workers: [],
       storylines: [],
+      workflowStatus: "Planned",
     });
+    expect(show.segments[0].reconciliation.actualMatch).toBeNull();
   });
 
-  test("rejects unsupported backup files", () => {
-    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":3,"shows":[]}')).toThrow(
+  test("accepts older versioned backups and rejects future unsupported versions", () => {
+    expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":1,"shows":[]}')).toEqual([]);
+    expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":2,"shows":[]}')).toEqual([]);
+    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":4,"shows":[]}')).toThrow(
       "not a supported TEW Story Tracker backup",
     );
   });

@@ -1,10 +1,14 @@
-import { createPlannedSegment } from "./model";
+import { createEmptySegmentReconciliation, createPlannedSegment } from "./model";
 import type {
+  ActualMatchSnapshot,
+  ActualShowSnapshot,
   PlannerBackup,
   PlannedSegment,
   PlannedShow,
   PlannedStorylineReference,
   PlannedWorkerReference,
+  SegmentReconciliation,
+  ShowReconciliation,
 } from "./types";
 
 export const PLANNER_STORAGE_KEY = "tew-story-tracker:planned-shows:v1";
@@ -19,6 +23,14 @@ function text(value: unknown, fallback = ""): string {
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function nullableNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function nullableBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
 }
 
 function normalizeWorker(value: unknown): PlannedWorkerReference | null {
@@ -45,6 +57,80 @@ function normalizeStoryline(value: unknown): PlannedStorylineReference | null {
   };
 }
 
+function normalizeActualMatch(value: unknown): ActualMatchSnapshot | null {
+  if (!isRecord(value) || typeof value.id !== "string") {
+    return null;
+  }
+  const placement =
+    value.placement === "Pre-Show" || value.placement === "Post-Show"
+      ? value.placement
+      : "Main Show";
+  return {
+    id: value.id,
+    description: text(value.description),
+    rating: nullableNumber(value.rating),
+    winner: text(value.winner),
+    matchTime: text(value.matchTime),
+    notes: text(value.notes),
+    placement,
+    workers: Array.isArray(value.workers)
+      ? value.workers.filter((worker): worker is string => typeof worker === "string")
+      : [],
+  };
+}
+
+function normalizeSegmentReconciliation(value: unknown): SegmentReconciliation {
+  const defaults = createEmptySegmentReconciliation();
+  if (!isRecord(value)) {
+    return defaults;
+  }
+  return {
+    linkedMatchId: text(value.linkedMatchId),
+    actualMatch: normalizeActualMatch(value.actualMatch),
+    happenedAsPlanned: nullableBoolean(value.happenedAsPlanned),
+    actualRating: nullableNumber(value.actualRating),
+    finalNarrative: text(value.finalNarrative),
+    changes: text(value.changes),
+    actualConsequences: text(value.actualConsequences),
+    finalFollowUp: text(value.finalFollowUp),
+    reconciledAt: text(value.reconciledAt),
+  };
+}
+
+function normalizeActualShow(value: unknown): ActualShowSnapshot | null {
+  if (!isRecord(value) || typeof value.id !== "string") {
+    return null;
+  }
+  return {
+    id: value.id,
+    name: text(value.name),
+    date: text(value.date),
+    rating: nullableNumber(value.rating),
+    attendance: nullableNumber(value.attendance),
+    venue: text(value.venue),
+    company: text(value.company),
+    broadcast: text(value.broadcast),
+    sourceFile: text(value.sourceFile),
+  };
+}
+
+function normalizeShowReconciliation(value: unknown): ShowReconciliation | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const actualShow = normalizeActualShow(value.actualShow);
+  if (!actualShow) {
+    return null;
+  }
+  return {
+    linkedShowId: text(value.linkedShowId, actualShow.id),
+    actualShow,
+    linkedAt: text(value.linkedAt),
+    completedAt: text(value.completedAt),
+    notes: text(value.notes),
+  };
+}
+
 function normalizeSegment(value: unknown): PlannedSegment | null {
   if (
     !isRecord(value) ||
@@ -65,6 +151,12 @@ function normalizeSegment(value: unknown): PlannedSegment | null {
         .map(normalizeStoryline)
         .filter((item): item is PlannedStorylineReference => item !== null)
     : [];
+  const workflowStatus =
+    value.workflowStatus === "Entered in TEW" ||
+    value.workflowStatus === "Completed" ||
+    value.workflowStatus === "Reconciled"
+      ? value.workflowStatus
+      : "Planned";
 
   return {
     ...defaults,
@@ -92,6 +184,8 @@ function normalizeSegment(value: unknown): PlannedSegment | null {
     angleContentType: text(value.angleContentType, defaults.angleContentType),
     segmentOutput: text(value.segmentOutput),
     audienceTakeaway: text(value.audienceTakeaway),
+    workflowStatus,
+    reconciliation: normalizeSegmentReconciliation(value.reconciliation),
   };
 }
 
@@ -110,7 +204,10 @@ function normalizeShow(value: unknown): PlannedShow | null {
     return null;
   }
 
-  const status = value.status === "Ready" || value.status === "Completed" ? value.status : "Draft";
+  const status =
+    value.status === "Ready" || value.status === "Completed" || value.status === "Reconciled"
+      ? value.status
+      : "Draft";
   return {
     id: value.id,
     name: value.name,
@@ -124,6 +221,7 @@ function normalizeShow(value: unknown): PlannedShow | null {
     createdAt: text(value.createdAt, new Date().toISOString()),
     updatedAt: text(value.updatedAt, new Date().toISOString()),
     segments: segments as PlannedSegment[],
+    reconciliation: normalizeShowReconciliation(value.reconciliation),
   };
 }
 
@@ -160,7 +258,7 @@ export function savePlannedShows(
 export function createPlannerBackup(shows: PlannedShow[]): PlannerBackup {
   return {
     product: "TEW IX Story Tracker",
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     shows,
   };
@@ -176,7 +274,7 @@ export function parsePlannerBackup(textValue: string): PlannedShow[] {
   if (
     !isRecord(value) ||
     value.product !== "TEW IX Story Tracker" ||
-    (value.version !== 1 && value.version !== 2)
+    (value.version !== 1 && value.version !== 2 && value.version !== 3)
   ) {
     throw new Error("The selected file is not a supported TEW Story Tracker backup.");
   }

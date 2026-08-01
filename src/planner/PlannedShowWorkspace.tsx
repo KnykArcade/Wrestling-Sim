@@ -9,6 +9,7 @@ import {
   touchShow,
 } from "./model";
 import NarrativeEditor from "./NarrativeEditor";
+import ReconciliationWorkspace from "./ReconciliationWorkspace";
 import {
   createPlannerBackup,
   loadPlannedShows,
@@ -18,6 +19,7 @@ import {
 import type { PlannedSegment, PlannedShow } from "./types";
 
 type SaveState = "Saved" | "Saving" | "Save failed";
+type EditorMode = "plan" | "reconcile";
 
 function downloadBackup(shows: PlannedShow[]): void {
   const backup = createPlannerBackup(shows);
@@ -62,6 +64,7 @@ function SegmentEditor({
           <span className={`narrative-status ${narrativeIsComplete(segment) ? "complete" : "incomplete"}`}>
             {narrativeIsComplete(segment) ? "Narrative added" : "Narrative needed"}
           </span>
+          <span className="workflow-status">{segment.workflowStatus}</span>
         </div>
         <div className="segment-actions">
           <button type="button" onClick={() => onMove(-1)} disabled={index === 0} aria-label="Move segment up">
@@ -153,6 +156,7 @@ export default function PlannedShowWorkspace({
   const [selectedId, setSelectedId] = useState<string>("");
   const [saveState, setSaveState] = useState<SaveState>("Saved");
   const [notice, setNotice] = useState("");
+  const [editorMode, setEditorMode] = useState<EditorMode>("plan");
   const importRef = useRef<HTMLInputElement | null>(null);
   const snapshotRef = useRef<HTMLInputElement | null>(null);
 
@@ -177,6 +181,12 @@ export default function PlannedShowWorkspace({
     }
   }, [shows]);
 
+  useEffect(() => {
+    if (selectedShow?.status === "Reconciled") {
+      setEditorMode("reconcile");
+    }
+  }, [selectedShow?.id, selectedShow?.status]);
+
   function updateShow(showId: string, updater: (show: PlannedShow) => PlannedShow): void {
     setShows((current) =>
       current.map((show) => (show.id === showId ? touchShow(updater(show)) : show)),
@@ -187,6 +197,7 @@ export default function PlannedShowWorkspace({
     const show = createPlannedShow(shows.length + 1);
     setShows((current) => [show, ...current]);
     setSelectedId(show.id);
+    setEditorMode("plan");
     setNotice("New planned show created.");
   }
 
@@ -197,7 +208,8 @@ export default function PlannedShowWorkspace({
     const duplicate = duplicatePlannedShow(selectedShow);
     setShows((current) => [duplicate, ...current]);
     setSelectedId(duplicate.id);
-    setNotice("Show duplicated with new segment and worker identifiers.");
+    setEditorMode("plan");
+    setNotice("Show duplicated with a clean reconciliation record.");
   }
 
   function deleteShow(): void {
@@ -228,6 +240,7 @@ export default function PlannedShowWorkspace({
       }
       setShows(imported);
       setSelectedId(imported[0]?.id ?? "");
+      setEditorMode(imported[0]?.status === "Reconciled" ? "reconcile" : "plan");
       setNotice(`Imported ${imported.length} planned show${imported.length === 1 ? "" : "s"}.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The backup could not be imported.");
@@ -241,8 +254,8 @@ export default function PlannedShowWorkspace({
       <header className="planner-toolbar">
         <div>
           <p className="eyebrow">PLANNED SHOW WORKSPACE</p>
-          <h2>Build the card and write every story before TEW</h2>
-          <p>Create matches and angles in show order, then preserve the full Match Story and Segment Output.</p>
+          <h2>Plan the show, run it in TEW, then preserve what actually happened</h2>
+          <p>Every card now supports full narrative writing and post-show planned-versus-actual reconciliation.</p>
         </div>
         <div className="planner-toolbar__actions">
           <span className={`save-state save-state--${saveState.toLowerCase().replace(" ", "-")}`}>
@@ -275,11 +288,11 @@ export default function PlannedShowWorkspace({
 
       <section className={`planner-snapshot-bar ${snapshot ? "is-loaded" : ""}`}>
         <div>
-          <strong>{snapshot ? `TEW reference loaded: ${snapshot.fileName}` : "Optional TEW reference snapshot"}</strong>
+          <strong>{snapshot ? `TEW reference loaded: ${snapshot.fileName}` : "TEW reference and results snapshot"}</strong>
           <span>
             {snapshot
-              ? `${snapshot.workers.length} workers and ${snapshot.storylines.length} storylines are available in the narrative editors.`
-              : "Import a current MDB snapshot to select TEW workers and storylines. Manual entry always remains available."}
+              ? `${snapshot.workers.length} workers, ${snapshot.storylines.length} storylines, and ${snapshot.shows.length} completed shows are available.`
+              : "Import a current MDB while planning, then replace it with the post-show MDB when the show is complete."}
           </span>
           {snapshotLoading && <small>Reading TEW snapshot…</small>}
           {snapshotError && <small className="snapshot-error">{snapshotError}</small>}
@@ -330,11 +343,15 @@ export default function PlannedShowWorkspace({
                 type="button"
                 className={selectedShow?.id === show.id ? "selected" : ""}
                 key={show.id}
-                onClick={() => setSelectedId(show.id)}
+                onClick={() => {
+                  setSelectedId(show.id);
+                  setEditorMode(show.status === "Reconciled" ? "reconcile" : "plan");
+                }}
               >
                 <strong>{show.name || "Untitled Show"}</strong>
                 <span>{show.date || "Date not set"}</span>
                 <small>{show.segments.length} segment{show.segments.length === 1 ? "" : "s"} · {show.status}</small>
+                {show.reconciliation && <em>Linked: {show.reconciliation.actualShow.name}</em>}
               </button>
             ))
           )}
@@ -348,144 +365,165 @@ export default function PlannedShowWorkspace({
           </section>
         ) : (
           <div className="planner-editor">
-            <section className="planned-show-details">
-              <header className="planned-show-details__header">
-                <div>
-                  <p className="eyebrow">SHOW DETAILS</p>
-                  <h3>{selectedShow.name || "Untitled Show"}</h3>
-                </div>
-                <div className="show-record-actions">
-                  <button className="secondary-button" type="button" onClick={duplicateShow}>Duplicate</button>
-                  <button className="danger-button" type="button" onClick={deleteShow}>Delete Show</button>
-                </div>
-              </header>
+            <nav className="show-workflow-tabs" aria-label="Selected show workflow">
+              <button type="button" className={editorMode === "plan" ? "active" : ""} onClick={() => setEditorMode("plan")}>
+                Plan Card
+              </button>
+              <button type="button" className={editorMode === "reconcile" ? "active" : ""} onClick={() => setEditorMode("reconcile")}>
+                {selectedShow.status === "Reconciled" ? "Enhanced History" : "Reconcile Results"}
+              </button>
+            </nav>
 
-              <div className="show-form-grid">
-                <label className="field field--wide">
-                  <span>Show name</span>
-                  <input
-                    value={selectedShow.name}
-                    onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, name: event.target.value }))}
-                  />
-                </label>
-                <label className="field">
-                  <span>Date</span>
-                  <input
-                    type="date"
-                    value={selectedShow.date}
-                    onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, date: event.target.value }))}
-                  />
-                </label>
-                <label className="field">
-                  <span>Status</span>
-                  <select
-                    value={selectedShow.status}
-                    onChange={(event) => updateShow(selectedShow.id, (show) => ({
-                      ...show,
-                      status: event.target.value as PlannedShow["status"],
-                    }))}
-                  >
-                    <option>Draft</option>
-                    <option>Ready</option>
-                    <option>Completed</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Company</span>
-                  <input
-                    value={selectedShow.company}
-                    onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, company: event.target.value }))}
-                  />
-                </label>
-                <label className="field">
-                  <span>Show type</span>
-                  <select
-                    value={selectedShow.showType}
-                    onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, showType: event.target.value }))}
-                  >
-                    <option>Television</option>
-                    <option>Event</option>
-                    <option>Tour Show</option>
-                    <option>House Show</option>
-                    <option>Other</option>
-                  </select>
-                </label>
-                <label className="field">
-                  <span>Expected length</span>
-                  <input
-                    type="number"
-                    min={15}
-                    max={600}
-                    value={selectedShow.expectedMinutes}
-                    onChange={(event) => updateShow(selectedShow.id, (show) => ({
-                      ...show,
-                      expectedMinutes: Math.max(15, Number(event.target.value) || 15),
-                    }))}
-                  />
-                </label>
-                <label className="field field--wide">
-                  <span>Venue / location</span>
-                  <input
-                    value={selectedShow.venue}
-                    onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, venue: event.target.value }))}
-                  />
-                </label>
-                <label className="field field--full">
-                  <span>Show notes</span>
-                  <textarea
-                    rows={3}
-                    value={selectedShow.notes}
-                    onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, notes: event.target.value }))}
-                  />
-                </label>
-              </div>
-            </section>
+            {editorMode === "reconcile" ? (
+              <ReconciliationWorkspace
+                show={selectedShow}
+                allShows={shows}
+                snapshot={snapshot}
+                onChange={(updated) => updateShow(selectedShow.id, () => updated)}
+              />
+            ) : (
+              <>
+                <section className="planned-show-details">
+                  <header className="planned-show-details__header">
+                    <div>
+                      <p className="eyebrow">SHOW DETAILS</p>
+                      <h3>{selectedShow.name || "Untitled Show"}</h3>
+                    </div>
+                    <div className="show-record-actions">
+                      <button className="secondary-button" type="button" onClick={duplicateShow}>Duplicate</button>
+                      <button className="danger-button" type="button" onClick={deleteShow}>Delete Show</button>
+                    </div>
+                  </header>
 
-            <section className="planned-card-editor">
-              <header className="card-editor-header">
-                <div>
-                  <p className="eyebrow">CARD ORDER</p>
-                  <h3>{selectedShow.segments.length} planned segment{selectedShow.segments.length === 1 ? "" : "s"}</h3>
-                  <p>
-                    {totalPlannedMinutes(selectedShow)} of {selectedShow.expectedMinutes} expected minutes planned · {completeNarratives} narratives complete
-                  </p>
-                </div>
-                <div className="card-editor-actions">
-                  <button className="primary-button" type="button" onClick={() => addSegment("match")}>Add Match</button>
-                  <button className="secondary-button" type="button" onClick={() => addSegment("angle")}>Add Angle</button>
-                </div>
-              </header>
+                  <div className="show-form-grid">
+                    <label className="field field--wide">
+                      <span>Show name</span>
+                      <input
+                        value={selectedShow.name}
+                        onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, name: event.target.value }))}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Date</span>
+                      <input
+                        type="date"
+                        value={selectedShow.date}
+                        onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, date: event.target.value }))}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Status</span>
+                      <select
+                        value={selectedShow.status}
+                        onChange={(event) => updateShow(selectedShow.id, (show) => ({
+                          ...show,
+                          status: event.target.value as PlannedShow["status"],
+                        }))}
+                      >
+                        <option>Draft</option>
+                        <option>Ready</option>
+                        <option>Completed</option>
+                        <option>Reconciled</option>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Company</span>
+                      <input
+                        value={selectedShow.company}
+                        onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, company: event.target.value }))}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Show type</span>
+                      <select
+                        value={selectedShow.showType}
+                        onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, showType: event.target.value }))}
+                      >
+                        <option>Television</option>
+                        <option>Event</option>
+                        <option>Tour Show</option>
+                        <option>House Show</option>
+                        <option>Other</option>
+                      </select>
+                    </label>
+                    <label className="field">
+                      <span>Expected length</span>
+                      <input
+                        type="number"
+                        min={15}
+                        max={600}
+                        value={selectedShow.expectedMinutes}
+                        onChange={(event) => updateShow(selectedShow.id, (show) => ({
+                          ...show,
+                          expectedMinutes: Math.max(15, Number(event.target.value) || 15),
+                        }))}
+                      />
+                    </label>
+                    <label className="field field--wide">
+                      <span>Venue / location</span>
+                      <input
+                        value={selectedShow.venue}
+                        onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, venue: event.target.value }))}
+                      />
+                    </label>
+                    <label className="field field--full">
+                      <span>Show notes</span>
+                      <textarea
+                        rows={3}
+                        value={selectedShow.notes}
+                        onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, notes: event.target.value }))}
+                      />
+                    </label>
+                  </div>
+                </section>
 
-              {selectedShow.segments.length === 0 ? (
-                <div className="empty-state card-empty">
-                  Add a match or angle to begin building the show in running order.
-                </div>
-              ) : (
-                <div className="planned-segment-list">
-                  {selectedShow.segments.map((segment, index) => (
-                    <SegmentEditor
-                      key={segment.id}
-                      segment={segment}
-                      index={index}
-                      count={selectedShow.segments.length}
-                      snapshot={snapshot}
-                      onChange={(updated) => updateShow(selectedShow.id, (show) => ({
-                        ...show,
-                        segments: show.segments.map((item) => item.id === updated.id ? updated : item),
-                      }))}
-                      onMove={(direction) => updateShow(selectedShow.id, (show) => ({
-                        ...show,
-                        segments: movePlannedSegment(show.segments, segment.id, direction),
-                      }))}
-                      onDelete={() => updateShow(selectedShow.id, (show) => ({
-                        ...show,
-                        segments: show.segments.filter((item) => item.id !== segment.id),
-                      }))}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
+                <section className="planned-card-editor">
+                  <header className="card-editor-header">
+                    <div>
+                      <p className="eyebrow">CARD ORDER</p>
+                      <h3>{selectedShow.segments.length} planned segment{selectedShow.segments.length === 1 ? "" : "s"}</h3>
+                      <p>
+                        {totalPlannedMinutes(selectedShow)} of {selectedShow.expectedMinutes} expected minutes planned · {completeNarratives} narratives complete
+                      </p>
+                    </div>
+                    <div className="card-editor-actions">
+                      <button className="primary-button" type="button" onClick={() => addSegment("match")}>Add Match</button>
+                      <button className="secondary-button" type="button" onClick={() => addSegment("angle")}>Add Angle</button>
+                    </div>
+                  </header>
+
+                  {selectedShow.segments.length === 0 ? (
+                    <div className="empty-state card-empty">
+                      Add a match or angle to begin building the show in running order.
+                    </div>
+                  ) : (
+                    <div className="planned-segment-list">
+                      {selectedShow.segments.map((segment, index) => (
+                        <SegmentEditor
+                          key={segment.id}
+                          segment={segment}
+                          index={index}
+                          count={selectedShow.segments.length}
+                          snapshot={snapshot}
+                          onChange={(updated) => updateShow(selectedShow.id, (show) => ({
+                            ...show,
+                            segments: show.segments.map((item) => item.id === updated.id ? updated : item),
+                          }))}
+                          onMove={(direction) => updateShow(selectedShow.id, (show) => ({
+                            ...show,
+                            segments: movePlannedSegment(show.segments, segment.id, direction),
+                          }))}
+                          onDelete={() => updateShow(selectedShow.id, (show) => ({
+                            ...show,
+                            segments: show.segments.filter((item) => item.id !== segment.id),
+                          }))}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
           </div>
         )}
       </div>
