@@ -11,6 +11,7 @@ import "./championships.css";
 import "./handoff.css";
 import "./match-engine.css";
 import "./match-setup.css";
+import "./match-performance.css";
 
 type ErrorBoundaryProps = {
   children: ReactNode;

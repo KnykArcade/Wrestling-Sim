@@ -188,6 +188,12 @@ export function createEmptyMatchApproachSetup(): MatchApproachSetup {
     matchAimId: "call-it-in-the-ring",
     workerPlans: [],
     notes: "",
+    performanceSettings: {
+      authority: "tew-authoritative",
+      volatility: 5,
+      bookingInfluence: 0,
+    },
+    performancePreview: null,
     updatedAt: "",
   };
 }

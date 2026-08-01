@@ -109,7 +109,7 @@ export default function App() {
   const standaloneViews: ViewName[] = ["control", "planner", "handoff", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
 
   return <div className="app-shell">
-    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>TEW IX Story Tracker</h1></div><div className="phase-badge">PHASE 4C2 · MATCH SETUP</div></header>
+    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>TEW IX Story Tracker</h1></div><div className="phase-badge">PHASE 4C3 · PERFORMANCE PREVIEW</div></header>
     <nav className="global-tabbar" aria-label="Story Tracker sections">
       <button className={view === "control" ? "active" : ""} onClick={() => setView("control")} type="button">Control Center</button>
       <button className={view === "planner" ? "active" : ""} onClick={() => setView("planner")} type="button">Planned Shows</button>
@@ -139,6 +139,6 @@ export default function App() {
         {view === "schema" && <section className="diagnostics-layout"><div className="content-panel"><div className="panel-heading large"><div><span>Matched TEW Tables</span><p>These mappings drive the read-only show, match, worker, and storyline views.</p></div></div><dl className="mapping-list">{Object.entries(snapshot.diagnostics.matchedTables).map(([purpose, table]) => <div key={purpose}><dt>{purpose}</dt><dd className={table ? "matched" : "missing"}>{table ?? "Not found"}</dd></div>)}</dl><div className="warning-list"><h3>Warnings</h3>{snapshot.diagnostics.warnings.length > 0 ? snapshot.diagnostics.warnings.map((warning, index) => <p key={`${warning}-${index}`}>{warning}</p>) : <p>No mapping warnings were generated.</p>}</div></div><div className="content-panel table-inventory"><div className="panel-heading large"><div><span>Database Table Inventory</span><p>Only recognized history tables are loaded into memory.</p></div><strong>{snapshot.tables.length}</strong></div><div className="inventory-list">{snapshot.tables.map((table) => <details key={table.name}><summary><span>{table.name}</span><small>{table.rowCount.toLocaleString()} rows · {table.columnCount} columns</small><b>{table.loaded ? "Mapped" : "Metadata only"}</b></summary><p>{table.columns.join(", ") || "No column names were returned."}</p>{table.truncated && <p className="truncate-warning">This table exceeded the Phase 1 row limit.</p>}</details>)}</div></div></section>}
       </>}
     </main>
-    <footer>TEW remains the game. This companion stores creative plans, Match Stories, Segment Outputs, match approaches, handoff versions, histories, storylines, workers, championships, and rankings. TEW snapshot access remains read-only.</footer>
+    <footer>TEW remains the game. This companion stores creative plans, Match Stories, Segment Outputs, match approaches, optional advisory performance previews, handoff versions, histories, storylines, workers, championships, and rankings. TEW snapshot access remains read-only.</footer>
   </div>;
 }

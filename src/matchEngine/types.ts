@@ -210,10 +210,58 @@ export interface MatchWorkerApproachPlan {
   generatedAt: string;
 }
 
+export type MatchOutcomeAuthority = "tew-authoritative" | "booker-selected" | "competitive-preview";
+
+export interface MatchPerformanceSettings {
+  authority: MatchOutcomeAuthority;
+  volatility: number;
+  bookingInfluence: number;
+}
+
+export interface MatchWorkerPerformanceResult {
+  workerKey: string;
+  workerName: string;
+  mentalStateId: MentalStateId;
+  mentalStateName: MentalStateDefinition["name"];
+  mentalStateScore: number;
+  mentalModifier: number;
+  luck: number;
+  swing: number;
+  consistencyVariance: number;
+  averageApproachRating: number;
+  approachExecution: number;
+  presentationScore: number;
+  staminaStatus: StaminaStatus;
+  staminaModifier: number;
+  paceStatus: PaceStatus;
+  paceModifier: number;
+  performanceScore: number;
+  competitiveScore: number;
+  winProbability: number;
+}
+
+export interface MatchPerformancePreview {
+  id: string;
+  generatedAt: string;
+  seed: string;
+  authority: MatchOutcomeAuthority;
+  matchScore: number;
+  starRating: number;
+  performanceLeaderKey: string;
+  performanceLeaderName: string;
+  projectedWinnerKey: string;
+  projectedWinnerName: string;
+  confidence: number;
+  summary: string;
+  workerResults: MatchWorkerPerformanceResult[];
+}
+
 export interface MatchApproachSetup {
   matchAimId: MatchAimId;
   workerPlans: MatchWorkerApproachPlan[];
   notes: string;
+  performanceSettings: MatchPerformanceSettings;
+  performancePreview: MatchPerformancePreview | null;
   updatedAt: string;
 }
 

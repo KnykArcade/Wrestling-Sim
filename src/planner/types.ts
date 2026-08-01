@@ -128,7 +128,7 @@ export interface PlannedShow {
 
 export interface PlannerBackup {
   product: "TEW IX Story Tracker";
-  version: 9;
+  version: 10;
   exportedAt: string;
   shows: PlannedShow[];
   storylines: TrackerStoryline[];

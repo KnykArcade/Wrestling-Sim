@@ -266,7 +266,7 @@ export function createPlannerBackup(
 ): PlannerBackup {
   return {
     product: "TEW IX Story Tracker",
-    version: 9,
+    version: 10,
     exportedAt: new Date().toISOString(),
     shows,
     storylines,
@@ -284,7 +284,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
   if (
     !isRecord(value) ||
     value.product !== "TEW IX Story Tracker" ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9].includes(typeof value.version === "number" ? value.version : -1)
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10].includes(typeof value.version === "number" ? value.version : -1)
   ) throw new Error("The selected file is not a supported TEW Story Tracker backup.");
   const version = value.version as number;
   return {
