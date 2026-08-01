@@ -133,7 +133,11 @@ test("creates schedules and searches a future booking idea", async ({ page }) =>
   await page.getByRole("button", { name: "Control Center" }).click();
   await page.getByRole("button", { name: "Global Search" }).click();
   await page.getByLabel("Global creative search").fill("World Championship Challenge");
-  await expect(page.getByRole("button", { name: /World Championship Challenge/ })).toBeVisible();
+  await expect(
+    page.locator(".search-result-list button")
+      .filter({ hasText: "Booking Idea" })
+      .filter({ hasText: "World Championship Challenge" }),
+  ).toBeVisible();
 
   await page.reload();
   await page.getByRole("button", { name: "Future Booking Board" }).click();
