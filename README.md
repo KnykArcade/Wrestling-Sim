@@ -1,93 +1,96 @@
 # TEW IX Story Tracker
 
-A browser-based companion for **Total Extreme Wrestling IX** that preserves booking plans, match stories, angle outputs, planned-versus-actual show history, storyline continuity, worker creative profiles, and future booking ideas without changing TEW's executable or save files.
+A browser-based companion for **Total Extreme Wrestling IX** that preserves booking plans, match stories, angle outputs, planned-versus-actual show history, storyline continuity, worker creative profiles, future booking ideas, championship lineage, rankings, and competitive records without changing TEW's executable or live save files.
 
-## Phase 3C: Creative Control Center
+## Phase 4A: Championship Hub, Rankings, and Competitive Records
 
-The application now opens on a universe-wide control center that connects every existing planning system.
+The **Championships** workspace creates a permanent competitive structure around the existing show, storyline, worker, and reconciliation systems.
 
-### Universe dashboard
+### Championship Hub
 
-The dashboard surfaces:
+Each tracker championship stores:
 
-- Upcoming planned shows and readiness scores
-- Completed shows awaiting reconciliation
-- Active storylines and milestones due soon
-- Open booking ideas
-- Worker arcs without upcoming appearances
-- Cross-system continuity warnings
-- Recently completed shows
+- Name, company, brand, division, and classification
+- Active, inactive, or vacant status
+- Current and previous champions
+- Date won and recorded defenses
+- Optional TEW title reference and legacy names used on older cards
+- Linked storyline and current title program
+- Private booking notes and inactivity threshold
 
-Every actionable item links back to its related show, storyline, worker, or booking idea.
+Imported TEW references remain read-only. A tracker championship can recognize older free-text title names so existing planned cards are not lost.
 
-### Future Booking Board
+### Reigns and lineage
 
-Booking ideas can be created before they are assigned to a show. Supported types include matches, angles, promos, debuts, returns, turns, betrayals, title changes, challenges, reveals, mysteries, interference, injury stories, and custom concepts.
+Lineage records retain champions, previous champions, start and end dates, title-winning and title-ending shows and segments, successful defenses, vacancy reasons, notes, and corrections.
 
-Each idea stores its status, priority, target date, target show, workers, storylines, championship, full concept, creative purpose, consequences, follow-up, and private notes.
+Reconciled championship matches create **result suggestions**, not automatic title changes. The user must explicitly confirm a retention, title change, vacancy, or unresolved result before the tracker updates the championship lineage.
 
-Ideas move through:
+### Competitive records and rankings
 
-`Inbox → Developing → Ready → Scheduled → Completed`
+Worker records are calculated only from completed match information the tracker actually possesses:
 
-They can also be delayed, cancelled, or archived.
+- Wins, losses, draws, no contests, and unresolved results
+- Singles and team appearances when participant counts support the distinction
+- Championship-match record
+- Last five results and current streak
+- Recorded results against specific opponents
 
-A ready idea can be converted directly into a planned match or angle. The tracker carries workers, roles, storyline links, narrative, purpose, consequences, follow-up, championship details, and the original booking-idea reference into the segment. Duplicate scheduling is blocked.
+Rankings are fully editable. Suggestions use visible stored results and activity, explain why each contender was suggested, and preserve manually locked entries. There is no hidden rating formula.
 
-### Creative calendar
+### Championship program and timeline
 
-The calendar combines, in date order:
+A title program can connect the champion, leading challenger, additional contenders, storyline, booking ideas, and target payoff show. The championship timeline combines reigns, defenses, vacancies, planned title matches, storyline links, booking ideas, and ranking updates.
 
-- Planned and reconciled shows
-- Storyline milestones
-- Worker character-arc targets
-- Booking ideas
+Integrity warnings identify multiple active reigns, missing champions, unresolved title results, vacant titles without a plan, inactive reigns, and leading contenders without bookings.
 
-Filters can isolate shows, milestones, arcs, or ideas.
+## Creative Control Center
 
-### Show readiness and continuity
+The universe-wide control center connects the planning systems and surfaces upcoming shows, reconciliation needs, active storylines, milestones, open ideas, worker arcs, continuity warnings, and recent history.
 
-Upcoming shows are checked for:
-
-- Planned time versus expected time
-- Missing Match Stories or Segment Outputs
-- Segments without workers
-- Storyline consequences without storyline links
-- Ideas assigned to the show but not added to the card
-- Storyline milestones assigned to the show but absent from the card
-
-The continuity center also identifies active storylines with no next segment, active character arcs without upcoming appearances, broken show links, completed ideas without segments, and title-change ideas without scheduled title matches. Warnings remain advisory and never block booking.
-
-### Global search
-
-Global search covers shows, segments, Match Stories, Segment Outputs, storylines, milestones, workers, character arcs, relationships, and booking ideas.
+Booking ideas can be created before assignment to a show and converted directly into planned matches or angles. The tracker carries workers, roles, storyline links, narrative, purpose, consequences, follow-up, championship details, and the original booking-idea reference into the segment. Duplicate scheduling is blocked.
 
 ## Existing systems
 
 - Planned-show workspace with ordered matches and angles
 - Full Match Story and Segment Output editors
-- Read-only TEW MDB/ACCDB import
+- Copy-ready TEW entry summaries
+- Read-only TEW MDB/ACCDB snapshot import
 - Planned-to-actual show and match reconciliation
 - Permanent enhanced show history
 - Storyline Hub, milestones, and chronological timelines
 - Worker creative profiles, statistics, character arcs, relationships, and comparison history
+- Future Booking Board, creative calendar, readiness checks, and global search
+
+## TEW handoff and integration boundary
+
+The intended workflow is:
+
+1. Build the card, match stories, angle outputs, workers, storylines, finishes, and title stakes in this tracker.
+2. Use the copy-ready TEW summaries while entering the show into TEW.
+3. Run the show in TEW.
+4. Import the updated TEW MDB snapshot back into the tracker.
+5. Reconcile actual results and confirm championship changes.
+
+Directly writing a completed card into a live TEW save is **not implemented**. Snapshot access remains read-only because uncontrolled writes to a live Access database could corrupt the save or create records TEW does not accept. A future handoff phase can add structured export, field-by-field entry assistance, and—only if a documented safe route is verified—a guarded write/import bridge using backups and validation.
 
 ## Backups
 
-Version 6 backups include:
+Version 7 backups include:
 
 - Planned and reconciled shows
 - Tracker storylines and milestones
 - Worker profiles, arcs, and relationships
 - Booking ideas and Creative Control Center settings
+- Championships, reigns, rankings, title programs, and result confirmations
 
-Backup versions 1 through 5 remain importable with safe empty defaults for systems that did not yet exist.
+Backup versions 1 through 6 remain importable with safe empty defaults for systems that did not yet exist.
 
 ## Safety boundary
 
 - TEW database access remains read-only.
 - No database is uploaded to an application server.
-- No TEW executable or save-file mutation is performed.
+- No TEW executable or live save-file mutation is performed.
 - Browser data saves automatically to the current preview origin.
 
 ## Open in GitHub Codespaces

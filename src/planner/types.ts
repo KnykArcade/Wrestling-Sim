@@ -1,3 +1,4 @@
+import type { ChampionshipMatchPurpose, ChampionshipUniverse, TitleResultDecision } from "../championships/types";
 import type { CreativeControlData } from "../control/types";
 import type { TrackerStoryline } from "../storylines/types";
 import type { WorkerUniverse } from "../workers/types";
@@ -81,6 +82,14 @@ export interface PlannedSegment {
 
   matchType: string;
   championship: string;
+  championshipId: string;
+  championshipMatchPurpose: ChampionshipMatchPurpose;
+  championEntering: string;
+  challenger: string;
+  expectedTitleChange: boolean | null;
+  championshipStakes: string;
+  titleResultDecision: TitleResultDecision;
+  titleResultConfirmedAt: string;
   plannedWinner: string;
   plannedFinish: string;
   matchStory: string;
@@ -116,12 +125,13 @@ export interface PlannedShow {
 
 export interface PlannerBackup {
   product: "TEW IX Story Tracker";
-  version: 6;
+  version: 7;
   exportedAt: string;
   shows: PlannedShow[];
   storylines: TrackerStoryline[];
   workers: WorkerUniverse;
   control: CreativeControlData;
+  championships: ChampionshipUniverse;
 }
 
 export interface PlannerBackupBundle {
@@ -129,4 +139,5 @@ export interface PlannerBackupBundle {
   storylines: TrackerStoryline[];
   workers: WorkerUniverse;
   control: CreativeControlData;
+  championships: ChampionshipUniverse;
 }
