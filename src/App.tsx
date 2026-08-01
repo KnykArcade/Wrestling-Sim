@@ -223,6 +223,7 @@ function SnapshotHeader({ snapshot, onClose }: { snapshot: TewSnapshot; onClose:
 
       <section className="summary-grid" aria-label="Import summary">
         <div><span>Tables</span><strong>{snapshot.tables.length}</strong></div>
+        <div><span>Workers</span><strong>{snapshot.workers.length}</strong></div>
         <div><span>Shows</span><strong>{snapshot.shows.length}</strong></div>
         <div><span>Matches</span><strong>{snapshot.shows.reduce((sum, show) => sum + show.matches.length, 0)}</strong></div>
         <div><span>Storylines</span><strong>{snapshot.storylines.length}</strong></div>
@@ -245,14 +246,20 @@ export default function App() {
     return snapshot.shows.find((show) => show.id === selectedShowId) ?? snapshot.shows[0] ?? null;
   }, [selectedShowId, snapshot]);
 
-  async function handleFile(file: File) {
+  function closeSnapshot(): void {
+    setSnapshot(null);
+    setSelectedShowId("");
+    setError("");
+  }
+
+  async function handleFile(file: File, destination: ViewName = "shows") {
     setLoading(true);
     setError("");
     try {
       const imported = await readTewSnapshot(file);
       setSnapshot(imported);
       setSelectedShowId(imported.shows[0]?.id ?? "");
-      setView("shows");
+      setView(destination);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The database could not be imported.");
     } finally {
@@ -269,7 +276,7 @@ export default function App() {
           <span className="brand-kicker">WRESTLING SIM</span>
           <h1>TEW IX Story Tracker</h1>
         </div>
-        <div className="phase-badge">PHASE 2A · PLANNED SHOWS</div>
+        <div className="phase-badge">PHASE 2B · NARRATIVE EDITORS</div>
       </header>
 
       <nav className="global-tabbar" aria-label="Story Tracker sections">
@@ -288,16 +295,24 @@ export default function App() {
       </nav>
 
       <main>
-        {view === "planner" && <PlannedShowWorkspace />}
+        {view === "planner" && (
+          <PlannedShowWorkspace
+            snapshot={snapshot}
+            snapshotLoading={loading}
+            snapshotError={error}
+            onSnapshotFile={(file) => void handleFile(file, "planner")}
+            onCloseSnapshot={closeSnapshot}
+          />
+        )}
 
-        {needsSnapshot && <ImportPanel onFile={handleFile} />}
+        {needsSnapshot && <ImportPanel onFile={(file) => void handleFile(file, view)} />}
 
-        {loading && (
+        {loading && view !== "planner" && (
           <div className="status-banner" role="status">
             Reading the database and matching TEW history tables…
           </div>
         )}
-        {error && (
+        {error && view !== "planner" && (
           <div className="status-banner error" role="alert">
             <strong>Import failed</strong>
             <span>{error}</span>
@@ -306,14 +321,7 @@ export default function App() {
 
         {snapshot && view !== "planner" && (
           <>
-            <SnapshotHeader
-              snapshot={snapshot}
-              onClose={() => {
-                setSnapshot(null);
-                setSelectedShowId("");
-                setError("");
-              }}
-            />
+            <SnapshotHeader snapshot={snapshot} onClose={closeSnapshot} />
 
             {view === "shows" && (
               <div className="history-layout">
@@ -422,7 +430,7 @@ export default function App() {
       </main>
 
       <footer>
-        Planned shows are stored in this browser. TEW snapshot access remains read-only.
+        Planned narratives are stored in this browser. TEW snapshot access remains read-only.
       </footer>
     </div>
   );
