@@ -146,7 +146,7 @@ export function createRanking(rank: number, competitors: ChampionshipCompetitor[
 
 export function titleMatchesSegment(championship: Championship, segment: PlannedSegment): boolean {
   if (segment.championshipId === championship.id) return true;
-  const references = [segment.championship, ...championship.legacyNames, championship.name, championship.linkedTewTitleName]
+  const references = [...championship.legacyNames, championship.name, championship.linkedTewTitleName]
     .map(normalize)
     .filter(Boolean);
   return Boolean(normalize(segment.championship) && references.includes(normalize(segment.championship)));
