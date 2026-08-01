@@ -10,7 +10,7 @@ test("creates and persists match and angle narratives without browser errors", a
   await expect(page.getByRole("heading", { name: "TEW IX Story Tracker" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Run the whole booking universe from one workspace" })).toBeVisible();
   await page.getByRole("button", { name: "Planned Shows" }).click();
-  await expect(page.getByRole("heading", { name: "Plan the show, run it in TEW, then preserve what actually happened" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Plan the show for TEW, add match approaches, then preserve what actually happened" })).toBeVisible();
 
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("Monday Night Test");
@@ -28,7 +28,7 @@ test("creates and persists match and angle narratives without browser errors", a
   await angle.getByRole("button", { name: "Add Manual Storyline" }).click();
   await expect(page.getByText("2 planned segments")).toBeVisible();
   await expect(page.getByText("2 narratives complete")).toBeVisible();
-  await expect(match.getByText("Bret Hart", { exact: true })).toBeVisible();
+  await expect(match.locator(".narrative-person-name strong").filter({ hasText: "Bret Hart" })).toBeVisible();
   await expect(angle.getByText("World Title Rivalry", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Reconcile Results" }).click();

@@ -1,3 +1,5 @@
+import { MATCH_AIMS } from "../matchEngine/catalog";
+import { createEmptyMatchApproachSetup, getApproach } from "../matchEngine/model";
 import type {
   PlannedSegment,
   PlannedSegmentSection,
@@ -84,6 +86,7 @@ export function createPlannedSegment(type: PlannedSegmentType): PlannedSegment {
     keyMoments: "",
     interference: "",
     postMatch: "",
+    matchApproachSetup: createEmptyMatchApproachSetup(),
 
     angleLocation: type === "angle" ? "In The Ring" : "",
     angleContentType: type === "angle" ? "Serious" : "",
@@ -118,6 +121,16 @@ export function duplicatePlannedShow(show: PlannedShow): PlannedShow {
       titleResultConfirmedAt: "",
       workflowStatus: "Planned",
       reconciliation: createEmptySegmentReconciliation(),
+      matchApproachSetup: {
+        ...segment.matchApproachSetup,
+        workerPlans: segment.matchApproachSetup.workerPlans.map((plan) => ({
+          ...plan,
+          selectedApproachIds: [...plan.selectedApproachIds],
+          lockedApproachIds: [...plan.lockedApproachIds],
+          generatedAt: "",
+        })),
+        updatedAt: "",
+      },
       workers: segment.workers.map((worker) => ({ ...worker, id: createPlannerId() })),
       storylines: segment.storylines.map((storyline) => ({ ...storyline })),
     })),
@@ -160,6 +173,11 @@ export function buildTewEntrySummary(segment: PlannedSegment): string {
   ];
 
   if (segment.type === "match") {
+    const aim = MATCH_AIMS.find((item) => item.id === segment.matchApproachSetup.matchAimId);
+    const approaches = segment.matchApproachSetup.workerPlans
+      .filter((plan) => plan.selectedApproachIds.length > 0)
+      .map((plan) => `${plan.workerName}: ${plan.selectedApproachIds.map((id) => getApproach(id)?.name ?? id).join(", ")}`)
+      .join("\n");
     lines.push(
       segment.matchType ? `Match type: ${segment.matchType}` : "",
       segment.championship ? `Championship: ${segment.championship}` : "",
@@ -168,6 +186,9 @@ export function buildTewEntrySummary(segment: PlannedSegment): string {
       segment.challenger ? `Challenger: ${segment.challenger}` : "",
       segment.expectedTitleChange === null ? "" : `Expected title change: ${segment.expectedTitleChange ? "Yes" : "No"}`,
       segment.championshipStakes ? `Championship stakes: ${segment.championshipStakes}` : "",
+      aim ? `Match aim: ${aim.name} · Ideal pace ${aim.idealPace}` : "",
+      approaches ? `Selected match approaches:\n${approaches}` : "",
+      segment.matchApproachSetup.notes ? `Approach notes:\n${segment.matchApproachSetup.notes}` : "",
       segment.plannedWinner ? `Planned winner: ${segment.plannedWinner}` : "",
       segment.plannedFinish ? `Planned finish: ${segment.plannedFinish}` : "",
       segment.matchStory ? `Match story:\n${segment.matchStory}` : "",

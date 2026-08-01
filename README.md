@@ -1,109 +1,117 @@
 # TEW IX Story Tracker
 
-A browser-based companion for **Total Extreme Wrestling IX** that preserves booking plans, match stories, angle outputs, planned-versus-actual show history, storyline continuity, worker creative profiles, future booking ideas, championship lineage, rankings, TEW handoff packages, and the foundation of a native match simulation engine without changing TEW's executable or live save files.
+A browser-based **Total Extreme Wrestling IX companion** for planning cards, writing Match Stories and Angle Segment Outputs, selecting match approaches, preparing TEW handoff packages, and preserving creative history. TEW remains the game and the authority for running the show.
 
-## Phase 4C1: Native Match Engine Data Foundation
+## Phase 4C2: Match Setup and Approach AI
 
-The new **Match Engine** workspace converts the uploaded match-system documents and workbooks into a typed, testable application catalog.
+Every planned match now includes an approach setup panel directly inside the Planned Show Workspace.
 
-### Canonical approaches
+### TEW companion boundary
 
-The engine now contains fifteen canonical approaches:
+Phase 4C2 does not replace TEW. It does not decide the winner, calculate a star rating, or write to the TEW database. It adds the creative and strategic material that TEW does not currently store in the form required by this tracker:
 
-- Aerial Showstopper
-- Big Match Performer
-- Chain Technician
-- Dirty Rulebreaker
-- Hardcore Daredevil
-- Heavy Striker / Brawler
-- High Tempo Hybrid
-- Opportunistic Schemer
-- Pace Controller
-- Power Dominance
-- Psychological Manipulator
-- Resilient Underdog
-- Showman
-- Strong Style Specialist
-- Submission Specialist
+- Match aim
+- Wrestler-selected approaches
+- Stamina budgeting
+- Match Story
+- Angle Segment Output
+- Road-agent and approach notes
+- Copy-ready TEW handoff details
 
-Every approach stores its four weighted wrestler skills, pace value, stamina cost, source names, source notes, and available narrative phrases. The interactive formula inspector calculates an approach rating from editable wrestler-skill values.
+### Wrestler match profiles
 
-### Duration-based approach slots
+Each TEW-linked or manual wrestler can have one tracker-side match profile containing:
 
-The approved rules are now authoritative:
+- One of fifteen source-derived wrestler styles
+- Overall, health, popularity, experience, fan reaction, and gimmick
+- The eighteen skills used by the uploaded approach formulas
+- Notes and a reusable TEW worker link
+
+Profiles remain in browser storage and never modify TEW.
+
+### Duration-based approach selection
+
+The approved slot rules remain authoritative:
 
 - 5 minutes or less: 1 approach per wrestler
 - 6–15 minutes: 2 approaches per wrestler
 - 16–24 minutes: 3 approaches per wrestler
 - 25 minutes or longer: 4 approaches per wrestler
 
-Legacy importance-based approach counts are retained for workbook parity and diagnostics but do not override these duration boundaries.
+### Approach AI
 
-### Match aims, pace, stamina, and mental states
+The AI evaluates complete combinations rather than simply selecting the highest raw numbers. Its visible inputs are:
 
-The catalog preserves nineteen combined match aims with style, ideal pace, best-fit wrestler styles, and clash styles.
+- Weighted approach rating
+- Wrestler-style boost
+- Transparent match-aim compatibility hint
+- Fit with the selected ideal pace
+- Stamina cost and available stamina
+- Combination pacing and diversity
+- Manually locked approaches
 
-Pace evaluation reproduces the workbook statuses and modifiers:
+The selected plan displays its approach ratings, stamina use, estimated pace, and explanation. The user can run the AI, lock any choice, add or remove approaches manually, and rerun the remaining slots.
 
-- Ideal Pace: +2
-- Open Pace: 0
-- Off Pace: -5
-- Noticeably Off: -10
-- Poor Pacing: -15
-- Bad Pacing: -20
-- Failed: -25
+### Workbook stamina parity
 
-Stamina evaluation reproduces Pass, Winded, Gassed, and Dead states. The five mental states remain Hot Night, Focused, Neutral, Distracted, and Off Night with the original modifiers and score thresholds.
+The tracker reproduces the uploaded stamina-rating formula using Selling, Stamina, Resilience, Experience, Athleticism, and Toughness. It also preserves the source capacity bands from 1 through 9 available stamina.
 
-### Explicit source reconciliation
+### TEW handoff integration
 
-Source differences are not silently discarded:
+The copy-ready TEW summary now includes:
 
-- `Aerial Specialist` maps to Aerial Showstopper.
-- `Heavy Striker/Brawler` maps to Heavy Striker / Brawler.
-- `Workrate Machine` maps to High Tempo Hybrid.
-- `Counter Specialist` and `Ring General` remain visible as unresolved legacy records because the fifteen-approach definition document does not define them.
-- Pace Controller retains a documented source conflict between pace 0 and pace 1; pace 1 is canonical because it is the active Data-table lookup value.
+- Match aim and ideal pace
+- Selected approaches for every wrestler
+- Approach and road-agent notes
+- Existing championship, winner, finish, storyline, and Match Story details
 
-The Source Reconciliation screen shows every alias, unresolved record, source conflict, and preserved legacy importance profile.
+## Phase 4C1 foundation
 
-## Phase 4B: TEW Show Handoff and Entry Assistant
+The Match Engine reference workspace retains:
 
-Planned shows can be finalized into immutable numbered handoff versions. The handoff workspace preserves the running order, workers, roles, match settings, championship stakes, finishes, narratives, follow-ups, and road-agent notes.
+- Fifteen canonical approaches and weighted formulas
+- Nineteen match aims
+- Pace modifiers
+- Stamina penalties
+- Mental-state definitions
+- Source aliases and unresolved legacy names
+- Workbook reconciliation notes
 
-The guided TEW Entry Assistant supports field-by-field or full-segment copying, saved progress, reusable TEW mappings, missing-record warnings, show-level entry checklists, version comparisons, JSON/text/Markdown exports, and printable booking sheets.
+## Existing systems
 
-TEW MDB/ACCDB access remains read-only.
-
-## Championship and creative systems
-
-- Championship Hub with reigns, vacancies, defenses, rankings, programs, timelines, and result confirmation
-- Creative Control Center with upcoming shows, readiness, continuity warnings, calendar, ideas, and global search
-- Planned-show workspace with ordered matches and angles
-- Full Match Story and Segment Output editors
-- Planned-to-actual show and match reconciliation
-- Storyline Hub, milestones, and chronological timelines
-- Worker creative profiles, statistics, character arcs, relationships, and comparison history
+- Planned shows with ordered matches and angles
+- Full Match Story and Angle Segment Output editors
+- TEW Show Handoff and guided Entry Assistant
+- Read-only MDB/ACCDB snapshot import
+- Planned-versus-actual reconciliation
+- Storyline Hub and timelines
+- Worker creative profiles and relationships
+- Championship lineage, rankings, and programs
+- Creative Control Center and Future Booking Board
 
 ## Next match-engine phases
 
-- **Phase 4C2:** Match Setup and Approach AI
-- **Phase 4C3:** Match Simulation and Outcome Engine
-- **Phase 4C4:** Narrative and Universe Integration
-
-These phases will build on the canonical data foundation rather than reimplementing spreadsheet formulas independently.
+- **Phase 4C3:** Optional simulation preview, outcome analysis, and rating model while preserving TEW-authoritative workflows
+- **Phase 4C4:** Generated narratives and integration with worker, championship, storyline, and history systems
 
 ## Backups
 
-Version 8 backups include planned and reconciled shows, tracker storylines, worker data, booking ideas, championships, and TEW handoff versions, mappings, checklists, and progress.
+Version 9 backups include:
 
-Phase 4C1 adds static source catalogs and does not require a new backup version.
+- Planned and reconciled shows
+- Match approach setup for every planned match
+- Reusable tracker-side wrestler match profiles
+- Storylines, workers, relationships, booking ideas, and championships
+- TEW handoff versions, mappings, checklists, and entry progress
+
+Backup versions 1 through 8 remain importable.
 
 ## Safety boundary
 
 - TEW database access remains read-only.
 - No database is uploaded to an application server.
 - No TEW executable or live save-file mutation is performed.
+- Match profiles and approach selections are tracker-side companion data.
 - Browser data saves automatically to the current preview origin.
 
 ## Open in GitHub Codespaces

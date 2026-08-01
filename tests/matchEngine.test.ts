@@ -11,12 +11,56 @@ import {
   approachSlotsForDuration,
   calculateApproachRating,
   calculateMentalStateScore,
+  calculateProfileStaminaRating,
+  chooseApproachPlan,
   classifyMentalState,
+  createMatchEngineProfile,
   evaluatePace,
   evaluateStamina,
   mentalSwingProbability,
+  profileStaminaCapacity,
   resolveApproachId,
+  scoreApproachCandidate,
+  staminaCapacityFromRating,
 } from "../src/matchEngine/model";
+import { WRESTLER_STYLES } from "../src/matchEngine/profileCatalog";
+import {
+  MATCH_ENGINE_STORAGE_KEY,
+  loadMatchEngineUniverse,
+  saveMatchEngineUniverse,
+} from "../src/matchEngine/storage";
+import type { MatchEngineProfile } from "../src/matchEngine/types";
+
+class MemoryStorage {
+  private values = new Map<string, string>();
+  getItem(key: string): string | null { return this.values.get(key) ?? null; }
+  setItem(key: string, value: string): void { this.values.set(key, value); }
+}
+
+function testProfile(): MatchEngineProfile {
+  const profile = createMatchEngineProfile({ id: "worker-1", name: "Test Wrestler", source: "tew" });
+  return {
+    ...profile,
+    styleId: "show-stealer-workhorse",
+    overall: 78,
+    experience: 75,
+    skills: {
+      ...profile.skills,
+      Aerial: 82,
+      Athleticism: 85,
+      Basics: 78,
+      Charisma: 72,
+      Consistency: 80,
+      Flashiness: 80,
+      Psychology: 79,
+      Resilience: 75,
+      Selling: 74,
+      Stamina: 84,
+      Technical: 76,
+      Toughness: 70,
+    },
+  };
+}
 
 describe("native match engine data foundation", () => {
   test("loads fifteen canonical approaches with normalized one-hundred-percent formulas", () => {
@@ -102,5 +146,58 @@ describe("native match engine data foundation", () => {
     expect(MATCH_IMPORTANCE_PROFILES.find((profile) => profile.name === "PPV Main Event")?.sourceApproachCount).toBe(4);
     expect(SOURCE_CONFLICTS.some((record) => record.id === "pace-controller-pace")).toBe(true);
     expect(SOURCE_CONFLICTS.some((record) => record.id === "importance-approach-count")).toBe(true);
+  });
+});
+
+describe("Phase 4C2 match setup and approach AI", () => {
+  test("reproduces the workbook stamina rating and capacity bands", () => {
+    const profile = testProfile();
+    const expected = (74 + 84 + 75 + 75 + 85 + 70) / 6;
+    expect(calculateProfileStaminaRating(profile)).toBeCloseTo(expected, 2);
+    expect(staminaCapacityFromRating(75)).toBe(9);
+    expect(staminaCapacityFromRating(70)).toBe(7);
+    expect(staminaCapacityFromRating(65)).toBe(6);
+    expect(staminaCapacityFromRating(60)).toBe(5);
+    expect(staminaCapacityFromRating(50)).toBe(4);
+    expect(staminaCapacityFromRating(30)).toBe(3);
+    expect(staminaCapacityFromRating(20)).toBe(2);
+    expect(staminaCapacityFromRating(19.99)).toBe(1);
+    expect(profileStaminaCapacity(profile)).toBe(9);
+  });
+
+  test("selects the correct number of approaches for each duration band", () => {
+    const profile = testProfile();
+    expect(chooseApproachPlan(profile, "competitive-tv-match", 5).selectedApproachIds).toHaveLength(1);
+    expect(chooseApproachPlan(profile, "competitive-tv-match", 12).selectedApproachIds).toHaveLength(2);
+    expect(chooseApproachPlan(profile, "competitive-tv-match", 20).selectedApproachIds).toHaveLength(3);
+    expect(chooseApproachPlan(profile, "competitive-tv-match", 25).selectedApproachIds).toHaveLength(4);
+  });
+
+  test("preserves manual locks while choosing the best remaining combination", () => {
+    const profile = testProfile();
+    const result = chooseApproachPlan(profile, "technical-showcase", 20, ["submission-specialist"]);
+    expect(result.selectedApproachIds).toHaveLength(3);
+    expect(result.selectedApproachIds).toContain("submission-specialist");
+    expect(result.usedStamina).toBeLessThanOrEqual(result.availableStamina);
+  });
+
+  test("uses transparent wrestler style boosts in candidate scoring", () => {
+    const profile = testProfile();
+    const highTempo = MATCH_APPROACHES.find((approach) => approach.id === "high-tempo-hybrid")!;
+    const boosted = scoreApproachCandidate(profile, "sprint", highTempo);
+    const unboostedProfile = { ...profile, styleId: "all-rounder" as const };
+    const unboosted = scoreApproachCandidate(unboostedProfile, "sprint", highTempo);
+    expect(WRESTLER_STYLES.find((style) => style.id === profile.styleId)?.approachBoosts).toContain("high-tempo-hybrid");
+    expect(boosted.styleBonus).toBe(8);
+    expect(unboosted.styleBonus).toBe(0);
+    expect(boosted.total).toBeGreaterThan(unboosted.total);
+  });
+
+  test("persists tracker-side wrestler profiles without modifying TEW data", () => {
+    const storage = new MemoryStorage();
+    const profile = testProfile();
+    saveMatchEngineUniverse(storage, { profiles: [profile] });
+    expect(storage.getItem(MATCH_ENGINE_STORAGE_KEY)).toContain("Test Wrestler");
+    expect(loadMatchEngineUniverse(storage)).toEqual({ profiles: [profile] });
   });
 });

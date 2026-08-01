@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import MatchApproachSetupEditor from "../matchEngine/MatchApproachSetup";
+import { loadMatchEngineUniverse, saveMatchEngineUniverse } from "../matchEngine/storage";
+import type { MatchEngineUniverse } from "../matchEngine/types";
 import type { TewSnapshot } from "../tew/types";
 import {
   createPlannedSegment,
@@ -21,8 +24,8 @@ import type { PlannedSegment, PlannedShow } from "./types";
 type SaveState = "Saved" | "Saving" | "Save failed";
 type EditorMode = "plan" | "reconcile";
 
-function downloadBackup(shows: PlannedShow[]): void {
-  const backup = createPlannerBackup(shows);
+function downloadBackup(shows: PlannedShow[], matchEngine: MatchEngineUniverse): void {
+  const backup = createPlannerBackup(shows, undefined, undefined, undefined, undefined, undefined, matchEngine);
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -43,6 +46,8 @@ function SegmentEditor({
   index,
   count,
   snapshot,
+  matchEngine,
+  onMatchEngineChange,
   onChange,
   onMove,
   onDelete,
@@ -51,6 +56,8 @@ function SegmentEditor({
   index: number;
   count: number;
   snapshot: TewSnapshot | null;
+  matchEngine: MatchEngineUniverse;
+  onMatchEngineChange: (universe: MatchEngineUniverse) => void;
   onChange: (segment: PlannedSegment) => void;
   onMove: (direction: -1 | 1) => void;
   onDelete: () => void;
@@ -85,6 +92,7 @@ function SegmentEditor({
         <label className="field field--full"><span>Quick planning outline</span><textarea rows={3} placeholder="A short overview for the running order. Use Narrative Details below for the complete story." value={segment.notes} onChange={(event) => onChange({ ...segment, notes: event.target.value })} /></label>
       </div>
 
+      {segment.type === "match" && <MatchApproachSetupEditor segment={segment} universe={matchEngine} onUniverseChange={onMatchEngineChange} onChange={onChange} />}
       <NarrativeEditor segment={segment} availableWorkers={snapshot?.workers ?? []} availableStorylines={snapshot?.storylines ?? []} onChange={onChange} />
     </article>
   );
@@ -108,6 +116,7 @@ export default function PlannedShowWorkspace({
   initialSegmentId?: string;
 }) {
   const [shows, setShows] = useState<PlannedShow[]>(() => loadPlannedShows(window.localStorage));
+  const [matchEngine, setMatchEngine] = useState<MatchEngineUniverse>(() => loadMatchEngineUniverse(window.localStorage));
   const [selectedId, setSelectedId] = useState<string>(initialShowId);
   const [saveState, setSaveState] = useState<SaveState>("Saved");
   const [notice, setNotice] = useState("");
@@ -133,6 +142,14 @@ export default function PlannedShowWorkspace({
       setSaveState("Save failed");
     }
   }, [shows]);
+
+  useEffect(() => {
+    try {
+      saveMatchEngineUniverse(window.localStorage, matchEngine);
+    } catch {
+      setSaveState("Save failed");
+    }
+  }, [matchEngine]);
 
   useEffect(() => {
     if (selectedShow?.status === "Reconciled") setEditorMode("reconcile");
@@ -187,9 +204,10 @@ export default function PlannedShowWorkspace({
       const imported = parsePlannerBackup(await file.text());
       if (shows.length > 0 && !window.confirm("Replace the planned shows saved in this browser?")) return;
       setShows(imported);
+      setMatchEngine(loadMatchEngineUniverse(window.localStorage));
       setSelectedId(imported[0]?.id ?? "");
       setEditorMode(imported[0]?.status === "Reconciled" ? "reconcile" : "plan");
-      setNotice(`Imported ${imported.length} planned show${imported.length === 1 ? "" : "s"}. Storyline data was restored when present.`);
+      setNotice(`Imported ${imported.length} planned show${imported.length === 1 ? "" : "s"}. Storyline, handoff, and match-profile data were restored when present.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "The backup could not be imported.");
     }
@@ -200,11 +218,11 @@ export default function PlannedShowWorkspace({
   return (
     <section className="planner-workspace">
       <header className="planner-toolbar">
-        <div><p className="eyebrow">PLANNED SHOW WORKSPACE</p><h2>Plan the show, run it in TEW, then preserve what actually happened</h2><p>Every card now supports full narrative writing and post-show planned-versus-actual reconciliation.</p></div>
+        <div><p className="eyebrow">PLANNED SHOW WORKSPACE</p><h2>Plan the show for TEW, add match approaches, then preserve what actually happened</h2><p>TEW remains the simulation game. The tracker adds Match Stories, Segment Outputs, approach strategy, handoff support, and permanent history.</p></div>
         <div className="planner-toolbar__actions">
           <span className={`save-state save-state--${saveState.toLowerCase().replace(" ", "-")}`}>{saveState}</span>
           <button className="primary-button" type="button" onClick={addShow}>Create Show</button>
-          <button className="secondary-button" type="button" onClick={() => downloadBackup(shows)} disabled={shows.length === 0}>Export Backup</button>
+          <button className="secondary-button" type="button" onClick={() => downloadBackup(shows, matchEngine)} disabled={shows.length === 0}>Export Backup</button>
           <button className="secondary-button" type="button" onClick={() => importRef.current?.click()}>Import Backup</button>
           <input ref={importRef} className="visually-hidden" type="file" accept="application/json,.json" onChange={(event) => { const file = event.target.files?.item(0); if (file) void importBackup(file); event.currentTarget.value = ""; }} />
         </div>
@@ -236,7 +254,7 @@ export default function PlannedShowWorkspace({
               </div>
             </section>
             <section className="planned-card-editor"><header className="card-editor-header"><div><p className="eyebrow">CARD ORDER</p><h3>{selectedShow.segments.length} planned segment{selectedShow.segments.length === 1 ? "" : "s"}</h3><p>{totalPlannedMinutes(selectedShow)} of {selectedShow.expectedMinutes} expected minutes planned · {completeNarratives} narratives complete</p></div><div className="card-editor-actions"><button className="primary-button" type="button" onClick={() => addSegment("match")}>Add Match</button><button className="secondary-button" type="button" onClick={() => addSegment("angle")}>Add Angle</button></div></header>
-              {selectedShow.segments.length === 0 ? <div className="empty-state card-empty">Add a match or angle to begin building the show in running order.</div> : <div className="planned-segment-list">{selectedShow.segments.map((segment, index) => <SegmentEditor key={segment.id} segment={segment} index={index} count={selectedShow.segments.length} snapshot={snapshot} onChange={(updated) => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.map((item) => item.id === updated.id ? updated : item) }))} onMove={(direction) => updateShow(selectedShow.id, (show) => ({ ...show, segments: movePlannedSegment(show.segments, segment.id, direction) }))} onDelete={() => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.filter((item) => item.id !== segment.id) }))} />)}</div>}
+              {selectedShow.segments.length === 0 ? <div className="empty-state card-empty">Add a match or angle to begin building the show in running order.</div> : <div className="planned-segment-list">{selectedShow.segments.map((segment, index) => <SegmentEditor key={segment.id} segment={segment} index={index} count={selectedShow.segments.length} snapshot={snapshot} matchEngine={matchEngine} onMatchEngineChange={setMatchEngine} onChange={(updated) => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.map((item) => item.id === updated.id ? updated : item) }))} onMove={(direction) => updateShow(selectedShow.id, (show) => ({ ...show, segments: movePlannedSegment(show.segments, segment.id, direction) }))} onDelete={() => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.filter((item) => item.id !== segment.id) }))} />)}</div>}
             </section>
           </>}
         </div>}
