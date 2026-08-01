@@ -1,4 +1,4 @@
-import type { WrestlerSkill, WrestlerStyleDefinition } from "./types";
+import type { MatchAimId, MatchApproachId, WrestlerSkill, WrestlerStyleDefinition } from "./types";
 
 export const MATCH_ENGINE_SKILLS: WrestlerSkill[] = [
   "Aerial",
@@ -143,3 +143,27 @@ export const WRESTLER_STYLES: WrestlerStyleDefinition[] = [
     aimStyleNames: ["Impactful", "Regular"],
   },
 ];
+
+// Transparent Phase 4C2 AI hints. These connect the source approach descriptions
+// to the selected match aim, but are not presented as workbook formulas.
+export const AIM_APPROACH_HINTS: Record<MatchAimId, MatchApproachId[]> = {
+  "call-it-in-the-ring": ["pace-controller", "chain-technician", "opportunistic-schemer", "big-match-performer"],
+  "comedy-entertainment": ["showman", "psychological-manipulator", "dirty-rulebreaker"],
+  "competitive-tv-match": ["high-tempo-hybrid", "chain-technician", "strong-style-specialist", "aerial-showstopper"],
+  "crowd-work-showcase": ["showman", "psychological-manipulator", "big-match-performer"],
+  "epic-main-event-slow-burn": ["big-match-performer", "pace-controller", "resilient-underdog", "power-dominance"],
+  elimination: ["opportunistic-schemer", "resilient-underdog", "power-dominance", "high-tempo-hybrid"],
+  "feature-match": ["big-match-performer", "high-tempo-hybrid", "showman"],
+  "feud-grudge-match": ["heavy-striker-brawler", "psychological-manipulator", "dirty-rulebreaker", "resilient-underdog"],
+  "hardcore-war": ["hardcore-daredevil", "heavy-striker-brawler", "resilient-underdog"],
+  "high-spots-spectacle": ["aerial-showstopper", "high-tempo-hybrid", "hardcore-daredevil"],
+  "monster-fight-hoss-battle": ["power-dominance", "heavy-striker-brawler", "resilient-underdog"],
+  "open-match": [],
+  sprint: ["high-tempo-hybrid", "aerial-showstopper", "strong-style-specialist"],
+  "storytelling-match": ["big-match-performer", "pace-controller", "resilient-underdog", "psychological-manipulator"],
+  "strong-style-duel": ["strong-style-specialist", "heavy-striker-brawler", "resilient-underdog"],
+  "survival-chaos": ["resilient-underdog", "opportunistic-schemer", "hardcore-daredevil"],
+  "technical-showcase": ["chain-technician", "submission-specialist", "pace-controller"],
+  "underdog-drama": ["resilient-underdog", "big-match-performer", "psychological-manipulator"],
+  "wild-brawl": ["heavy-striker-brawler", "hardcore-daredevil", "dirty-rulebreaker"],
+};
