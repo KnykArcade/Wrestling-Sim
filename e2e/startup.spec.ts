@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("renders the Phase 1 import screen without browser errors", async ({ page }) => {
+test("creates and persists a planned show without browser errors", async ({ page }) => {
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
 
@@ -14,9 +14,20 @@ test("renders the Phase 1 import screen without browser errors", async ({ page }
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "TEW IX Story Tracker" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Open a TEW IX MDB snapshot" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Select MDB File" })).toBeVisible();
-  await expect(page.locator("body")).not.toBeEmpty();
+  await expect(page.getByRole("heading", { name: "Build the card before the TEW show exists" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Create Show" }).first().click();
+  await page.getByLabel("Show name").fill("Monday Night Test");
+  await page.getByRole("button", { name: "Add Match" }).click();
+  await page.getByRole("button", { name: "Add Angle" }).click();
+
+  await expect(page.getByText("2 planned segments")).toBeVisible();
+  await expect(page.locator(".planned-segment--match input").first()).toHaveValue("Untitled Match");
+  await expect(page.locator(".planned-segment--angle input").first()).toHaveValue("Untitled Angle");
+
+  await page.reload();
+  await expect(page.getByLabel("Show name")).toHaveValue("Monday Night Test");
+  await expect(page.getByText("2 planned segments")).toBeVisible();
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
@@ -24,8 +35,9 @@ test("renders the Phase 1 import screen without browser errors", async ({ page }
 
 test("loads MDB browser shims before evaluating the parser", async ({ page }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "TEW Show History" }).click();
 
-  await page.locator('input[type="file"]').setInputFiles({
+  await page.locator('input[accept*=".mdb"]').setInputFiles({
     name: "invalid-test-snapshot.mdb",
     mimeType: "application/x-msaccess",
     buffer: Buffer.from("not a real Access database"),

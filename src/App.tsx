@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from "react";
+import PlannedShowWorkspace from "./planner/PlannedShowWorkspace";
 import { readTewSnapshot } from "./tew/reader";
 import type { MatchRecord, ShowRecord, StorylineRecord, TewSnapshot } from "./tew/types";
 
-type ViewName = "shows" | "storylines" | "schema";
+type ViewName = "planner" | "shows" | "storylines" | "schema";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) {
@@ -183,7 +184,7 @@ function ImportPanel({ onFile }: { onFile: (file: File) => void }) {
         <p className="eyebrow">READ-ONLY IMPORT</p>
         <h2>Open a TEW IX MDB snapshot</h2>
         <p>
-          The file is parsed inside this browser session. The prototype does not upload, change, or
+          The file is parsed inside this browser session. The tracker does not upload, change, or
           write back to the TEW database.
         </p>
       </div>
@@ -208,10 +209,32 @@ function ImportPanel({ onFile }: { onFile: (file: File) => void }) {
   );
 }
 
+function SnapshotHeader({ snapshot, onClose }: { snapshot: TewSnapshot; onClose: () => void }) {
+  return (
+    <>
+      <section className="database-header">
+        <div>
+          <p className="eyebrow">CURRENT TEW SNAPSHOT</p>
+          <h2>{snapshot.fileName}</h2>
+          <p>{formatBytes(snapshot.fileSize)} · Imported {formatDate(snapshot.importedAt)}</p>
+        </div>
+        <button className="secondary-button" type="button" onClick={onClose}>Close Snapshot</button>
+      </section>
+
+      <section className="summary-grid" aria-label="Import summary">
+        <div><span>Tables</span><strong>{snapshot.tables.length}</strong></div>
+        <div><span>Shows</span><strong>{snapshot.shows.length}</strong></div>
+        <div><span>Matches</span><strong>{snapshot.shows.reduce((sum, show) => sum + show.matches.length, 0)}</strong></div>
+        <div><span>Storylines</span><strong>{snapshot.storylines.length}</strong></div>
+      </section>
+    </>
+  );
+}
+
 export default function App() {
   const [snapshot, setSnapshot] = useState<TewSnapshot | null>(null);
   const [selectedShowId, setSelectedShowId] = useState<string>("");
-  const [view, setView] = useState<ViewName>("shows");
+  const [view, setView] = useState<ViewName>("planner");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
 
@@ -231,13 +254,13 @@ export default function App() {
       setSelectedShowId(imported.shows[0]?.id ?? "");
       setView("shows");
     } catch (caught) {
-      setSnapshot(null);
-      setSelectedShowId("");
       setError(caught instanceof Error ? caught.message : "The database could not be imported.");
     } finally {
       setLoading(false);
     }
   }
+
+  const needsSnapshot = view !== "planner" && snapshot === null;
 
   return (
     <div className="app-shell">
@@ -246,11 +269,28 @@ export default function App() {
           <span className="brand-kicker">WRESTLING SIM</span>
           <h1>TEW IX Story Tracker</h1>
         </div>
-        <div className="phase-badge">PHASE 1 · READ ONLY</div>
+        <div className="phase-badge">PHASE 2A · PLANNED SHOWS</div>
       </header>
 
+      <nav className="global-tabbar" aria-label="Story Tracker sections">
+        <button className={view === "planner" ? "active" : ""} onClick={() => setView("planner")} type="button">
+          Planned Shows
+        </button>
+        <button className={view === "shows" ? "active" : ""} onClick={() => setView("shows")} type="button">
+          TEW Show History
+        </button>
+        <button className={view === "storylines" ? "active" : ""} onClick={() => setView("storylines")} type="button">
+          TEW Storylines
+        </button>
+        <button className={view === "schema" ? "active" : ""} onClick={() => setView("schema")} type="button">
+          Import Diagnostics
+        </button>
+      </nav>
+
       <main>
-        {!snapshot && <ImportPanel onFile={handleFile} />}
+        {view === "planner" && <PlannedShowWorkspace />}
+
+        {needsSnapshot && <ImportPanel onFile={handleFile} />}
 
         {loading && (
           <div className="status-banner" role="status">
@@ -264,47 +304,16 @@ export default function App() {
           </div>
         )}
 
-        {snapshot && (
+        {snapshot && view !== "planner" && (
           <>
-            <section className="database-header">
-              <div>
-                <p className="eyebrow">CURRENT SNAPSHOT</p>
-                <h2>{snapshot.fileName}</h2>
-                <p>
-                  {formatBytes(snapshot.fileSize)} · Imported {formatDate(snapshot.importedAt)}
-                </p>
-              </div>
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() => {
-                  setSnapshot(null);
-                  setSelectedShowId("");
-                  setError("");
-                }}
-              >
-                Close Snapshot
-              </button>
-            </section>
-
-            <section className="summary-grid" aria-label="Import summary">
-              <div><span>Tables</span><strong>{snapshot.tables.length}</strong></div>
-              <div><span>Shows</span><strong>{snapshot.shows.length}</strong></div>
-              <div><span>Matches</span><strong>{snapshot.shows.reduce((sum, show) => sum + show.matches.length, 0)}</strong></div>
-              <div><span>Storylines</span><strong>{snapshot.storylines.length}</strong></div>
-            </section>
-
-            <nav className="tabbar" aria-label="Prototype views">
-              <button className={view === "shows" ? "active" : ""} onClick={() => setView("shows")} type="button">
-                Show History
-              </button>
-              <button className={view === "storylines" ? "active" : ""} onClick={() => setView("storylines")} type="button">
-                Storylines
-              </button>
-              <button className={view === "schema" ? "active" : ""} onClick={() => setView("schema")} type="button">
-                Import Diagnostics
-              </button>
-            </nav>
+            <SnapshotHeader
+              snapshot={snapshot}
+              onClose={() => {
+                setSnapshot(null);
+                setSelectedShowId("");
+                setError("");
+              }}
+            />
 
             {view === "shows" && (
               <div className="history-layout">
@@ -341,7 +350,7 @@ export default function App() {
                 <div className="panel-heading large">
                   <div>
                     <span>Stored Storylines</span>
-                    <p>Phase 1 reads existing storyline records only. Narrative entries are added in Phase 2.</p>
+                    <p>These records come from the imported TEW snapshot and remain read-only.</p>
                   </div>
                   <strong>{snapshot.storylines.length}</strong>
                 </div>
@@ -413,7 +422,7 @@ export default function App() {
       </main>
 
       <footer>
-        Read-only prototype. It does not modify TEW IX, the executable, or any save database.
+        Planned shows are stored in this browser. TEW snapshot access remains read-only.
       </footer>
     </div>
   );

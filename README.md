@@ -2,9 +2,26 @@
 
 A narrowly scoped companion for **Total Extreme Wrestling IX**. The project exists to improve tracking of angle outputs, match stories, and storyline history without changing TEW's simulation, booking rules, executable, or save files.
 
-## Phase 1 status
+## Phase 2A status
 
-Phase 1 is a read-only browser prototype that:
+Phase 2A adds a planned-show workspace that works before a show exists inside TEW.
+
+- Create, rename, duplicate, and delete planned shows.
+- Store the show date, company, type, expected length, venue, status, and general notes.
+- Add match and angle placeholders in running order.
+- Set each segment's placement, planned duration, name, and basic planning notes.
+- Move segments upward or downward without changing TEW.
+- Calculate the currently planned time against the show's expected length.
+- Save automatically in browser storage.
+- Export all planned shows to a JSON backup and restore that backup later.
+
+The planned-show workspace is independent from the MDB importer. A TEW snapshot is optional while the card is being built.
+
+Phase 2A intentionally uses a basic planning-notes field for each segment. The full Match Story and Angle Segment Output editors, worker selection, storyline linking, and copy-to-TEW tools belong to Phase 2B.
+
+## TEW read-only import
+
+The existing importer:
 
 - Opens a user-selected `.mdb` or `.accdb` snapshot in browser memory.
 - Inventories the database tables and columns.
@@ -14,13 +31,9 @@ Phase 1 is a read-only browser prototype that:
 - Displays mapping warnings instead of inventing missing information.
 - Never writes to the selected database and never uploads it to an application server.
 
-Phase 1 does **not** yet create angle outputs or match-story notes. Those editing and permanent-history features belong to Phase 2 after the read-only import is verified against an MDB generated from a real TEW IX save.
+The application remains static and browser-based. There is no API endpoint, database upload, save-file mutation, or TEW executable modification.
 
-## Read-only architecture
-
-The prototype is a static React application. The selected Access database is read with `mdb-reader` inside the browser session. There is no API endpoint, database upload, save-file mutation, or TEW executable modification.
-
-The initial mapper recognizes these table families:
+The importer recognizes these table families:
 
 - `Previous_Shows`
 - `Match_Histories`
@@ -42,17 +55,18 @@ Table and field matching is case-insensitive and ignores underscores so that sma
 
 No TEW database should be committed to GitHub. `.mdb` and `.accdb` files are excluded by `.gitignore`.
 
+Browser storage belongs to the current preview origin. Export a tracker backup before deleting a Codespace or moving to a different Codespace URL.
+
 ## Verification commands
 
 ```bash
 npm test
 npm run build
+npm run test:browser
 ```
 
-GitHub Actions runs both commands for every pull request.
+GitHub Actions runs all three checks for every pull request.
 
-## Required real-save verification
+## Next phase
 
-The installation-template MDB files are useful for schema investigation, but the Phase 1 acceptance test requires an MDB snapshot generated from an active TEW IX save. The snapshot should be opened only through the prototype's file selector; it should not be added to the repository.
-
-The diagnostic screen records which tables were matched, which tables were missing, row counts, column names, truncation warnings, orphan matches, and unresolved worker references. Those results will determine any schema aliases needed before Phase 2.
+Phase 2B will add the full narrative editors needed to write Match Stories and Angle Segment Outputs while building the card, then copy those details into TEW during booking.
