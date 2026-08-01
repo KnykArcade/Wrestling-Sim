@@ -45,6 +45,17 @@ test("creates and persists match and angle narratives without browser errors", a
 
 test("creates a storyline and builds its timeline from planned segments", async ({ page }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "Create Show" }).first().click();
+  await page.getByLabel("Show name").fill("Timeline Test Show");
+  await page.getByRole("button", { name: "Add Angle" }).click();
+  const angle = page.locator('[data-segment-type="angle"]');
+  await angle.getByLabel("Segment name").fill("Opening Challenge");
+  await angle.getByLabel("Full Segment Output").fill("The challenger demands a championship match.");
+  await angle.getByLabel("Manual worker name").fill("Bret Hart");
+  await angle.getByRole("button", { name: "Add Manual Worker" }).click();
+  await angle.getByLabel("Manual storyline name").fill("World Title Rivalry");
+  await angle.getByRole("button", { name: "Add Manual Storyline" }).click();
+
   await page.getByRole("button", { name: "Storyline Hub" }).click();
   await expect(page.getByRole("heading", { name: "Storyline Hub and Timeline" })).toBeVisible();
   await page.getByRole("button", { name: "Create Storyline" }).first().click();
@@ -53,8 +64,13 @@ test("creates a storyline and builds its timeline from planned segments", async 
   await page.getByLabel("Manual participant name").fill("Bret Hart");
   await page.getByRole("button", { name: "Add Manual Participant" }).click();
   await page.getByRole("button", { name: "Add Milestone" }).click();
-  await expect(page.getByText("Opening Challenge").or(page.getByText("Untitled Angle"))).toBeVisible();
-  await expect(page.getByText(/linked segment/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Opening Challenge" })).toBeVisible();
+  await expect(page.getByText("1 linked segment")).toBeVisible();
+  await page.getByRole("button", { name: "Open Related Show and Segment" }).click();
+  await expect(page.getByLabel("Show name")).toHaveValue("Timeline Test Show");
+  await expect(page.locator('[data-segment-id]').getByLabel("Segment name")).toHaveValue("Opening Challenge");
+
+  await page.getByRole("button", { name: "Storyline Hub" }).click();
   await page.reload();
   await page.getByRole("button", { name: "Storyline Hub" }).click();
   await expect(page.getByLabel("Storyline name")).toHaveValue("World Title Rivalry");
