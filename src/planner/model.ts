@@ -3,6 +3,7 @@ import type {
   PlannedSegmentSection,
   PlannedSegmentType,
   PlannedShow,
+  SegmentReconciliation,
 } from "./types";
 
 function fallbackId(): string {
@@ -17,6 +18,20 @@ export function createPlannerId(): string {
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+export function createEmptySegmentReconciliation(): SegmentReconciliation {
+  return {
+    linkedMatchId: "",
+    actualMatch: null,
+    happenedAsPlanned: null,
+    actualRating: null,
+    finalNarrative: "",
+    changes: "",
+    actualConsequences: "",
+    finalFollowUp: "",
+    reconciledAt: "",
+  };
 }
 
 export function createPlannedShow(sequence: number): PlannedShow {
@@ -34,6 +49,7 @@ export function createPlannedShow(sequence: number): PlannedShow {
     createdAt: timestamp,
     updatedAt: timestamp,
     segments: [],
+    reconciliation: null,
   };
 }
 
@@ -65,6 +81,9 @@ export function createPlannedSegment(type: PlannedSegmentType): PlannedSegment {
     angleContentType: type === "angle" ? "Serious" : "",
     segmentOutput: "",
     audienceTakeaway: "",
+
+    workflowStatus: "Planned",
+    reconciliation: createEmptySegmentReconciliation(),
   };
 }
 
@@ -81,9 +100,12 @@ export function duplicatePlannedShow(show: PlannedShow): PlannedShow {
     status: "Draft",
     createdAt: timestamp,
     updatedAt: timestamp,
+    reconciliation: null,
     segments: show.segments.map((segment) => ({
       ...segment,
       id: createPlannerId(),
+      workflowStatus: "Planned",
+      reconciliation: createEmptySegmentReconciliation(),
       workers: segment.workers.map((worker) => ({ ...worker, id: createPlannerId() })),
       storylines: segment.storylines.map((storyline) => ({ ...storyline })),
     })),
