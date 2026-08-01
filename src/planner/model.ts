@@ -1,5 +1,6 @@
 import { MATCH_AIMS } from "../matchEngine/catalog";
 import { createEmptyMatchApproachSetup, getApproach } from "../matchEngine/model";
+import { formatStarRating } from "../matchEngine/performance";
 import type {
   PlannedSegment,
   PlannedSegmentSection,
@@ -129,6 +130,7 @@ export function duplicatePlannedShow(show: PlannedShow): PlannedShow {
           lockedApproachIds: [...plan.lockedApproachIds],
           generatedAt: "",
         })),
+        performancePreview: null,
         updatedAt: "",
       },
       workers: segment.workers.map((worker) => ({ ...worker, id: createPlannerId() })),
@@ -178,6 +180,8 @@ export function buildTewEntrySummary(segment: PlannedSegment): string {
       .filter((plan) => plan.selectedApproachIds.length > 0)
       .map((plan) => `${plan.workerName}: ${plan.selectedApproachIds.map((id) => getApproach(id)?.name ?? id).join(", ")}`)
       .join("\n");
+    const preview = segment.matchApproachSetup.performancePreview;
+    const previewWinner = preview?.projectedWinnerName ? ` · Preview winner: ${preview.projectedWinnerName}` : "";
     lines.push(
       segment.matchType ? `Match type: ${segment.matchType}` : "",
       segment.championship ? `Championship: ${segment.championship}` : "",
@@ -189,6 +193,7 @@ export function buildTewEntrySummary(segment: PlannedSegment): string {
       aim ? `Match aim: ${aim.name} · Ideal pace ${aim.idealPace}` : "",
       approaches ? `Selected match approaches:\n${approaches}` : "",
       segment.matchApproachSetup.notes ? `Approach notes:\n${segment.matchApproachSetup.notes}` : "",
+      preview ? `Tracker performance preview — advisory only: ${preview.matchScore.toFixed(1)}/100 · ${formatStarRating(preview.starRating)}${previewWinner}\n${preview.summary}` : "",
       segment.plannedWinner ? `Planned winner: ${segment.plannedWinner}` : "",
       segment.plannedFinish ? `Planned finish: ${segment.plannedFinish}` : "",
       segment.matchStory ? `Match story:\n${segment.matchStory}` : "",
