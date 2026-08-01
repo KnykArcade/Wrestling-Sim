@@ -163,7 +163,7 @@ test("creates a championship lineage and contender ranking", async ({ page }) =>
   await page.getByLabel("Rank 1 competitors").fill("Shawn Michaels");
   await page.getByLabel("Rank 1 record").fill("4-1-0");
   await page.getByLabel("Rank 1 reason").fill("Four wins in the last five recorded matches.");
-  await expect(page.getByText("Shawn Michaels", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Rank 1 competitors")).toHaveValue("Shawn Michaels");
 
   await page.reload();
   await page.getByRole("button", { name: "Championships" }).click();
