@@ -63,6 +63,7 @@ export interface TewSnapshot {
   databaseCreatedAt: string;
   importedAt: string;
   tables: TableSummary[];
+  workers: WorkerReference[];
   shows: ShowRecord[];
   storylines: StorylineRecord[];
   diagnostics: MappingDiagnostics;

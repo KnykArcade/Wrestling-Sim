@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { TewSnapshot } from "../tew/types";
 import {
   createPlannedSegment,
   createPlannedShow,
@@ -7,6 +8,7 @@ import {
   totalPlannedMinutes,
   touchShow,
 } from "./model";
+import NarrativeEditor from "./NarrativeEditor";
 import {
   createPlannerBackup,
   loadPlannedShows,
@@ -30,10 +32,15 @@ function downloadBackup(shows: PlannedShow[]): void {
   URL.revokeObjectURL(url);
 }
 
+function narrativeIsComplete(segment: PlannedSegment): boolean {
+  return segment.type === "match" ? Boolean(segment.matchStory.trim()) : Boolean(segment.segmentOutput.trim());
+}
+
 function SegmentEditor({
   segment,
   index,
   count,
+  snapshot,
   onChange,
   onMove,
   onDelete,
@@ -41,16 +48,20 @@ function SegmentEditor({
   segment: PlannedSegment;
   index: number;
   count: number;
+  snapshot: TewSnapshot | null;
   onChange: (segment: PlannedSegment) => void;
   onMove: (direction: -1 | 1) => void;
   onDelete: () => void;
 }) {
   return (
-    <article className={`planned-segment planned-segment--${segment.type}`}>
+    <article className={`planned-segment planned-segment--${segment.type}`} data-segment-type={segment.type}>
       <header className="planned-segment__header">
         <div>
           <span className="segment-order">#{index + 1}</span>
           <span className="segment-kind">{segment.type === "match" ? "MATCH" : "ANGLE"}</span>
+          <span className={`narrative-status ${narrativeIsComplete(segment) ? "complete" : "incomplete"}`}>
+            {narrativeIsComplete(segment) ? "Narrative added" : "Narrative needed"}
+          </span>
         </div>
         <div className="segment-actions">
           <button type="button" onClick={() => onMove(-1)} disabled={index === 0} aria-label="Move segment up">
@@ -105,25 +116,45 @@ function SegmentEditor({
           />
         </label>
         <label className="field field--full">
-          <span>Planning notes</span>
+          <span>Quick planning outline</span>
           <textarea
             rows={3}
-            placeholder="Use this for the basic purpose or outline. Full match-story and angle-output editors arrive in Phase 2B."
+            placeholder="A short overview for the running order. Use Narrative Details below for the complete story."
             value={segment.notes}
             onChange={(event) => onChange({ ...segment, notes: event.target.value })}
           />
         </label>
       </div>
+
+      <NarrativeEditor
+        segment={segment}
+        availableWorkers={snapshot?.workers ?? []}
+        availableStorylines={snapshot?.storylines ?? []}
+        onChange={onChange}
+      />
     </article>
   );
 }
 
-export default function PlannedShowWorkspace() {
+export default function PlannedShowWorkspace({
+  snapshot,
+  snapshotLoading = false,
+  snapshotError = "",
+  onSnapshotFile,
+  onCloseSnapshot,
+}: {
+  snapshot: TewSnapshot | null;
+  snapshotLoading?: boolean;
+  snapshotError?: string;
+  onSnapshotFile: (file: File) => void;
+  onCloseSnapshot: () => void;
+}) {
   const [shows, setShows] = useState<PlannedShow[]>(() => loadPlannedShows(window.localStorage));
   const [selectedId, setSelectedId] = useState<string>("");
   const [saveState, setSaveState] = useState<SaveState>("Saved");
   const [notice, setNotice] = useState("");
   const importRef = useRef<HTMLInputElement | null>(null);
+  const snapshotRef = useRef<HTMLInputElement | null>(null);
 
   const selectedShow = useMemo(
     () => shows.find((show) => show.id === selectedId) ?? shows[0] ?? null,
@@ -166,7 +197,7 @@ export default function PlannedShowWorkspace() {
     const duplicate = duplicatePlannedShow(selectedShow);
     setShows((current) => [duplicate, ...current]);
     setSelectedId(duplicate.id);
-    setNotice("Show duplicated with new segment identifiers.");
+    setNotice("Show duplicated with new segment and worker identifiers.");
   }
 
   function deleteShow(): void {
@@ -203,13 +234,15 @@ export default function PlannedShowWorkspace() {
     }
   }
 
+  const completeNarratives = selectedShow?.segments.filter(narrativeIsComplete).length ?? 0;
+
   return (
     <section className="planner-workspace">
       <header className="planner-toolbar">
         <div>
           <p className="eyebrow">PLANNED SHOW WORKSPACE</p>
-          <h2>Build the card before the TEW show exists</h2>
-          <p>Create matches and angles in show order. Everything saves automatically in this browser.</p>
+          <h2>Build the card and write every story before TEW</h2>
+          <p>Create matches and angles in show order, then preserve the full Match Story and Segment Output.</p>
         </div>
         <div className="planner-toolbar__actions">
           <span className={`save-state save-state--${saveState.toLowerCase().replace(" ", "-")}`}>
@@ -239,6 +272,42 @@ export default function PlannedShowWorkspace() {
           />
         </div>
       </header>
+
+      <section className={`planner-snapshot-bar ${snapshot ? "is-loaded" : ""}`}>
+        <div>
+          <strong>{snapshot ? `TEW reference loaded: ${snapshot.fileName}` : "Optional TEW reference snapshot"}</strong>
+          <span>
+            {snapshot
+              ? `${snapshot.workers.length} workers and ${snapshot.storylines.length} storylines are available in the narrative editors.`
+              : "Import a current MDB snapshot to select TEW workers and storylines. Manual entry always remains available."}
+          </span>
+          {snapshotLoading && <small>Reading TEW snapshot…</small>}
+          {snapshotError && <small className="snapshot-error">{snapshotError}</small>}
+        </div>
+        <div>
+          <button className="secondary-button" type="button" onClick={() => snapshotRef.current?.click()} disabled={snapshotLoading}>
+            {snapshot ? "Replace TEW Snapshot" : "Import TEW Snapshot"}
+          </button>
+          {snapshot && (
+            <button className="secondary-button" type="button" onClick={onCloseSnapshot}>
+              Close Snapshot
+            </button>
+          )}
+          <input
+            ref={snapshotRef}
+            className="visually-hidden"
+            type="file"
+            accept=".mdb,.accdb,application/x-msaccess"
+            onChange={(event) => {
+              const file = event.target.files?.item(0);
+              if (file) {
+                onSnapshotFile(file);
+              }
+              event.currentTarget.value = "";
+            }}
+          />
+        </div>
+      </section>
 
       {notice && (
         <div className="status-banner planner-notice" role="status">
@@ -274,7 +343,7 @@ export default function PlannedShowWorkspace() {
         {!selectedShow ? (
           <section className="planner-empty-card">
             <h3>Create your first show</h3>
-            <p>The card can be built here before you create or book anything inside TEW.</p>
+            <p>The card and its complete narrative can be written here before you create anything inside TEW.</p>
             <button className="primary-button" type="button" onClick={addShow}>Create Show</button>
           </section>
         ) : (
@@ -378,7 +447,7 @@ export default function PlannedShowWorkspace() {
                   <p className="eyebrow">CARD ORDER</p>
                   <h3>{selectedShow.segments.length} planned segment{selectedShow.segments.length === 1 ? "" : "s"}</h3>
                   <p>
-                    {totalPlannedMinutes(selectedShow)} of {selectedShow.expectedMinutes} expected minutes planned
+                    {totalPlannedMinutes(selectedShow)} of {selectedShow.expectedMinutes} expected minutes planned · {completeNarratives} narratives complete
                   </p>
                 </div>
                 <div className="card-editor-actions">
@@ -399,6 +468,7 @@ export default function PlannedShowWorkspace() {
                       segment={segment}
                       index={index}
                       count={selectedShow.segments.length}
+                      snapshot={snapshot}
                       onChange={(updated) => updateShow(selectedShow.id, (show) => ({
                         ...show,
                         segments: show.segments.map((item) => item.id === updated.id ? updated : item),

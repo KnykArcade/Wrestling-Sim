@@ -45,6 +45,26 @@ export function createPlannedSegment(type: PlannedSegmentType): PlannedSegment {
     title: type === "match" ? "Untitled Match" : "Untitled Angle",
     durationMinutes: type === "match" ? 12 : 5,
     notes: "",
+    workers: [],
+    storylines: [],
+    purpose: "",
+    consequences: "",
+    followUp: "",
+    privateNotes: "",
+
+    matchType: type === "match" ? "1 vs. 1" : "",
+    championship: "",
+    plannedWinner: "",
+    plannedFinish: "",
+    matchStory: "",
+    keyMoments: "",
+    interference: "",
+    postMatch: "",
+
+    angleLocation: type === "angle" ? "In The Ring" : "",
+    angleContentType: type === "angle" ? "Serious" : "",
+    segmentOutput: "",
+    audienceTakeaway: "",
   };
 }
 
@@ -61,7 +81,12 @@ export function duplicatePlannedShow(show: PlannedShow): PlannedShow {
     status: "Draft",
     createdAt: timestamp,
     updatedAt: timestamp,
-    segments: show.segments.map((segment) => ({ ...segment, id: createPlannerId() })),
+    segments: show.segments.map((segment) => ({
+      ...segment,
+      id: createPlannerId(),
+      workers: segment.workers.map((worker) => ({ ...worker, id: createPlannerId() })),
+      storylines: segment.storylines.map((storyline) => ({ ...storyline })),
+    })),
   };
 }
 
@@ -86,4 +111,35 @@ export function sectionLabel(section: PlannedSegmentSection): string {
 
 export function totalPlannedMinutes(show: PlannedShow): number {
   return show.segments.reduce((total, segment) => total + segment.durationMinutes, 0);
+}
+
+export function buildTewEntrySummary(segment: PlannedSegment): string {
+  const people = segment.workers
+    .map((worker) => [worker.name, worker.role, worker.side].filter(Boolean).join(" — "))
+    .join("\n");
+  const storylines = segment.storylines.map((storyline) => storyline.name).join(", ");
+  const lines = [
+    segment.title,
+    `${segment.type === "match" ? "Match" : "Angle"} · ${segment.section} · ${segment.durationMinutes} minutes`,
+    people ? `Workers:\n${people}` : "",
+    storylines ? `Storylines: ${storylines}` : "",
+  ];
+
+  if (segment.type === "match") {
+    lines.push(
+      segment.matchType ? `Match type: ${segment.matchType}` : "",
+      segment.championship ? `Championship: ${segment.championship}` : "",
+      segment.plannedWinner ? `Planned winner: ${segment.plannedWinner}` : "",
+      segment.plannedFinish ? `Planned finish: ${segment.plannedFinish}` : "",
+      segment.matchStory ? `Match story:\n${segment.matchStory}` : "",
+    );
+  } else {
+    lines.push(
+      segment.angleLocation ? `Location: ${segment.angleLocation}` : "",
+      segment.angleContentType ? `Content type: ${segment.angleContentType}` : "",
+      segment.segmentOutput ? `Segment output:\n${segment.segmentOutput}` : "",
+    );
+  }
+
+  return lines.filter(Boolean).join("\n\n");
 }

@@ -69,9 +69,13 @@ function fixtureTables(): LoadedTable[] {
 }
 
 describe("mapTewTables", () => {
-  it("reconstructs shows, matches, participants, and storylines", () => {
+  it("reconstructs shows, matches, workers, participants, and storylines", () => {
     const result = mapTewTables(fixtureTables());
 
+    expect(result.workers.map((worker) => worker.name)).toEqual([
+      "Bobby Lashley",
+      "Matt Jackson",
+    ]);
     expect(result.shows).toHaveLength(1);
     expect(result.shows[0]).toMatchObject({
       id: "10",
@@ -123,23 +127,32 @@ describe("mapTewTables", () => {
         name: "storylines",
         rows: [{ id: 3, title: "Test Story", momentum: 60 }],
       },
+      {
+        name: "workers",
+        rows: [{ id: 4, workername: "Test Worker" }],
+      },
     ]);
 
     expect(result.shows[0].name).toBe("Test Show");
     expect(result.shows[0].rating).toBe(65);
     expect(result.shows[0].matches[0].description).toBe("A defeated B");
     expect(result.storylines[0].name).toBe("Test Story");
+    expect(result.workers[0].name).toBe("Test Worker");
   });
 
   it("reports missing TEW history tables instead of inventing data", () => {
     const result = mapTewTables([]);
 
+    expect(result.workers).toEqual([]);
     expect(result.shows).toEqual([]);
     expect(result.storylines).toEqual([]);
     expect(result.diagnostics.matchedTables.shows).toBeNull();
     expect(result.diagnostics.warnings).toContain("No supported previous-show table was found.");
     expect(result.diagnostics.warnings).toContain("No supported match-history table was found.");
     expect(result.diagnostics.warnings).toContain("No supported storyline table was found.");
+    expect(result.diagnostics.warnings).toContain(
+      "No supported worker table was found; planner worker selection will require manual entry.",
+    );
   });
 
   it("keeps unlinked matches out of fabricated shows and reports them", () => {

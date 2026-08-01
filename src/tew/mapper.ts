@@ -159,20 +159,30 @@ function determinePlacement(row: RawRow): MatchRecord["placement"] {
   return "Main Show";
 }
 
-function workerLookup(workerTable: LoadedTable | null): Map<string, string> {
-  const lookup = new Map<string, string>();
+function mapAllWorkers(workerTable: LoadedTable | null): WorkerReference[] {
   if (!workerTable) {
-    return lookup;
+    return [];
   }
+  const seen = new Set<string>();
+  return workerTable.rows
+    .map((row, index) => {
+      const id = toIdentifier(findValue(row, FIELD_ALIASES.workerId), `worker-${index + 1}`);
+      const name = toText(findValue(row, FIELD_ALIASES.workerName));
+      return { id, name, role: "", side: "" } satisfies WorkerReference;
+    })
+    .filter((worker) => {
+      const key = `${worker.id}:${normalizeKey(worker.name)}`;
+      if (!worker.name || seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    })
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
 
-  workerTable.rows.forEach((row, index) => {
-    const id = toIdentifier(findValue(row, FIELD_ALIASES.workerId), `worker-${index + 1}`);
-    const name = toText(findValue(row, FIELD_ALIASES.workerName));
-    if (name) {
-      lookup.set(id, name);
-    }
-  });
-  return lookup;
+function workerLookup(workers: WorkerReference[]): Map<string, string> {
+  return new Map(workers.map((worker) => [worker.id, worker.name]));
 }
 
 function mapWorkerReference(
@@ -302,6 +312,7 @@ function mapStorylines(
 }
 
 export interface MappedTewData {
+  workers: WorkerReference[];
   shows: ShowRecord[];
   storylines: StorylineRecord[];
   diagnostics: MappingDiagnostics;
@@ -317,7 +328,8 @@ export function mapTewTables(loadedTables: LoadedTable[]): MappedTewData {
   const storylineWorkerTable = findTable(tables, TABLE_CANDIDATES.storylineWorkers);
   const workerTable = findTable(tables, TABLE_CANDIDATES.workers);
 
-  const lookup = workerLookup(workerTable);
+  const workers = mapAllWorkers(workerTable);
+  const lookup = workerLookup(workers);
   const matches = mapMatches(matchTable, matchWorkerTable, lookup);
   const shows = mapShows(showTable, matches);
   const storylines = mapStorylines(
@@ -346,6 +358,9 @@ export function mapTewTables(loadedTables: LoadedTable[]): MappedTewData {
   if (!playerStorylineTable && !databaseStorylineTable) {
     warnings.push("No supported storyline table was found.");
   }
+  if (!workerTable) {
+    warnings.push("No supported worker table was found; planner worker selection will require manual entry.");
+  }
   if (orphanMatchCount > 0) {
     warnings.push(`${orphanMatchCount} match record(s) could not be linked to a previous show.`);
   }
@@ -354,6 +369,7 @@ export function mapTewTables(loadedTables: LoadedTable[]): MappedTewData {
   }
 
   return {
+    workers,
     shows,
     storylines,
     diagnostics: {

@@ -2,30 +2,55 @@
 
 A narrowly scoped companion for **Total Extreme Wrestling IX**. The project exists to improve tracking of angle outputs, match stories, and storyline history without changing TEW's simulation, booking rules, executable, or save files.
 
-## Phase 2A status
+## Phase 2B status
 
-Phase 2A adds a planned-show workspace that works before a show exists inside TEW.
+Phase 2B turns each planned match and angle into a complete narrative record while the card is being built.
+
+### Match editor
+
+- Assign workers from an imported TEW snapshot or enter names manually.
+- Record each person's role and match side or team.
+- Link imported TEW storylines or manual planning storylines.
+- Store match type, championship, planned winner, and planned finish.
+- Write the full Match Story.
+- Track key moments, interference, and post-match events.
+- Record the segment's purpose, storyline consequences, planned follow-up, and private notes.
+- Copy the Match Story or a formatted TEW entry summary.
+
+### Angle editor
+
+- Assign workers and describe each person's role.
+- Link imported or manual storylines.
+- Store location and content type.
+- Write and permanently retain the full Segment Output.
+- Record the intended audience takeaway, purpose, consequences, follow-up, and private notes.
+- Copy the Segment Output or a formatted TEW entry summary.
+
+Narratives, worker references, and storyline links save automatically with the planned show. Existing Phase 2A cards are migrated automatically with empty Phase 2B fields; no planned matches or angles are discarded.
+
+## Planned-show workspace
+
+The tracker can be used before a show exists inside TEW.
 
 - Create, rename, duplicate, and delete planned shows.
 - Store the show date, company, type, expected length, venue, status, and general notes.
-- Add match and angle placeholders in running order.
-- Set each segment's placement, planned duration, name, and basic planning notes.
+- Add matches and angles in running order.
+- Set each segment's placement, planned duration, and name.
 - Move segments upward or downward without changing TEW.
-- Calculate the currently planned time against the show's expected length.
+- Calculate planned time and narrative completion against the show length.
 - Save automatically in browser storage.
-- Export all planned shows to a JSON backup and restore that backup later.
+- Export all planned shows to a versioned JSON backup and restore it later.
 
-The planned-show workspace is independent from the MDB importer. A TEW snapshot is optional while the card is being built.
-
-Phase 2A intentionally uses a basic planning-notes field for each segment. The full Match Story and Angle Segment Output editors, worker selection, storyline linking, and copy-to-TEW tools belong to Phase 2B.
+A TEW snapshot is optional. Manual worker and storyline entry always remains available. Importing a snapshot inside the planner makes its mapped worker list and storylines selectable without writing anything back to TEW.
 
 ## TEW read-only import
 
-The existing importer:
+The importer:
 
 - Opens a user-selected `.mdb` or `.accdb` snapshot in browser memory.
 - Inventories the database tables and columns.
 - Detects known TEW show-history, match-history, participant, worker, and storyline tables.
+- Exposes imported workers to the planned-show narrative editors.
 - Reconstructs previous shows and their linked matches.
 - Resolves match and storyline participants when worker records are available.
 - Displays mapping warnings instead of inventing missing information.
@@ -69,4 +94,4 @@ GitHub Actions runs all three checks for every pull request.
 
 ## Next phase
 
-Phase 2B will add the full narrative editors needed to write Match Stories and Angle Segment Outputs while building the card, then copy those details into TEW during booking.
+Phase 2C will reconcile a planned show with a completed TEW show, preserve planned-versus-actual details, attach TEW ratings and results, and convert the planned card into permanent enhanced show history.

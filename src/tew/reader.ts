@@ -112,6 +112,7 @@ export async function readTewSnapshot(file: File): Promise<TewSnapshot> {
     databaseCreatedAt: creationDate ? creationDate.toISOString() : "",
     importedAt: new Date().toISOString(),
     tables: tableSummaries.sort((left, right) => left.name.localeCompare(right.name)),
+    workers: mapped.workers,
     shows: mapped.shows,
     storylines: mapped.storylines,
     diagnostics: {
