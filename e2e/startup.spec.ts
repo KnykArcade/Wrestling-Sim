@@ -10,7 +10,7 @@ test("creates and persists match and angle narratives without browser errors", a
   await expect(page.getByRole("heading", { name: "TEW IX Story Tracker" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Run the whole booking universe from one workspace" })).toBeVisible();
   await page.getByRole("button", { name: "Planned Shows" }).click();
-  await expect(page.getByRole("heading", { name: "Plan the show, run it in TEW, then preserve what actually happened" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Plan the show for TEW, add match approaches, then preserve what actually happened" })).toBeVisible();
 
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("Monday Night Test");
