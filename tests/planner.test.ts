@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { emptyChampionshipUniverse } from "../src/championships/storage";
 import { emptyCreativeControlData } from "../src/control/storage";
+import { emptyHandoffUniverse } from "../src/handoff/storage";
 import {
   buildTewEntrySummary,
   createPlannedSegment,
@@ -96,7 +97,7 @@ describe("planned show workspace", () => {
     expect(duplicate.segments[0].reconciliation.actualMatch).toBeNull();
   });
 
-  test("saves loads exports and imports Phase 4A data", () => {
+  test("saves loads exports and imports Phase 4B data", () => {
     const storage = new MemoryStorage();
     const show = createPlannedShow(1);
     const match = createPlannedSegment("match");
@@ -107,14 +108,16 @@ describe("planned show workspace", () => {
     const workers = { profiles: [], relationships: [] };
     const control = emptyCreativeControlData();
     const championships = emptyChampionshipUniverse();
-    const backup = createPlannerBackup([show], [], workers, control, championships);
-    expect(backup.version).toBe(7);
+    const handoff = emptyHandoffUniverse();
+    const backup = createPlannerBackup([show], [], workers, control, championships, handoff);
+    expect(backup.version).toBe(8);
     expect(backup.storylines).toEqual([]);
     expect(backup.workers).toEqual(workers);
     expect(backup.control).toEqual(control);
     expect(backup.championships).toEqual(championships);
+    expect(backup.handoff).toEqual(handoff);
     expect(parsePlannerBackup(JSON.stringify(backup))).toEqual([show]);
-    expect(parsePlannerBackupBundle(JSON.stringify(backup))).toEqual({ shows: [show], storylines: [], workers, control, championships });
+    expect(parsePlannerBackupBundle(JSON.stringify(backup))).toEqual({ shows: [show], storylines: [], workers, control, championships, handoff });
   });
 
   test("migrates Phase 2A planned shows without losing the card", () => {
@@ -134,6 +137,7 @@ describe("planned show workspace", () => {
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":4,"shows":[],"storylines":[]}')).toEqual([]);
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":5,"shows":[],"storylines":[],"workers":{"profiles":[],"relationships":[]}}')).toEqual([]);
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":6,"shows":[],"storylines":[],"workers":{"profiles":[],"relationships":[]},"control":{"ideas":[],"settings":{"dashboardWindowDays":45,"calendarFilter":"All","searchQuery":""}}}')).toEqual([]);
-    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":8,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
+    expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":7,"shows":[],"storylines":[],"workers":{"profiles":[],"relationships":[]},"control":{"ideas":[],"settings":{"dashboardWindowDays":45,"calendarFilter":"All","searchQuery":""}},"championships":{"championships":[]}}')).toEqual([]);
+    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":9,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
   });
 });
