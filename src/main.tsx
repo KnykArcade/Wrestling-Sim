@@ -9,6 +9,7 @@ import "./workers.css";
 import "./control.css";
 import "./championships.css";
 import "./handoff.css";
+import "./match-engine.css";
 
 type ErrorBoundaryProps = {
   children: ReactNode;

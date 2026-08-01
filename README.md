@@ -1,90 +1,103 @@
 # TEW IX Story Tracker
 
-A browser-based companion for **Total Extreme Wrestling IX** that preserves booking plans, match stories, angle outputs, planned-versus-actual show history, storyline continuity, worker creative profiles, future booking ideas, championship lineage, rankings, and competitive records without changing TEW's executable or live save files.
+A browser-based companion for **Total Extreme Wrestling IX** that preserves booking plans, match stories, angle outputs, planned-versus-actual show history, storyline continuity, worker creative profiles, future booking ideas, championship lineage, rankings, TEW handoff packages, and the foundation of a native match simulation engine without changing TEW's executable or live save files.
 
-## Phase 4A: Championship Hub, Rankings, and Competitive Records
+## Phase 4C1: Native Match Engine Data Foundation
 
-The **Championships** workspace creates a permanent competitive structure around the existing show, storyline, worker, and reconciliation systems.
+The new **Match Engine** workspace converts the uploaded match-system documents and workbooks into a typed, testable application catalog.
 
-### Championship Hub
+### Canonical approaches
 
-Each tracker championship stores:
+The engine now contains fifteen canonical approaches:
 
-- Name, company, brand, division, and classification
-- Active, inactive, or vacant status
-- Current and previous champions
-- Date won and recorded defenses
-- Optional TEW title reference and legacy names used on older cards
-- Linked storyline and current title program
-- Private booking notes and inactivity threshold
+- Aerial Showstopper
+- Big Match Performer
+- Chain Technician
+- Dirty Rulebreaker
+- Hardcore Daredevil
+- Heavy Striker / Brawler
+- High Tempo Hybrid
+- Opportunistic Schemer
+- Pace Controller
+- Power Dominance
+- Psychological Manipulator
+- Resilient Underdog
+- Showman
+- Strong Style Specialist
+- Submission Specialist
 
-Imported TEW references remain read-only. A tracker championship can recognize older free-text title names so existing planned cards are not lost.
+Every approach stores its four weighted wrestler skills, pace value, stamina cost, source names, source notes, and available narrative phrases. The interactive formula inspector calculates an approach rating from editable wrestler-skill values.
 
-### Reigns and lineage
+### Duration-based approach slots
 
-Lineage records retain champions, previous champions, start and end dates, title-winning and title-ending shows and segments, successful defenses, vacancy reasons, notes, and corrections.
+The approved rules are now authoritative:
 
-Reconciled championship matches create **result suggestions**, not automatic title changes. The user must explicitly confirm a retention, title change, vacancy, or unresolved result before the tracker updates the championship lineage.
+- 5 minutes or less: 1 approach per wrestler
+- 6–15 minutes: 2 approaches per wrestler
+- 16–24 minutes: 3 approaches per wrestler
+- 25 minutes or longer: 4 approaches per wrestler
 
-### Competitive records and rankings
+Legacy importance-based approach counts are retained for workbook parity and diagnostics but do not override these duration boundaries.
 
-Worker records are calculated only from completed match information the tracker actually possesses:
+### Match aims, pace, stamina, and mental states
 
-- Wins, losses, draws, no contests, and unresolved results
-- Singles and team appearances when participant counts support the distinction
-- Championship-match record
-- Last five results and current streak
-- Recorded results against specific opponents
+The catalog preserves nineteen combined match aims with style, ideal pace, best-fit wrestler styles, and clash styles.
 
-Rankings are fully editable. Suggestions use visible stored results and activity, explain why each contender was suggested, and preserve manually locked entries. There is no hidden rating formula.
+Pace evaluation reproduces the workbook statuses and modifiers:
 
-### Championship program and timeline
+- Ideal Pace: +2
+- Open Pace: 0
+- Off Pace: -5
+- Noticeably Off: -10
+- Poor Pacing: -15
+- Bad Pacing: -20
+- Failed: -25
 
-A title program can connect the champion, leading challenger, additional contenders, storyline, booking ideas, and target payoff show. The championship timeline combines reigns, defenses, vacancies, planned title matches, storyline links, booking ideas, and ranking updates.
+Stamina evaluation reproduces Pass, Winded, Gassed, and Dead states. The five mental states remain Hot Night, Focused, Neutral, Distracted, and Off Night with the original modifiers and score thresholds.
 
-Integrity warnings identify multiple active reigns, missing champions, unresolved title results, vacant titles without a plan, inactive reigns, and leading contenders without bookings.
+### Explicit source reconciliation
 
-## Creative Control Center
+Source differences are not silently discarded:
 
-The universe-wide control center connects the planning systems and surfaces upcoming shows, reconciliation needs, active storylines, milestones, open ideas, worker arcs, continuity warnings, and recent history.
+- `Aerial Specialist` maps to Aerial Showstopper.
+- `Heavy Striker/Brawler` maps to Heavy Striker / Brawler.
+- `Workrate Machine` maps to High Tempo Hybrid.
+- `Counter Specialist` and `Ring General` remain visible as unresolved legacy records because the fifteen-approach definition document does not define them.
+- Pace Controller retains a documented source conflict between pace 0 and pace 1; pace 1 is canonical because it is the active Data-table lookup value.
 
-Booking ideas can be created before assignment to a show and converted directly into planned matches or angles. The tracker carries workers, roles, storyline links, narrative, purpose, consequences, follow-up, championship details, and the original booking-idea reference into the segment. Duplicate scheduling is blocked.
+The Source Reconciliation screen shows every alias, unresolved record, source conflict, and preserved legacy importance profile.
 
-## Existing systems
+## Phase 4B: TEW Show Handoff and Entry Assistant
 
+Planned shows can be finalized into immutable numbered handoff versions. The handoff workspace preserves the running order, workers, roles, match settings, championship stakes, finishes, narratives, follow-ups, and road-agent notes.
+
+The guided TEW Entry Assistant supports field-by-field or full-segment copying, saved progress, reusable TEW mappings, missing-record warnings, show-level entry checklists, version comparisons, JSON/text/Markdown exports, and printable booking sheets.
+
+TEW MDB/ACCDB access remains read-only.
+
+## Championship and creative systems
+
+- Championship Hub with reigns, vacancies, defenses, rankings, programs, timelines, and result confirmation
+- Creative Control Center with upcoming shows, readiness, continuity warnings, calendar, ideas, and global search
 - Planned-show workspace with ordered matches and angles
 - Full Match Story and Segment Output editors
-- Copy-ready TEW entry summaries
-- Read-only TEW MDB/ACCDB snapshot import
 - Planned-to-actual show and match reconciliation
-- Permanent enhanced show history
 - Storyline Hub, milestones, and chronological timelines
 - Worker creative profiles, statistics, character arcs, relationships, and comparison history
-- Future Booking Board, creative calendar, readiness checks, and global search
 
-## TEW handoff and integration boundary
+## Next match-engine phases
 
-The intended workflow is:
+- **Phase 4C2:** Match Setup and Approach AI
+- **Phase 4C3:** Match Simulation and Outcome Engine
+- **Phase 4C4:** Narrative and Universe Integration
 
-1. Build the card, match stories, angle outputs, workers, storylines, finishes, and title stakes in this tracker.
-2. Use the copy-ready TEW summaries while entering the show into TEW.
-3. Run the show in TEW.
-4. Import the updated TEW MDB snapshot back into the tracker.
-5. Reconcile actual results and confirm championship changes.
-
-Directly writing a completed card into a live TEW save is **not implemented**. Snapshot access remains read-only because uncontrolled writes to a live Access database could corrupt the save or create records TEW does not accept. A future handoff phase can add structured export, field-by-field entry assistance, and—only if a documented safe route is verified—a guarded write/import bridge using backups and validation.
+These phases will build on the canonical data foundation rather than reimplementing spreadsheet formulas independently.
 
 ## Backups
 
-Version 7 backups include:
+Version 8 backups include planned and reconciled shows, tracker storylines, worker data, booking ideas, championships, and TEW handoff versions, mappings, checklists, and progress.
 
-- Planned and reconciled shows
-- Tracker storylines and milestones
-- Worker profiles, arcs, and relationships
-- Booking ideas and Creative Control Center settings
-- Championships, reigns, rankings, title programs, and result confirmations
-
-Backup versions 1 through 6 remain importable with safe empty defaults for systems that did not yet exist.
+Phase 4C1 adds static source catalogs and does not require a new backup version.
 
 ## Safety boundary
 
