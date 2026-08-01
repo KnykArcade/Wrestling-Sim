@@ -33,5 +33,7 @@ test("finalizes a card and persists TEW entry progress", async ({ page }) => {
   await page.getByRole("button", { name: "TEW Handoff" }).click();
   await page.getByRole("button", { name: "Entry Assistant" }).click();
   await expect(page.getByRole("heading", { name: "1 of 1 segments entered into TEW" })).toBeVisible();
-  await expect(page.getByText("Checklist").locator("..").getByText("2/11")).toBeVisible();
+  await expect(
+    page.locator(".handoff-summary > div").filter({ hasText: "Checklist" }).getByText("2/11", { exact: true }),
+  ).toBeVisible();
 });
