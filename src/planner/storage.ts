@@ -1,3 +1,5 @@
+import { emptyCreativeControlData, loadCreativeControlData, parseCreativeControlData, saveCreativeControlData } from "../control/storage";
+import type { CreativeControlData } from "../control/types";
 import { loadTrackerStorylines, parseTrackerStorylines, saveTrackerStorylines } from "../storylines/storage";
 import type { TrackerStoryline } from "../storylines/types";
 import { emptyWorkerUniverse, loadWorkerUniverse, parseWorkerUniverse, saveWorkerUniverse } from "../workers/storage";
@@ -39,9 +41,7 @@ function nullableBoolean(value: unknown): boolean | null {
 }
 
 function normalizeWorker(value: unknown): PlannedWorkerReference | null {
-  if (!isRecord(value) || typeof value.name !== "string" || !value.name.trim()) {
-    return null;
-  }
+  if (!isRecord(value) || typeof value.name !== "string" || !value.name.trim()) return null;
   return {
     id: text(value.id, `manual-${value.name}`),
     name: value.name,
@@ -52,9 +52,7 @@ function normalizeWorker(value: unknown): PlannedWorkerReference | null {
 }
 
 function normalizeStoryline(value: unknown): PlannedStorylineReference | null {
-  if (!isRecord(value) || typeof value.name !== "string" || !value.name.trim()) {
-    return null;
-  }
+  if (!isRecord(value) || typeof value.name !== "string" || !value.name.trim()) return null;
   return {
     id: text(value.id, `manual-${value.name}`),
     name: value.name,
@@ -63,13 +61,8 @@ function normalizeStoryline(value: unknown): PlannedStorylineReference | null {
 }
 
 function normalizeActualMatch(value: unknown): ActualMatchSnapshot | null {
-  if (!isRecord(value) || typeof value.id !== "string") {
-    return null;
-  }
-  const placement =
-    value.placement === "Pre-Show" || value.placement === "Post-Show"
-      ? value.placement
-      : "Main Show";
+  if (!isRecord(value) || typeof value.id !== "string") return null;
+  const placement = value.placement === "Pre-Show" || value.placement === "Post-Show" ? value.placement : "Main Show";
   return {
     id: value.id,
     description: text(value.description),
@@ -78,17 +71,13 @@ function normalizeActualMatch(value: unknown): ActualMatchSnapshot | null {
     matchTime: text(value.matchTime),
     notes: text(value.notes),
     placement,
-    workers: Array.isArray(value.workers)
-      ? value.workers.filter((worker): worker is string => typeof worker === "string")
-      : [],
+    workers: Array.isArray(value.workers) ? value.workers.filter((worker): worker is string => typeof worker === "string") : [],
   };
 }
 
 function normalizeSegmentReconciliation(value: unknown): SegmentReconciliation {
   const defaults = createEmptySegmentReconciliation();
-  if (!isRecord(value)) {
-    return defaults;
-  }
+  if (!isRecord(value)) return defaults;
   return {
     linkedMatchId: text(value.linkedMatchId),
     actualMatch: normalizeActualMatch(value.actualMatch),
@@ -103,9 +92,7 @@ function normalizeSegmentReconciliation(value: unknown): SegmentReconciliation {
 }
 
 function normalizeActualShow(value: unknown): ActualShowSnapshot | null {
-  if (!isRecord(value) || typeof value.id !== "string") {
-    return null;
-  }
+  if (!isRecord(value) || typeof value.id !== "string") return null;
   return {
     id: value.id,
     name: text(value.name),
@@ -120,13 +107,9 @@ function normalizeActualShow(value: unknown): ActualShowSnapshot | null {
 }
 
 function normalizeShowReconciliation(value: unknown): ShowReconciliation | null {
-  if (!isRecord(value)) {
-    return null;
-  }
+  if (!isRecord(value)) return null;
   const actualShow = normalizeActualShow(value.actualShow);
-  if (!actualShow) {
-    return null;
-  }
+  if (!actualShow) return null;
   return {
     linkedShowId: text(value.linkedShowId, actualShow.id),
     actualShow,
@@ -143,25 +126,16 @@ function normalizeSegment(value: unknown): PlannedSegment | null {
     (value.type !== "match" && value.type !== "angle") ||
     (value.section !== "Pre-Show" && value.section !== "Main Show" && value.section !== "Post-Show") ||
     typeof value.title !== "string"
-  ) {
-    return null;
-  }
+  ) return null;
 
   const defaults = createPlannedSegment(value.type);
   const workers = Array.isArray(value.workers)
     ? value.workers.map(normalizeWorker).filter((item): item is PlannedWorkerReference => item !== null)
     : [];
   const storylines = Array.isArray(value.storylines)
-    ? value.storylines
-        .map(normalizeStoryline)
-        .filter((item): item is PlannedStorylineReference => item !== null)
+    ? value.storylines.map(normalizeStoryline).filter((item): item is PlannedStorylineReference => item !== null)
     : [];
-  const workflowStatus =
-    value.workflowStatus === "Entered in TEW" ||
-    value.workflowStatus === "Completed" ||
-    value.workflowStatus === "Reconciled"
-      ? value.workflowStatus
-      : "Planned";
+  const workflowStatus = value.workflowStatus === "Entered in TEW" || value.workflowStatus === "Completed" || value.workflowStatus === "Reconciled" ? value.workflowStatus : "Planned";
 
   return {
     ...defaults,
@@ -189,30 +163,17 @@ function normalizeSegment(value: unknown): PlannedSegment | null {
     angleContentType: text(value.angleContentType, defaults.angleContentType),
     segmentOutput: text(value.segmentOutput),
     audienceTakeaway: text(value.audienceTakeaway),
+    bookingIdeaId: text(value.bookingIdeaId),
     workflowStatus,
     reconciliation: normalizeSegmentReconciliation(value.reconciliation),
   };
 }
 
 function normalizeShow(value: unknown): PlannedShow | null {
-  if (
-    !isRecord(value) ||
-    typeof value.id !== "string" ||
-    typeof value.name !== "string" ||
-    !Array.isArray(value.segments)
-  ) {
-    return null;
-  }
-
+  if (!isRecord(value) || typeof value.id !== "string" || typeof value.name !== "string" || !Array.isArray(value.segments)) return null;
   const segments = value.segments.map(normalizeSegment);
-  if (segments.some((segment) => segment === null)) {
-    return null;
-  }
-
-  const status =
-    value.status === "Ready" || value.status === "Completed" || value.status === "Reconciled"
-      ? value.status
-      : "Draft";
+  if (segments.some((segment) => segment === null)) return null;
+  const status = value.status === "Ready" || value.status === "Completed" || value.status === "Reconciled" ? value.status : "Draft";
   return {
     id: value.id,
     name: value.name,
@@ -231,82 +192,65 @@ function normalizeShow(value: unknown): PlannedShow | null {
 }
 
 export function parsePlannerShows(value: unknown): PlannedShow[] {
-  if (!Array.isArray(value)) {
-    throw new Error("The planned-show data is not in a supported format.");
-  }
+  if (!Array.isArray(value)) throw new Error("The planned-show data is not in a supported format.");
   const shows = value.map(normalizeShow);
-  if (shows.some((show) => show === null)) {
-    throw new Error("The planned-show data is not in a supported format.");
-  }
+  if (shows.some((show) => show === null)) throw new Error("The planned-show data is not in a supported format.");
   return shows as PlannedShow[];
 }
 
 export function loadPlannedShows(storage: Pick<Storage, "getItem">): PlannedShow[] {
   const stored = storage.getItem(PLANNER_STORAGE_KEY);
-  if (!stored) {
-    return [];
-  }
-  try {
-    return parsePlannerShows(JSON.parse(stored) as unknown);
-  } catch {
-    return [];
-  }
+  if (!stored) return [];
+  try { return parsePlannerShows(JSON.parse(stored) as unknown); } catch { return []; }
 }
 
-export function savePlannedShows(
-  storage: Pick<Storage, "setItem">,
-  shows: PlannedShow[],
-): void {
+export function savePlannedShows(storage: Pick<Storage, "setItem">, shows: PlannedShow[]): void {
   storage.setItem(PLANNER_STORAGE_KEY, JSON.stringify(shows));
 }
 
 function browserStorylines(): TrackerStoryline[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-  return loadTrackerStorylines(window.localStorage);
+  return typeof window === "undefined" ? [] : loadTrackerStorylines(window.localStorage);
 }
 
 function browserWorkers(): WorkerUniverse {
-  if (typeof window === "undefined") {
-    return emptyWorkerUniverse();
-  }
-  return loadWorkerUniverse(window.localStorage);
+  return typeof window === "undefined" ? emptyWorkerUniverse() : loadWorkerUniverse(window.localStorage);
+}
+
+function browserControl(): CreativeControlData {
+  return typeof window === "undefined" ? emptyCreativeControlData() : loadCreativeControlData(window.localStorage);
 }
 
 export function createPlannerBackup(
   shows: PlannedShow[],
   storylines: TrackerStoryline[] = browserStorylines(),
   workers: WorkerUniverse = browserWorkers(),
+  control: CreativeControlData = browserControl(),
 ): PlannerBackup {
   return {
     product: "TEW IX Story Tracker",
-    version: 5,
+    version: 6,
     exportedAt: new Date().toISOString(),
     shows,
     storylines,
     workers,
+    control,
   };
 }
 
 export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle {
   let value: unknown;
-  try {
-    value = JSON.parse(textValue) as unknown;
-  } catch {
-    throw new Error("The selected backup is not valid JSON.");
-  }
+  try { value = JSON.parse(textValue) as unknown; } catch { throw new Error("The selected backup is not valid JSON."); }
   if (
     !isRecord(value) ||
     value.product !== "TEW IX Story Tracker" ||
-    (value.version !== 1 && value.version !== 2 && value.version !== 3 && value.version !== 4 && value.version !== 5)
-  ) {
-    throw new Error("The selected file is not a supported TEW Story Tracker backup.");
-  }
+    ![1, 2, 3, 4, 5, 6].includes(typeof value.version === "number" ? value.version : -1)
+  ) throw new Error("The selected file is not a supported TEW Story Tracker backup.");
+  const version = value.version as number;
   return {
     shows: parsePlannerShows(value.shows),
-    storylines: value.version === 4 || value.version === 5 ? parseTrackerStorylines(value.storylines ?? []) : [],
-    workers: value.version === 5 ? parseWorkerUniverse(value.workers ?? emptyWorkerUniverse()) : emptyWorkerUniverse(),
+    storylines: version >= 4 ? parseTrackerStorylines(value.storylines ?? []) : [],
+    workers: version >= 5 ? parseWorkerUniverse(value.workers ?? emptyWorkerUniverse()) : emptyWorkerUniverse(),
+    control: version >= 6 ? parseCreativeControlData(value.control ?? emptyCreativeControlData()) : emptyCreativeControlData(),
   };
 }
 
@@ -315,6 +259,7 @@ export function parsePlannerBackup(textValue: string): PlannedShow[] {
   if (typeof window !== "undefined") {
     saveTrackerStorylines(window.localStorage, bundle.storylines);
     saveWorkerUniverse(window.localStorage, bundle.workers);
+    saveCreativeControlData(window.localStorage, bundle.control);
   }
   return bundle.shows;
 }
