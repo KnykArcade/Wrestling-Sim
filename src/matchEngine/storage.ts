@@ -1,4 +1,4 @@
-import { MATCH_AIMS, MATCH_APPROACHES } from "./catalog";
+import { MATCH_AIMS, MATCH_APPROACHES, MENTAL_STATES } from "./catalog";
 import { MATCH_ENGINE_SKILLS, WRESTLER_STYLES } from "./profileCatalog";
 import {
   createEmptyMatchApproachSetup,
@@ -10,7 +10,13 @@ import type {
   MatchApproachSetup,
   MatchEngineProfile,
   MatchEngineUniverse,
+  MatchOutcomeAuthority,
+  MatchPerformancePreview,
+  MatchPerformanceSettings,
   MatchWorkerApproachPlan,
+  MatchWorkerPerformanceResult,
+  PaceStatus,
+  StaminaStatus,
   WrestlerSkill,
 } from "./types";
 
@@ -26,6 +32,10 @@ function text(value: unknown, fallback = ""): string {
 
 function finiteNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
 }
 
 function validApproachIds(value: unknown): MatchApproachId[] {
@@ -76,6 +86,72 @@ function normalizeWorkerPlan(value: unknown): MatchWorkerApproachPlan | null {
   };
 }
 
+function normalizePerformanceSettings(value: unknown): MatchPerformanceSettings {
+  const fallback = createEmptyMatchApproachSetup().performanceSettings;
+  if (!isRecord(value)) return fallback;
+  const authorities: MatchOutcomeAuthority[] = ["tew-authoritative", "booker-selected", "competitive-preview"];
+  const authority = authorities.includes(value.authority as MatchOutcomeAuthority)
+    ? value.authority as MatchOutcomeAuthority
+    : fallback.authority;
+  return {
+    authority,
+    volatility: clamp(finiteNumber(value.volatility, fallback.volatility), 1, 10),
+    bookingInfluence: clamp(finiteNumber(value.bookingInfluence, fallback.bookingInfluence), 0, 10),
+  };
+}
+
+function normalizeWorkerPerformance(value: unknown): MatchWorkerPerformanceResult | null {
+  if (!isRecord(value) || typeof value.workerKey !== "string" || typeof value.workerName !== "string") return null;
+  const mentalState = MENTAL_STATES.find((state) => state.id === value.mentalStateId) ?? MENTAL_STATES[2];
+  const staminaStatuses: StaminaStatus[] = ["PASS", "WINDED", "GASSED", "DEAD"];
+  const paceStatuses: PaceStatus[] = ["IDEAL PACE", "OPEN PACE", "OFF PACE", "NOTICEABLY OFF", "POOR PACING", "BAD PACING", "FAILED"];
+  return {
+    workerKey: value.workerKey,
+    workerName: value.workerName,
+    mentalStateId: mentalState.id,
+    mentalStateName: mentalState.name,
+    mentalStateScore: finiteNumber(value.mentalStateScore, 0),
+    mentalModifier: finiteNumber(value.mentalModifier, mentalState.modifier),
+    luck: finiteNumber(value.luck, 0),
+    swing: finiteNumber(value.swing, 0),
+    consistencyVariance: finiteNumber(value.consistencyVariance, 0),
+    averageApproachRating: finiteNumber(value.averageApproachRating, 0),
+    approachExecution: finiteNumber(value.approachExecution, 0),
+    presentationScore: finiteNumber(value.presentationScore, 0),
+    staminaStatus: staminaStatuses.includes(value.staminaStatus as StaminaStatus) ? value.staminaStatus as StaminaStatus : "PASS",
+    staminaModifier: finiteNumber(value.staminaModifier, 0),
+    paceStatus: paceStatuses.includes(value.paceStatus as PaceStatus) ? value.paceStatus as PaceStatus : "OPEN PACE",
+    paceModifier: finiteNumber(value.paceModifier, 0),
+    performanceScore: finiteNumber(value.performanceScore, 0),
+    competitiveScore: finiteNumber(value.competitiveScore, 0),
+    winProbability: clamp(finiteNumber(value.winProbability, 0), 0, 1),
+  };
+}
+
+function normalizePerformancePreview(value: unknown): MatchPerformancePreview | null {
+  if (!isRecord(value) || typeof value.id !== "string" || !Array.isArray(value.workerResults)) return null;
+  const settings = normalizePerformanceSettings({ authority: value.authority, volatility: 5, bookingInfluence: 0 });
+  const workerResults = value.workerResults
+    .map(normalizeWorkerPerformance)
+    .filter((result): result is MatchWorkerPerformanceResult => result !== null);
+  if (workerResults.length === 0) return null;
+  return {
+    id: value.id,
+    generatedAt: text(value.generatedAt),
+    seed: text(value.seed),
+    authority: settings.authority,
+    matchScore: clamp(finiteNumber(value.matchScore, 0), 0, 100),
+    starRating: clamp(finiteNumber(value.starRating, 0), 0, 5),
+    performanceLeaderKey: text(value.performanceLeaderKey),
+    performanceLeaderName: text(value.performanceLeaderName),
+    projectedWinnerKey: text(value.projectedWinnerKey),
+    projectedWinnerName: text(value.projectedWinnerName),
+    confidence: clamp(finiteNumber(value.confidence, 0), 0, 100),
+    summary: text(value.summary),
+    workerResults,
+  };
+}
+
 export function normalizeMatchApproachSetup(value: unknown): MatchApproachSetup {
   const fallback = createEmptyMatchApproachSetup();
   if (!isRecord(value)) return fallback;
@@ -89,6 +165,8 @@ export function normalizeMatchApproachSetup(value: unknown): MatchApproachSetup 
     matchAimId,
     workerPlans,
     notes: text(value.notes),
+    performanceSettings: normalizePerformanceSettings(value.performanceSettings),
+    performancePreview: normalizePerformancePreview(value.performancePreview),
     updatedAt: text(value.updatedAt),
   };
 }
