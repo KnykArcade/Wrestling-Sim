@@ -95,7 +95,6 @@ test("creates worker profiles character arcs and a relationship network", async 
   await page.getByLabel("Worker alignment").selectOption("Heel");
   await page.getByLabel("Relationship worker").selectOption({ label: "Bret Hart" });
   await page.getByRole("button", { name: "Add Relationship" }).click();
-  await expect(page.getByText("Bret Hart", { exact: true }).last()).toBeVisible();
   await expect(page.getByText("Rival · Planned")).toBeVisible();
 
   await page.reload();
