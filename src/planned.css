@@ -1,0 +1,384 @@
+.global-tabbar {
+  width: min(1460px, 100%);
+  margin: 0 auto;
+  display: flex;
+  gap: 4px;
+  padding: 10px clamp(14px, 3vw, 40px) 0;
+}
+
+.global-tabbar button {
+  min-height: 42px;
+  padding: 8px 18px;
+  border: 1px solid #8296bd;
+  background: #0b1830;
+  color: #dce5f7;
+  font-weight: 800;
+}
+
+.global-tabbar button:hover,
+.global-tabbar button:focus-visible,
+.global-tabbar button.active {
+  color: #fff200;
+  background: #1a3970;
+  outline: none;
+}
+
+.planner-workspace {
+  display: grid;
+  gap: 14px;
+}
+
+.planner-toolbar,
+.planned-show-details,
+.planned-card-editor,
+.planner-empty-card,
+.planned-show-list {
+  border: 1px solid #8296bd;
+  background: rgba(8, 20, 39, 0.96);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+}
+
+.planner-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  padding: 20px 22px;
+}
+
+.planner-toolbar h2 {
+  margin: 5px 0 6px;
+}
+
+.planner-toolbar p {
+  margin: 0;
+  color: #becce3;
+}
+
+.planner-toolbar__actions,
+.show-record-actions,
+.card-editor-actions,
+.segment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.planner-toolbar__actions .primary-button,
+.planner-toolbar__actions .secondary-button,
+.show-record-actions .secondary-button,
+.card-editor-actions .primary-button,
+.card-editor-actions .secondary-button {
+  min-width: 0;
+}
+
+.save-state {
+  padding: 8px 11px;
+  border: 1px solid #607aa5;
+  color: #b9c8df;
+  background: #071428;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.save-state--saved {
+  color: #81ef9d;
+  border-color: #388452;
+}
+
+.save-state--save-failed {
+  color: #ff9f9f;
+  border-color: #a74848;
+}
+
+.planner-notice {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.planner-notice button {
+  padding: 5px 10px;
+  border: 1px solid #8296bd;
+  background: #0b1830;
+  color: #fff;
+}
+
+.planner-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 310px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.planned-show-list {
+  overflow: hidden;
+  position: sticky;
+  top: 12px;
+}
+
+.planned-show-list .panel-heading {
+  border-bottom: 1px solid #607aa5;
+}
+
+.planned-show-list > button {
+  width: 100%;
+  display: grid;
+  gap: 5px;
+  padding: 14px 16px;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid #263c5d;
+  background: #0b172a;
+  color: #f5f7fb;
+}
+
+.planned-show-list > button:hover,
+.planned-show-list > button:focus-visible,
+.planned-show-list > button.selected {
+  background: #183660;
+  box-shadow: inset 4px 0 0 #fff200;
+  outline: none;
+}
+
+.planned-show-list > button span,
+.planned-show-list > button small {
+  color: #aebdd4;
+}
+
+.planner-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.planner-empty-card {
+  min-height: 360px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  padding: 32px;
+  text-align: center;
+}
+
+.planner-empty-card h3,
+.planner-empty-card p {
+  margin: 0;
+}
+
+.planner-empty-card p {
+  color: #b9c7dc;
+}
+
+.planned-show-details,
+.planned-card-editor {
+  padding: 20px;
+}
+
+.planned-show-details__header,
+.card-editor-header,
+.planned-segment__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.planned-show-details__header h3,
+.card-editor-header h3 {
+  margin: 5px 0 0;
+  font-size: 1.25rem;
+}
+
+.card-editor-header p {
+  margin: 5px 0 0;
+  color: #aebdd4;
+}
+
+.show-form-grid,
+.segment-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.field {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.field span {
+  color: #d7e2f3;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-height: 39px;
+  border: 1px solid #7189b1;
+  background: #f8f9fb;
+  color: #071428;
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.field textarea {
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: 2px solid #fff200;
+  outline-offset: 1px;
+}
+
+.field--wide {
+  grid-column: span 2;
+}
+
+.field--full {
+  grid-column: 1 / -1;
+}
+
+.danger-button {
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid #d76666;
+  background: #32131b;
+  color: #ffb7b7;
+  font-weight: 800;
+}
+
+.danger-button:hover,
+.danger-button:focus-visible {
+  background: #5a1e2b;
+  outline: 2px solid #ff8b8b;
+  outline-offset: 2px;
+}
+
+.card-editor-header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #334c70;
+}
+
+.card-empty {
+  margin-top: 16px;
+  min-height: 150px;
+  border: 1px dashed #61799f;
+}
+
+.planned-segment-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.planned-segment {
+  padding: 14px;
+  border: 1px solid #5f7699;
+  background: #0b1729;
+}
+
+.planned-segment--match {
+  border-left: 5px solid #4aa5ff;
+}
+
+.planned-segment--angle {
+  border-left: 5px solid #d99bff;
+}
+
+.segment-order,
+.segment-kind {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 5px 8px;
+  border: 1px solid #4f678d;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.segment-kind {
+  color: #fff200;
+}
+
+.segment-actions button:not(.danger-button) {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid #7087aa;
+  background: #122743;
+  color: #eef3fb;
+  font-weight: 700;
+}
+
+.segment-actions button:disabled,
+.planner-toolbar__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+@media (max-width: 1080px) {
+  .planner-toolbar,
+  .planned-show-details__header,
+  .card-editor-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .planner-toolbar__actions,
+  .show-record-actions,
+  .card-editor-actions {
+    justify-content: flex-start;
+  }
+
+  .show-form-grid,
+  .segment-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .global-tabbar {
+    overflow-x: auto;
+  }
+
+  .global-tabbar button {
+    flex: 0 0 auto;
+  }
+
+  .planner-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .planned-show-list {
+    position: static;
+  }
+
+  .show-form-grid,
+  .segment-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field--wide,
+  .field--full {
+    grid-column: auto;
+  }
+
+  .planned-segment__header {
+    flex-direction: column;
+  }
+
+  .segment-actions {
+    justify-content: flex-start;
+  }
+}
