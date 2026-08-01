@@ -1,0 +1,31 @@
+{
+  "name": "tew-story-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only Total Extreme Wrestling IX show, match, and storyline history prototype.",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "dependencies": {
+    "buffer": "6.0.3",
+    "mdb-reader": "3.2.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "typescript": "6.0.3",
+    "vite": "7.3.6",
+    "vitest": "4.1.10"
+  }
+}

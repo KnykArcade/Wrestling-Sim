@@ -1,0 +1,420 @@
+import { useMemo, useRef, useState } from "react";
+import { readTewSnapshot } from "./tew/reader";
+import type { MatchRecord, ShowRecord, StorylineRecord, TewSnapshot } from "./tew/types";
+
+type ViewName = "shows" | "storylines" | "schema";
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDate(value: string): string {
+  if (!value) {
+    return "Date unavailable";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
+
+function formatNumber(value: number | null): string {
+  return value === null ? "—" : new Intl.NumberFormat("en-US").format(value);
+}
+
+function Rating({ value, label = "Rating" }: { value: number | null; label?: string }) {
+  return (
+    <div className="rating-box" aria-label={`${label}: ${value ?? "unavailable"}`}>
+      <span>{label}</span>
+      <strong>{value ?? "—"}</strong>
+    </div>
+  );
+}
+
+function MatchCard({ match }: { match: MatchRecord }) {
+  return (
+    <article className="match-card">
+      <div className="match-card__topline">
+        <span className="placement-badge">{match.placement}</span>
+        <span>{match.matchTime ? `Match time: ${match.matchTime}` : "Match time unavailable"}</span>
+        <Rating value={match.rating} label="Match" />
+      </div>
+      <h3>{match.description}</h3>
+      {match.winner && <p className="winner-line">Recorded winner: {match.winner}</p>}
+      {match.workers.length > 0 && (
+        <div className="worker-grid" aria-label="Match participants">
+          {match.workers.map((worker, index) => (
+            <div className="worker-chip" key={`${match.id}-${worker.id}-${index}`}>
+              <strong>{worker.name}</strong>
+              <span>{[worker.side, worker.role].filter(Boolean).join(" · ") || "Participant"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {match.notes && (
+        <div className="notes-panel">
+          <span>Existing TEW notes</span>
+          <p>{match.notes}</p>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function ShowDetails({ show }: { show: ShowRecord }) {
+  return (
+    <section className="details-panel">
+      <header className="details-header">
+        <div>
+          <p className="eyebrow">SHOW HISTORY</p>
+          <h2>{show.name}</h2>
+          <p>{formatDate(show.date)}</p>
+        </div>
+        <Rating value={show.rating} label="Show" />
+      </header>
+
+      <div className="show-facts">
+        <div>
+          <span>Company</span>
+          <strong>{show.company || "Unavailable"}</strong>
+        </div>
+        <div>
+          <span>Venue</span>
+          <strong>{show.venue || "Unavailable"}</strong>
+        </div>
+        <div>
+          <span>Attendance</span>
+          <strong>{formatNumber(show.attendance)}</strong>
+        </div>
+        <div>
+          <span>Broadcast</span>
+          <strong>{show.broadcast || "Unavailable"}</strong>
+        </div>
+      </div>
+
+      <div className="section-title-row">
+        <h3>Recorded Matches</h3>
+        <span>{show.matches.length}</span>
+      </div>
+      {show.matches.length > 0 ? (
+        <div className="match-list">
+          {show.matches.map((match) => (
+            <MatchCard key={match.id} match={match} />
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state compact">
+          No linked match-history records were found for this show.
+        </div>
+      )}
+    </section>
+  );
+}
+
+function StorylineCard({ storyline }: { storyline: StorylineRecord }) {
+  return (
+    <article className="storyline-card">
+      <header>
+        <div>
+          <span className="source-label">{storyline.sourceTable}</span>
+          <h3>{storyline.name}</h3>
+        </div>
+        <Rating value={storyline.heat} label="Heat" />
+      </header>
+      <p>{storyline.description || "No stored storyline description was found in this table."}</p>
+      <div className="storyline-meta">
+        <span>Status: {storyline.status || "Unavailable"}</span>
+        <span>Participants: {storyline.workers.length}</span>
+      </div>
+      {storyline.workers.length > 0 && (
+        <div className="worker-grid">
+          {storyline.workers.map((worker, index) => (
+            <div className="worker-chip" key={`${storyline.id}-${worker.id}-${index}`}>
+              <strong>{worker.name}</strong>
+              <span>{worker.role || "Involved"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function ImportPanel({ onFile }: { onFile: (file: File) => void }) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+
+  return (
+    <section
+      className={`import-panel ${dragActive ? "is-dragging" : ""}`}
+      onDragEnter={(event) => {
+        event.preventDefault();
+        setDragActive(true);
+      }}
+      onDragOver={(event) => event.preventDefault()}
+      onDragLeave={(event) => {
+        event.preventDefault();
+        if (event.currentTarget === event.target) {
+          setDragActive(false);
+        }
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDragActive(false);
+        const file = event.dataTransfer.files.item(0);
+        if (file) {
+          onFile(file);
+        }
+      }}
+    >
+      <div>
+        <p className="eyebrow">READ-ONLY IMPORT</p>
+        <h2>Open a TEW IX MDB snapshot</h2>
+        <p>
+          The file is parsed inside this browser session. The prototype does not upload, change, or
+          write back to the TEW database.
+        </p>
+      </div>
+      <input
+        ref={inputRef}
+        className="visually-hidden"
+        type="file"
+        accept=".mdb,.accdb,application/x-msaccess"
+        onChange={(event) => {
+          const file = event.target.files?.item(0);
+          if (file) {
+            onFile(file);
+          }
+          event.currentTarget.value = "";
+        }}
+      />
+      <button className="primary-button" type="button" onClick={() => inputRef.current?.click()}>
+        Select MDB File
+      </button>
+      <span className="drop-hint">or drop the file anywhere in this panel</span>
+    </section>
+  );
+}
+
+export default function App() {
+  const [snapshot, setSnapshot] = useState<TewSnapshot | null>(null);
+  const [selectedShowId, setSelectedShowId] = useState<string>("");
+  const [view, setView] = useState<ViewName>("shows");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>("");
+
+  const selectedShow = useMemo(() => {
+    if (!snapshot) {
+      return null;
+    }
+    return snapshot.shows.find((show) => show.id === selectedShowId) ?? snapshot.shows[0] ?? null;
+  }, [selectedShowId, snapshot]);
+
+  async function handleFile(file: File) {
+    setLoading(true);
+    setError("");
+    try {
+      const imported = await readTewSnapshot(file);
+      setSnapshot(imported);
+      setSelectedShowId(imported.shows[0]?.id ?? "");
+      setView("shows");
+    } catch (caught) {
+      setSnapshot(null);
+      setSelectedShowId("");
+      setError(caught instanceof Error ? caught.message : "The database could not be imported.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <div>
+          <span className="brand-kicker">WRESTLING SIM</span>
+          <h1>TEW IX Story Tracker</h1>
+        </div>
+        <div className="phase-badge">PHASE 1 · READ ONLY</div>
+      </header>
+
+      <main>
+        {!snapshot && <ImportPanel onFile={handleFile} />}
+
+        {loading && (
+          <div className="status-banner" role="status">
+            Reading the database and matching TEW history tables…
+          </div>
+        )}
+        {error && (
+          <div className="status-banner error" role="alert">
+            <strong>Import failed</strong>
+            <span>{error}</span>
+          </div>
+        )}
+
+        {snapshot && (
+          <>
+            <section className="database-header">
+              <div>
+                <p className="eyebrow">CURRENT SNAPSHOT</p>
+                <h2>{snapshot.fileName}</h2>
+                <p>
+                  {formatBytes(snapshot.fileSize)} · Imported {formatDate(snapshot.importedAt)}
+                </p>
+              </div>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => {
+                  setSnapshot(null);
+                  setSelectedShowId("");
+                  setError("");
+                }}
+              >
+                Close Snapshot
+              </button>
+            </section>
+
+            <section className="summary-grid" aria-label="Import summary">
+              <div><span>Tables</span><strong>{snapshot.tables.length}</strong></div>
+              <div><span>Shows</span><strong>{snapshot.shows.length}</strong></div>
+              <div><span>Matches</span><strong>{snapshot.shows.reduce((sum, show) => sum + show.matches.length, 0)}</strong></div>
+              <div><span>Storylines</span><strong>{snapshot.storylines.length}</strong></div>
+            </section>
+
+            <nav className="tabbar" aria-label="Prototype views">
+              <button className={view === "shows" ? "active" : ""} onClick={() => setView("shows")} type="button">
+                Show History
+              </button>
+              <button className={view === "storylines" ? "active" : ""} onClick={() => setView("storylines")} type="button">
+                Storylines
+              </button>
+              <button className={view === "schema" ? "active" : ""} onClick={() => setView("schema")} type="button">
+                Import Diagnostics
+              </button>
+            </nav>
+
+            {view === "shows" && (
+              <div className="history-layout">
+                <aside className="show-list" aria-label="Previous shows">
+                  <div className="panel-heading">
+                    <span>Previous Shows</span>
+                    <strong>{snapshot.shows.length}</strong>
+                  </div>
+                  {snapshot.shows.length > 0 ? snapshot.shows.map((show) => (
+                    <button
+                      type="button"
+                      className={selectedShow?.id === show.id ? "selected" : ""}
+                      key={show.id}
+                      onClick={() => setSelectedShowId(show.id)}
+                    >
+                      <strong>{show.name}</strong>
+                      <span>{formatDate(show.date)}</span>
+                      <small>{show.matches.length} match{show.matches.length === 1 ? "" : "es"}</small>
+                    </button>
+                  )) : (
+                    <div className="empty-state compact">No previous shows were mapped.</div>
+                  )}
+                </aside>
+                {selectedShow ? <ShowDetails show={selectedShow} /> : (
+                  <section className="details-panel empty-state">
+                    No show record is available to display. Open Import Diagnostics to review the detected tables.
+                  </section>
+                )}
+              </div>
+            )}
+
+            {view === "storylines" && (
+              <section className="content-panel">
+                <div className="panel-heading large">
+                  <div>
+                    <span>Stored Storylines</span>
+                    <p>Phase 1 reads existing storyline records only. Narrative entries are added in Phase 2.</p>
+                  </div>
+                  <strong>{snapshot.storylines.length}</strong>
+                </div>
+                {snapshot.storylines.length > 0 ? (
+                  <div className="storyline-grid">
+                    {snapshot.storylines.map((storyline) => (
+                      <StorylineCard key={`${storyline.sourceTable}-${storyline.id}`} storyline={storyline} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state">No supported storyline records were mapped from this snapshot.</div>
+                )}
+              </section>
+            )}
+
+            {view === "schema" && (
+              <section className="diagnostics-layout">
+                <div className="content-panel">
+                  <div className="panel-heading large">
+                    <div>
+                      <span>Matched TEW Tables</span>
+                      <p>These mappings drive the read-only show, match, worker, and storyline views.</p>
+                    </div>
+                  </div>
+                  <dl className="mapping-list">
+                    {Object.entries(snapshot.diagnostics.matchedTables).map(([purpose, table]) => (
+                      <div key={purpose}>
+                        <dt>{purpose}</dt>
+                        <dd className={table ? "matched" : "missing"}>{table ?? "Not found"}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <div className="warning-list">
+                    <h3>Warnings</h3>
+                    {snapshot.diagnostics.warnings.length > 0 ? (
+                      snapshot.diagnostics.warnings.map((warning, index) => <p key={`${warning}-${index}`}>{warning}</p>)
+                    ) : (
+                      <p>No mapping warnings were generated.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="content-panel table-inventory">
+                  <div className="panel-heading large">
+                    <div>
+                      <span>Database Table Inventory</span>
+                      <p>Only recognized history tables are loaded into memory.</p>
+                    </div>
+                    <strong>{snapshot.tables.length}</strong>
+                  </div>
+                  <div className="inventory-list">
+                    {snapshot.tables.map((table) => (
+                      <details key={table.name}>
+                        <summary>
+                          <span>{table.name}</span>
+                          <small>{table.rowCount.toLocaleString()} rows · {table.columnCount} columns</small>
+                          <b>{table.loaded ? "Mapped" : "Metadata only"}</b>
+                        </summary>
+                        <p>{table.columns.join(", ") || "No column names were returned."}</p>
+                        {table.truncated && <p className="truncate-warning">This table exceeded the Phase 1 row limit.</p>}
+                      </details>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
+          </>
+        )}
+      </main>
+
+      <footer>
+        Read-only prototype. It does not modify TEW IX, the executable, or any save database.
+      </footer>
+    </div>
+  );
+}
