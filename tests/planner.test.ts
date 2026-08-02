@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { emptyBridgeUniverse } from "../src/bridge/model";
 import { emptyChampionshipUniverse } from "../src/championships/storage";
 import { emptyCompetitionUniverse } from "../src/competitions/model";
 import { emptyCreativeControlData } from "../src/control/storage";
@@ -189,7 +190,7 @@ describe("planned show workspace", () => {
     expect(duplicate.segments[0].matchApproachSetup.performancePreview).toBeNull();
   });
 
-  test("saves loads exports and imports Phase 4D data", () => {
+  test("saves loads exports and imports Phase 5A bridge data", () => {
     const storage = new MemoryStorage();
     const show = createPlannedShow(1);
     const match = createPlannedSegment("match");
@@ -204,8 +205,9 @@ describe("planned show workspace", () => {
     const handoff = emptyHandoffUniverse();
     const matchEngine = emptyMatchEngineUniverse();
     const competitions = emptyCompetitionUniverse();
-    const backup = createPlannerBackup([show], [], workers, control, championships, handoff, matchEngine, competitions);
-    expect(backup.version).toBe(11);
+    const bridge = emptyBridgeUniverse();
+    const backup = createPlannerBackup([show], [], workers, control, championships, handoff, matchEngine, competitions, bridge);
+    expect(backup.version).toBe(12);
     expect(backup.storylines).toEqual([]);
     expect(backup.workers).toEqual(workers);
     expect(backup.control).toEqual(control);
@@ -213,8 +215,9 @@ describe("planned show workspace", () => {
     expect(backup.handoff).toEqual(handoff);
     expect(backup.matchEngine).toEqual(matchEngine);
     expect(backup.competitions).toEqual(competitions);
+    expect(backup.bridge).toEqual(bridge);
     expect(parsePlannerBackup(JSON.stringify(backup))).toEqual([show]);
-    expect(parsePlannerBackupBundle(JSON.stringify(backup))).toEqual({ shows: [show], storylines: [], workers, control, championships, handoff, matchEngine, competitions });
+    expect(parsePlannerBackupBundle(JSON.stringify(backup))).toEqual({ shows: [show], storylines: [], workers, control, championships, handoff, matchEngine, competitions, bridge });
   });
 
   test("migrates Phase 2A planned shows without losing the card", () => {
@@ -255,6 +258,7 @@ describe("planned show workspace", () => {
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":9,"shows":[],"storylines":[],"workers":{"profiles":[],"relationships":[]},"control":{"ideas":[],"settings":{"dashboardWindowDays":45,"calendarFilter":"All","searchQuery":""}},"championships":{"championships":[]},"handoff":{"shows":[],"mappings":[]},"matchEngine":{"profiles":[]}}')).toEqual([]);
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":10,"shows":[],"storylines":[],"workers":{"profiles":[],"relationships":[]},"control":{"ideas":[],"settings":{"dashboardWindowDays":45,"calendarFilter":"All","searchQuery":""}},"championships":{"championships":[]},"handoff":{"shows":[],"mappings":[]},"matchEngine":{"profiles":[]}}')).toEqual([]);
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":11,"shows":[],"storylines":[],"workers":{"profiles":[],"relationships":[]},"control":{"ideas":[],"settings":{"dashboardWindowDays":45,"calendarFilter":"All","searchQuery":""}},"championships":{"championships":[]},"handoff":{"shows":[],"mappings":[]},"matchEngine":{"profiles":[]},"competitions":{"competitions":[]}}')).toEqual([]);
-    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":12,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
+    expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":12,"shows":[],"storylines":[],"workers":{"profiles":[],"relationships":[]},"control":{"ideas":[],"settings":{"dashboardWindowDays":45,"calendarFilter":"All","searchQuery":""}},"championships":{"championships":[]},"handoff":{"shows":[],"mappings":[]},"matchEngine":{"profiles":[]},"competitions":{"competitions":[]},"bridge":{"settings":{"enabled":true,"advancedPreviewTools":false,"defaultView":"workflow"},"mappings":[],"comparisonReports":[]}}')).toEqual([]);
+    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":13,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
   });
 });
