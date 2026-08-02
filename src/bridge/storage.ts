@@ -1,5 +1,13 @@
 import { emptyBridgeUniverse } from "./model";
-import type { BridgeFieldMapping, BridgeUniverse, CompanionModeSettings, TewComparisonReport } from "./types";
+import type {
+  BridgeFieldMapping,
+  BridgeMappingHistoryEntry,
+  BridgeUniverse,
+  CompanionModeSettings,
+  GuardedExportAudit,
+  RawEvidenceSession,
+  TewComparisonReport,
+} from "./types";
 
 export const BRIDGE_STORAGE_KEY = "tew-story-tracker:bridge:v1";
 
@@ -9,6 +17,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function text(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
+}
+
+function strings(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function normalizeSettings(value: unknown): CompanionModeSettings {
@@ -24,6 +36,18 @@ function normalizeSettings(value: unknown): CompanionModeSettings {
   };
 }
 
+function normalizeHistory(value: unknown): BridgeMappingHistoryEntry | null {
+  if (!isRecord(value) || !text(value.id)) return null;
+  const stages = ["Candidate", "Corroborated", "Verified", "Export Eligible", "Unsupported"];
+  return {
+    id: text(value.id),
+    changedAt: text(value.changedAt),
+    fromStage: stages.includes(text(value.fromStage)) ? text(value.fromStage) as BridgeMappingHistoryEntry["fromStage"] : "Candidate",
+    toStage: stages.includes(text(value.toStage)) ? text(value.toStage) as BridgeMappingHistoryEntry["toStage"] : "Candidate",
+    reason: text(value.reason),
+  };
+}
+
 function normalizeMapping(value: unknown): BridgeFieldMapping | null {
   if (!isRecord(value) || !text(value.id) || !text(value.trackerField)) return null;
   const category = ["Show", "Match", "Angle", "Worker", "Storyline", "Championship", "Competition"].includes(text(value.category))
@@ -35,7 +59,8 @@ function normalizeMapping(value: unknown): BridgeFieldMapping | null {
   const confidence = ["Low", "Medium", "High"].includes(text(value.confidence))
     ? text(value.confidence) as BridgeFieldMapping["confidence"]
     : "Low";
-  return {
+  const stages = ["Candidate", "Corroborated", "Verified", "Export Eligible", "Unsupported"];
+  const normalized: BridgeFieldMapping = {
     id: text(value.id),
     category,
     trackerField: text(value.trackerField),
@@ -48,6 +73,13 @@ function normalizeMapping(value: unknown): BridgeFieldMapping | null {
     notes: text(value.notes),
     updatedAt: text(value.updatedAt),
   };
+  if (stages.includes(text(value.verificationStage))) normalized.verificationStage = text(value.verificationStage) as BridgeFieldMapping["verificationStage"];
+  if (Object.prototype.hasOwnProperty.call(value, "identityField")) normalized.identityField = text(value.identityField);
+  if (Object.prototype.hasOwnProperty.call(value, "requiredDefaults")) normalized.requiredDefaults = text(value.requiredDefaults);
+  if (Object.prototype.hasOwnProperty.call(value, "formatNotes")) normalized.formatNotes = text(value.formatNotes);
+  if (Object.prototype.hasOwnProperty.call(value, "evidenceSessionIds")) normalized.evidenceSessionIds = strings(value.evidenceSessionIds);
+  if (Object.prototype.hasOwnProperty.call(value, "history")) normalized.history = Array.isArray(value.history) ? value.history.map(normalizeHistory).filter((item): item is BridgeMappingHistoryEntry => item !== null) : [];
+  return normalized;
 }
 
 function normalizeComparison(value: unknown): TewComparisonReport | null {
@@ -75,9 +107,19 @@ function normalizeComparison(value: unknown): TewComparisonReport | null {
       changeType: ["Added", "Removed", "Changed"].includes(text(item.changeType)) ? text(item.changeType) as TewComparisonReport["entityChanges"][number]["changeType"] : "Changed",
       fieldChanges: Array.isArray(item.fieldChanges) ? item.fieldChanges.filter(isRecord).map((field) => ({ field: text(field.field), beforeValue: text(field.beforeValue), afterValue: text(field.afterValue) })) : [],
     })) : [],
-    candidateTables: Array.isArray(value.candidateTables) ? value.candidateTables.filter((item): item is string => typeof item === "string") : [],
+    candidateTables: strings(value.candidateTables),
     notes: text(value.notes),
   };
+}
+
+function normalizeRawEvidence(value: unknown): RawEvidenceSession | null {
+  if (!isRecord(value) || !text(value.id)) return null;
+  return value as unknown as RawEvidenceSession;
+}
+
+function normalizeExportAudit(value: unknown): GuardedExportAudit | null {
+  if (!isRecord(value) || !text(value.id) || !text(value.showId)) return null;
+  return value as unknown as GuardedExportAudit;
 }
 
 export function parseBridgeUniverse(value: unknown): BridgeUniverse {
@@ -89,11 +131,14 @@ export function parseBridgeUniverse(value: unknown): BridgeUniverse {
   const comparisons = Array.isArray(value.comparisonReports)
     ? value.comparisonReports.map(normalizeComparison).filter((item): item is TewComparisonReport => item !== null)
     : [];
-  return {
+  const normalized: BridgeUniverse = {
     settings: normalizeSettings(value.settings),
     mappings: mappings.length > 0 ? mappings : defaults.mappings,
     comparisonReports: comparisons,
   };
+  if (Object.prototype.hasOwnProperty.call(value, "rawEvidenceSessions")) normalized.rawEvidenceSessions = Array.isArray(value.rawEvidenceSessions) ? value.rawEvidenceSessions.map(normalizeRawEvidence).filter((item): item is RawEvidenceSession => item !== null) : [];
+  if (Object.prototype.hasOwnProperty.call(value, "exportAudits")) normalized.exportAudits = Array.isArray(value.exportAudits) ? value.exportAudits.map(normalizeExportAudit).filter((item): item is GuardedExportAudit => item !== null) : [];
+  return normalized;
 }
 
 export function loadBridgeUniverse(storage: Pick<Storage, "getItem">): BridgeUniverse {

@@ -73,3 +73,21 @@ export interface LoadedTable {
   name: string;
   rows: RawRow[];
 }
+
+export interface TewResearchTable {
+  name: string;
+  columns: string[];
+  rowCount: number;
+  sampledRows: number;
+  identityCandidates: string[];
+  truncated: boolean;
+  rows: Array<Record<string, string>>;
+}
+
+export interface TewResearchSnapshot {
+  fileName: string;
+  importedAt: string;
+  rowLimit: number;
+  tables: TewResearchTable[];
+  warnings: string[];
+}

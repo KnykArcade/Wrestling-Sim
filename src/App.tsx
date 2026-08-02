@@ -9,9 +9,10 @@ import PlannedShowWorkspace from "./planner/PlannedShowWorkspace";
 import StorylineHub from "./storylines/StorylineHub";
 import { readTewSnapshot } from "./tew/reader";
 import type { MatchRecord, ShowRecord, StorylineRecord, TewSnapshot } from "./tew/types";
+import TransferWorkspace from "./transfer/TransferWorkspace";
 import WorkerHub from "./workers/WorkerHub";
 
-type ViewName = "bridge" | "control" | "planner" | "handoff" | "competitions" | "match-engine" | "storyline-hub" | "worker-hub" | "championship-hub" | "shows" | "tew-storylines" | "schema";
+type ViewName = "bridge" | "transfer" | "control" | "planner" | "handoff" | "competitions" | "match-engine" | "storyline-hub" | "worker-hub" | "championship-hub" | "shows" | "tew-storylines" | "schema";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -108,12 +109,13 @@ export default function App() {
   }
 
   const needsSnapshot = (view === "shows" || view === "tew-storylines" || view === "schema") && snapshot === null;
-  const standaloneViews: ViewName[] = ["bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
+  const standaloneViews: ViewName[] = ["bridge", "transfer", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
 
   return <div className="app-shell">
-    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>TEW IX Story Tracker</h1></div><div className="phase-badge">PHASE 5A · SAFE TEW BRIDGE</div></header>
+    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>TEW IX Story Tracker</h1></div><div className="phase-badge">PHASE 5B · GUARDED TEW TRANSFER</div></header>
     <nav className="global-tabbar" aria-label="Story Tracker sections">
       <button className={view === "bridge" ? "active" : ""} onClick={() => setView("bridge")} type="button">TEW Companion</button>
+      <button className={view === "transfer" ? "active" : ""} onClick={() => setView("transfer")} type="button">TEW Transfer</button>
       <button className={view === "control" ? "active" : ""} onClick={() => setView("control")} type="button">Control Center</button>
       <button className={view === "planner" ? "active" : ""} onClick={() => setView("planner")} type="button">Planned Shows</button>
       <button className={view === "handoff" ? "active" : ""} onClick={() => setView("handoff")} type="button">TEW Handoff</button>
@@ -128,6 +130,7 @@ export default function App() {
     </nav>
     <main>
       {view === "bridge" && <BridgeWorkspace onOpenShow={openPlannedSegment} />}
+      {view === "transfer" && <TransferWorkspace onOpenShow={openPlannedSegment} />}
       {view === "control" && <CreativeControlCenter snapshot={snapshot} onOpenShow={openPlannedSegment} onOpenStoryline={() => setView("storyline-hub")} onOpenWorker={() => setView("worker-hub")} />}
       {view === "planner" && <PlannedShowWorkspace key={plannerTarget?.key ?? 0} snapshot={snapshot} snapshotLoading={loading} snapshotError={error} onSnapshotFile={(file) => void handleFile(file, "planner")} onCloseSnapshot={closeSnapshot} initialShowId={plannerTarget?.showId ?? ""} initialSegmentId={plannerTarget?.segmentId ?? ""} />}
       {view === "handoff" && <HandoffWorkspace snapshot={snapshot} />}
@@ -145,6 +148,6 @@ export default function App() {
         {view === "schema" && <section className="diagnostics-layout"><div className="content-panel"><div className="panel-heading large"><div><span>Matched TEW Tables</span><p>These mappings drive the read-only show, match, worker, and storyline views.</p></div></div><dl className="mapping-list">{Object.entries(snapshot.diagnostics.matchedTables).map(([purpose, table]) => <div key={purpose}><dt>{purpose}</dt><dd className={table ? "matched" : "missing"}>{table ?? "Not found"}</dd></div>)}</dl><div className="warning-list"><h3>Warnings</h3>{snapshot.diagnostics.warnings.length > 0 ? snapshot.diagnostics.warnings.map((warning, index) => <p key={`${warning}-${index}`}>{warning}</p>) : <p>No mapping warnings were generated.</p>}</div></div><div className="content-panel table-inventory"><div className="panel-heading large"><div><span>Database Table Inventory</span><p>Only recognized history tables are loaded into memory.</p></div><strong>{snapshot.tables.length}</strong></div><div className="inventory-list">{snapshot.tables.map((table) => <details key={table.name}><summary><span>{table.name}</span><small>{table.rowCount.toLocaleString()} rows · {table.columnCount} columns</small><b>{table.loaded ? "Mapped" : "Metadata only"}</b></summary><p>{table.columns.join(", ") || "No column names were returned."}</p>{table.truncated && <p className="truncate-warning">This table exceeded the Phase 1 row limit.</p>}</details>)}</div></div></section>}
       </>}
     </main>
-    <footer>TEW remains the game. Companion Mode prepares cards, approaches, Match Stories, Angle Outputs, competitions, handoff packages, read-only comparisons, and reconciliation. Direct database writing remains disabled.</footer>
+    <footer>TEW remains the game. The tracker prepares cards, approaches, Match Stories, Angle Outputs, competitions, assisted transfer packages, raw mapping evidence, and reconciliation. Database writing stays blocked until every safety gate and a verified Access writer exist.</footer>
   </div>;
 }

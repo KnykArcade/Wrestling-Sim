@@ -1,0 +1,85 @@
+.transfer-workspace { display: grid; gap: 18px; }
+.transfer-hero, .transfer-panel, .transfer-show-picker, .transfer-event-fields, .transfer-segment-card, .transfer-evidence-results, .transfer-export-audit { border: 1px solid #36577f; background: linear-gradient(180deg, #10243d 0%, #0b192d 100%); box-shadow: 0 14px 30px rgba(0,0,0,.22); }
+.transfer-hero { padding: 22px; display: flex; justify-content: space-between; gap: 22px; align-items: flex-start; }
+.transfer-hero h2, .transfer-panel h3 { margin: 4px 0 8px; }
+.transfer-hero p, .transfer-panel header p { margin: 0; color: #c3d2e6; line-height: 1.55; }
+.transfer-safety-card { min-width: 190px; padding: 16px; border: 1px solid #a65353; background: #27151a; display: grid; gap: 4px; }
+.transfer-safety-card span, .transfer-safety-card small { color: #e6bfc1; }
+.transfer-safety-card strong { font-size: 24px; color: #ff8b8b; }
+.transfer-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.transfer-tabs button { border: 1px solid #395b84; background: #10223a; color: #d8e4f4; padding: 10px 14px; font-weight: 700; cursor: pointer; }
+.transfer-tabs button.active { background: #24517e; border-color: #7aa8d7; color: white; }
+.transfer-show-picker { padding: 14px 16px; display: flex; align-items: end; gap: 12px; }
+.transfer-show-picker .field { flex: 1; }
+.transfer-panel { padding: 18px; display: grid; gap: 18px; }
+.transfer-panel > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
+.transfer-actions, .transfer-segment-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.transfer-score-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.transfer-score-strip > div { padding: 14px; border: 1px solid #2f4d72; background: #0b1728; display: grid; gap: 5px; }
+.transfer-score-strip span { color: #9fb2c9; font-size: 12px; text-transform: uppercase; }
+.transfer-score-strip strong { font-size: 22px; }
+.transfer-event-fields, .transfer-segment-card { padding: 16px; display: grid; gap: 12px; }
+.transfer-event-fields > header, .transfer-segment-card > header, .transfer-evidence-results > header, .transfer-export-audit > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.transfer-field-row { border: 1px solid #2e4b6d; background: #0a1626; padding: 13px; display: grid; gap: 10px; }
+.transfer-field-row > header { display: flex; justify-content: space-between; gap: 14px; }
+.transfer-field-row header div { display: grid; gap: 3px; }
+.transfer-field-row header span { color: #7da8d3; font-size: 11px; text-transform: uppercase; }
+.transfer-field-row header small { color: #9fb2c9; }
+.transfer-field-row pre { margin: 0; padding: 11px; white-space: pre-wrap; overflow-wrap: anywhere; background: #050d18; border: 1px solid #1e3654; color: #edf4ff; font-family: inherit; line-height: 1.45; }
+.transfer-field-row footer { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.transfer-field-row footer span { color: #aebfd3; font-size: 13px; }
+.transfer-segment-card > header > div:first-child { display: grid; gap: 3px; }
+.transfer-segment-card > header span { color: #83b1dc; font-size: 12px; font-weight: 700; }
+.transfer-segment-card > header h3 { margin: 0; }
+.transfer-segment-card > header small { color: #9eb0c5; }
+.transfer-evidence-files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.transfer-file-slot { border: 1px dashed #456b95; background: #0b1728; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.transfer-file-slot.is-loaded { border-style: solid; border-color: #4d8a72; }
+.transfer-file-slot div { display: grid; gap: 3px; }
+.transfer-file-slot span { color: #9fb2c9; font-size: 12px; text-transform: uppercase; }
+.transfer-file-slot small { color: #aabbd0; }
+.transfer-table-selector { border: 1px solid #2f4d72; background: #0a1626; padding: 14px; display: grid; gap: 8px; }
+.transfer-table-selector h4 { margin: 0 0 4px; }
+.transfer-table-selector label { display: grid; grid-template-columns: auto 1fr minmax(180px, .7fr); gap: 10px; align-items: center; }
+.transfer-table-selector input[type="text"], .transfer-table-selector input:not([type]) { width: 100%; }
+.transfer-row-limit { max-width: 320px; }
+.transfer-evidence-results { padding: 14px; display: grid; gap: 12px; }
+.transfer-evidence-results > article { border: 1px solid #2d4c6d; background: #081421; padding: 12px; display: grid; gap: 8px; }
+.transfer-evidence-results article > div:first-child { display: flex; justify-content: space-between; gap: 12px; }
+.transfer-evidence-results dl { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.transfer-evidence-results dl div { background: #101f33; padding: 8px; }
+.transfer-evidence-results dt { color: #9fb2c9; }
+.transfer-evidence-results dd { margin: 3px 0 0; font-size: 18px; font-weight: 700; }
+.transfer-evidence-results details { background: #101d2f; padding: 8px; }
+.transfer-mapping-list { display: grid; gap: 12px; }
+.transfer-mapping-card { border: 1px solid #315274; background: #091625; padding: 14px; display: grid; gap: 12px; }
+.transfer-mapping-card > header { display: flex; justify-content: space-between; gap: 12px; }
+.transfer-mapping-card > header div { display: grid; gap: 3px; }
+.transfer-mapping-card > header span { color: #7da8d3; font-size: 11px; text-transform: uppercase; }
+.transfer-mapping-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.transfer-mapping-grid .field--full { grid-column: 1 / -1; }
+.transfer-mapping-card fieldset { border: 1px solid #294765; display: flex; flex-wrap: wrap; gap: 10px; }
+.transfer-mapping-card fieldset label { display: flex; gap: 6px; align-items: center; }
+.transfer-stage { align-self: start; padding: 5px 8px; border: 1px solid #5d7897; background: #13243a; }
+.transfer-stage--export-eligible { border-color: #4c9c73; background: #143323; color: #91e5b6; }
+.transfer-stage--unsupported { border-color: #a34e4e; background: #35191d; color: #ff9d9d; }
+.transfer-stage-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.transfer-gate-pass, .transfer-gate-block { margin: 0; padding: 9px 11px; }
+.transfer-gate-pass { background: #123323; border: 1px solid #3f8a62; color: #a6e8c0; }
+.transfer-gate-block { background: #31191e; border: 1px solid #944b52; color: #ffc0c4; }
+.transfer-confirm { display: flex; gap: 9px; align-items: center; padding: 12px; background: #0a1626; border: 1px solid #2f4d72; }
+.transfer-export-audit { padding: 15px; display: grid; gap: 12px; }
+.transfer-gate-list { display: grid; gap: 8px; }
+.transfer-gate-list article { display: grid; grid-template-columns: 66px 1fr; gap: 10px; align-items: start; padding: 10px; border: 1px solid #315274; background: #091625; }
+.transfer-gate-list article.passed { border-color: #3f845f; }
+.transfer-gate-list article.blocked { border-color: #984c54; }
+.transfer-gate-list article > strong { font-size: 11px; padding: 4px 6px; text-align: center; }
+.transfer-gate-list article.passed > strong { background: #173a29; color: #9fe1bb; }
+.transfer-gate-list article.blocked > strong { background: #3a1b20; color: #ffb1b7; }
+.transfer-gate-list article div { display: grid; gap: 3px; }
+.transfer-gate-list article span { color: #afc0d4; }
+.transfer-validation-file { display: grid; gap: 6px; padding: 12px; border: 1px dashed #456b95; }
+.transfer-validation-result { padding: 12px; border: 1px solid #4b6e91; background: #0a1626; }
+.transfer-validation-result--passed { border-color: #4a8d66; }
+.transfer-validation-result--failed { border-color: #9a4e55; }
+@media (max-width: 900px) { .transfer-hero, .transfer-panel > header, .transfer-show-picker, .transfer-event-fields > header, .transfer-segment-card > header, .transfer-evidence-results > header, .transfer-export-audit > header { flex-direction: column; } .transfer-score-strip, .transfer-evidence-files, .transfer-mapping-grid { grid-template-columns: 1fr; } .transfer-table-selector label { grid-template-columns: auto 1fr; } .transfer-table-selector label input:last-child { grid-column: 1 / -1; } }
