@@ -194,8 +194,12 @@ test("restores parsed TEW history, compares snapshots, onboards PWL, and round-t
   await page.getByRole("button", { name: "TEW Snapshot Vault" }).click();
 
   await page.getByRole("button", { name: "Compare Supported TEW History" }).click();
-  await expect(page.getByText("New Show: PWL Power Hour #2", { exact: false })).toBeVisible();
-  await expect(page.getByText("Changed Match: PAC defeated Jay White", { exact: false })).toBeVisible();
+  const newShowChange = page.locator(".snapshot-comparison-results > article").filter({ hasText: "PWL Power Hour #2" });
+  await expect(newShowChange.getByText("New Show", { exact: true })).toBeVisible();
+  await expect(newShowChange.getByText("PWL Power Hour #2", { exact: true })).toBeVisible();
+  const changedMatchChange = page.locator(".snapshot-comparison-results > article").filter({ hasText: "PAC defeated Jay White" });
+  await expect(changedMatchChange.getByText("Changed Match", { exact: true })).toBeVisible();
+  await expect(changedMatchChange.getByText("PAC defeated Jay White", { exact: true })).toBeVisible();
 
   const afterCard = page.locator(".snapshot-vault-list > article").filter({ hasText: "PWL-after-show.mdb" });
   await afterCard.getByRole("button", { name: "Activate Snapshot" }).click();
