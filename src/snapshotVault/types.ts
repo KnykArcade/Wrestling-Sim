@@ -202,7 +202,7 @@ export interface SnapshotVaultImportResult {
 
 export interface SnapshotVaultPackage {
   product: "TEW IX Snapshot Vault";
-  version: 1;
+  version: number;
   exportedAt: string;
   universe: SnapshotVaultUniverse;
   records: StoredSnapshotRecord[];
