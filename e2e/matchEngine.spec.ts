@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { openAdvancedTools } from "./helpers";
 
 test("loads canonical match data and calculates an approach rating", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Match Engine" }).click();
+  await openAdvancedTools(page);
+  await page.getByRole("button", { name: "Match Engine Formulas" }).click();
 
   await expect(page.getByRole("heading", { name: "Match Data Foundation" })).toBeVisible();
   await expect(page.getByText("15", { exact: true }).first()).toBeVisible();
