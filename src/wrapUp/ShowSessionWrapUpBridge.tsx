@@ -49,6 +49,8 @@ export default function ShowSessionWrapUpBridge({ onOpenCalendar, onRefreshShowS
   const [open, setOpen] = useState(() => record?.activeStep === "wrap-up");
 
   useEffect(() => {
+    const badge = document.querySelector<HTMLElement>(".phase-badge");
+    if (badge) badge.textContent = "PHASE 5I · POST-SHOW WRAP-UP";
     const timer = window.setInterval(() => {
       const next = readBridgeState();
       setState((current) => current.fingerprint === next.fingerprint ? current : next);
@@ -102,7 +104,7 @@ export default function ShowSessionWrapUpBridge({ onOpenCalendar, onRefreshShowS
 
   return <section className={`show-session-wrap-up-bridge ${open ? "is-open" : ""}`} aria-label="Show Session post-show Wrap-Up">
     <header>
-      <div><p className="eyebrow">SHOW SESSION STEP 6</p><h2>Post-Show Wrap-Up</h2><p>{eligible ? "Confirm final creative history and explicitly approve every downstream consequence after TEW reconciliation." : "This step unlocks after the completed TEW show has been linked and reconciled."}</p></div>
+      <div><p className="eyebrow">SHOW SESSION STEP 6</p><h2>Post-Show Wrap-Up</h2><p>{eligible ? "Confirm final creative history and explicitly approve every downstream consequence after TEW reconciliation." : "This step unlocks after the completed TEW show has been linked and reconciled."}</p><small>Current complete backup format: version 20.</small></div>
       <div className="wrap-up-bridge-state"><span>{show.name}</span><strong>{wrapSession?.status ?? (eligible ? "Wrap-Up Not Reviewed" : "Awaiting Reconciliation")}</strong><small>{wrapSession?.closureReports[0] ? `Closed ${wrapSession.closureReports[0].generatedAt}` : "No consequence is applied automatically."}</small></div>
       <button className={open ? "secondary-button" : "primary-button"} type="button" disabled={!eligible} onClick={() => setBridgeOpen(!open)}>{open ? "Return to Main Show Session" : wrapSession?.status === "Closed" ? "Open Closed Wrap-Up" : "Open Step 6: Wrap-Up"}</button>
     </header>
