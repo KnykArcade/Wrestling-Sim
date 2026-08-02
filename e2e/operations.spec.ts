@@ -17,7 +17,7 @@ test("guides a planned show through preflight and preserves entry changes", asyn
   })).toBe("PWL Operations Test");
 
   await page.getByRole("button", { name: "Show Operations", exact: true }).click();
-  await expect(page.getByText("PWL Operations Test", { exact: true }).first()).toBeVisible();
+  await expect(page.getByLabel("Operations planned show").locator("option:checked")).toContainText("PWL Operations Test");
   await expect(page.getByText("Draft", { exact: true }).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Card Preflight" }).click();
