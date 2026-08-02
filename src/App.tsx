@@ -10,6 +10,8 @@ import OutputLibraryWorkspace from "./outputLibrary/OutputLibraryWorkspace";
 import WorkbenchOutputLibraryBridge from "./outputLibrary/WorkbenchOutputLibraryBridge";
 import PlannedShowWorkspace from "./planner/PlannedShowWorkspace";
 import ProfileLibraryWorkspace from "./profileLibrary/ProfileLibraryWorkspace";
+import PromotionCalendarWorkspace from "./schedule/PromotionCalendarWorkspace";
+import ShowSessionCalendarBridge from "./schedule/ShowSessionCalendarBridge";
 import ShowSessionWorkspace from "./showSession/ShowSessionWorkspace";
 import StorylineHub from "./storylines/StorylineHub";
 import { readTewSnapshot } from "./tew/reader";
@@ -20,7 +22,7 @@ import SegmentWorkbench from "./workbench/SegmentWorkbench";
 import { loadWorkbenchUniverse, updateWorkbenchSettings } from "./workbench/storage";
 import WorkerHub from "./workers/WorkerHub";
 
-type ViewName = "session" | "operations" | "workbench" | "outputs" | "profiles" | "transfer" | "results" | "bridge" | "control" | "planner" | "handoff" | "competitions" | "match-engine" | "storyline-hub" | "worker-hub" | "championship-hub" | "shows" | "tew-storylines" | "schema";
+type ViewName = "session" | "calendar" | "operations" | "workbench" | "outputs" | "profiles" | "transfer" | "results" | "bridge" | "control" | "planner" | "handoff" | "competitions" | "match-engine" | "storyline-hub" | "worker-hub" | "championship-hub" | "shows" | "tew-storylines" | "schema";
 
 const advancedViews: ViewName[] = ["operations", "bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub", "shows", "tew-storylines", "schema"];
 
@@ -90,6 +92,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [advancedToolsVisible, setAdvancedToolsVisible] = useState(() => loadWorkbenchUniverse(window.localStorage).settings.advancedToolsVisible);
   const [plannerTarget, setPlannerTarget] = useState<{ showId: string; segmentId: string; key: number } | null>(null);
+  const [sessionKey, setSessionKey] = useState(0);
 
   const selectedShow = useMemo(() => snapshot ? snapshot.shows.find((show) => show.id === selectedShowId) ?? snapshot.shows[0] ?? null : null, [selectedShowId, snapshot]);
 
@@ -119,6 +122,11 @@ export default function App() {
     setView("planner");
   }
 
+  function openShowSession(): void {
+    setSessionKey(Date.now());
+    setView("session");
+  }
+
   function toggleAdvancedTools(): void {
     const next = !advancedToolsVisible;
     setAdvancedToolsVisible(next);
@@ -126,12 +134,13 @@ export default function App() {
   }
 
   const needsSnapshot = (view === "shows" || view === "tew-storylines" || view === "schema") && snapshot === null;
-  const standaloneViews: ViewName[] = ["session", "operations", "workbench", "outputs", "profiles", "transfer", "results", "bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
+  const standaloneViews: ViewName[] = ["session", "calendar", "operations", "workbench", "outputs", "profiles", "transfer", "results", "bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
 
   return <div className="app-shell">
-    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>TEW IX Story Tracker</h1></div><div className="phase-badge">PHASE 5G · SHOW SESSION</div></header>
+    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>TEW IX Story Tracker</h1></div><div className="phase-badge">PHASE 5H · PROMOTION CALENDAR</div></header>
     <nav className="global-tabbar" aria-label="TEW Companion Core sections">
       <button className={view === "session" ? "active" : ""} onClick={() => setView("session")} type="button">Show Session</button>
+      <button className={view === "calendar" ? "active" : ""} onClick={() => setView("calendar")} type="button">Promotion Calendar</button>
       <button className={view === "workbench" ? "active" : ""} onClick={() => setView("workbench")} type="button">Match &amp; Angle Workbench</button>
       <button className={view === "outputs" ? "active" : ""} onClick={() => setView("outputs")} type="button">Output Library</button>
       <button className={view === "profiles" ? "active" : ""} onClick={() => setView("profiles")} type="button">Wrestler Profiles</button>
@@ -158,7 +167,8 @@ export default function App() {
       </details>}
     </nav>
     <main>
-      {view === "session" && <ShowSessionWorkspace snapshot={snapshot} snapshotLoading={loading} snapshotError={error} onSnapshotFile={(file) => void handleFile(file, "session")} onOpenWorkbench={() => setView("workbench")} onOpenOutputLibrary={() => setView("outputs")} onOpenPlanner={() => setView("planner")} onOpenTransfer={() => setView("transfer")} />}
+      {view === "session" && <><ShowSessionCalendarBridge onOpenCalendar={() => setView("calendar")} onOpenShow={() => openShowSession()} /><ShowSessionWorkspace key={sessionKey} snapshot={snapshot} snapshotLoading={loading} snapshotError={error} onSnapshotFile={(file) => void handleFile(file, "session")} onOpenWorkbench={() => setView("workbench")} onOpenOutputLibrary={() => setView("outputs")} onOpenPlanner={() => setView("planner")} onOpenTransfer={() => setView("transfer")} /></>}
+      {view === "calendar" && <PromotionCalendarWorkspace onOpenShowSession={() => openShowSession()} onOpenPlannedShow={openPlannedSegment} onOpenControl={() => setView("control")} onOpenStorylines={() => setView("storyline-hub")} onOpenWorkers={() => setView("worker-hub")} onOpenChampionships={() => setView("championship-hub")} onOpenCompetitions={() => setView("competitions")} />}
       {view === "operations" && <ShowOperationsWorkspace key="operations-overview" snapshot={snapshot} onOpenShow={openPlannedSegment} onOpenHandoff={() => setView("handoff")} onOpenTransfer={() => setView("transfer")} />}
       {view === "workbench" && <><WorkbenchOutputLibraryBridge onOpenOutputLibrary={() => setView("outputs")} /><SegmentWorkbench snapshot={snapshot} onOpenPlannedSegment={openPlannedSegment} /></>}
       {view === "outputs" && <OutputLibraryWorkspace onOpenPlannedSegment={openPlannedSegment} onOpenWorkbench={() => setView("workbench")} />}
@@ -183,6 +193,6 @@ export default function App() {
         {view === "schema" && <section className="diagnostics-layout"><div className="content-panel"><div className="panel-heading large"><div><span>Matched TEW Tables</span><p>These mappings drive the read-only show, match, worker, and storyline views.</p></div></div><dl className="mapping-list">{Object.entries(snapshot.diagnostics.matchedTables).map(([purpose, table]) => <div key={purpose}><dt>{purpose}</dt><dd className={table ? "matched" : "missing"}>{table ?? "Not found"}</dd></div>)}</dl><div className="warning-list"><h3>Warnings</h3>{snapshot.diagnostics.warnings.length > 0 ? snapshot.diagnostics.warnings.map((warning, index) => <p key={`${warning}-${index}`}>{warning}</p>) : <p>No mapping warnings were generated.</p>}</div></div><div className="content-panel table-inventory"><div className="panel-heading large"><div><span>Database Table Inventory</span><p>Only recognized history tables are loaded into memory.</p></div><strong>{snapshot.tables.length}</strong></div><div className="inventory-list">{snapshot.tables.map((table) => <details key={table.name}><summary><span>{table.name}</span><small>{table.rowCount.toLocaleString()} rows · {table.columnCount} columns</small><b>{table.loaded ? "Mapped" : "Metadata only"}</b></summary><p>{table.columns.join(", ") || "No column names were returned."}</p>{table.truncated && <p className="truncate-warning">This table exceeded the Phase 1 row limit.</p>}</details>)}</div></div></section>}
       </>}
     </main>
-    <footer>TEW remains the game. Show Session connects match approaches, Match Stories, Angle Outputs, production packages, assisted entry, and permanent result history without modifying TEW or replacing its simulation.</footer>
+    <footer>TEW remains the game. Promotion Calendar organizes recurring shows and grounded continuity obligations around Show Session without modifying TEW or replacing its simulation.</footer>
   </div>;
 }
