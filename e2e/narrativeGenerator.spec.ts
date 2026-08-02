@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { openAdvancedTools } from "./helpers";
 
 test("generates and persists editable Match Story and Angle Segment Output drafts", async ({ page }) => {
   await page.goto("/");
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Generated Output Test");
@@ -45,6 +47,7 @@ test("generates and persists editable Match Story and Angle Segment Output draft
   await expect(angle.getByLabel("Full Segment Output")).toContainText("the championship match is now official");
 
   await page.reload();
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await expect(page.getByLabel("Show name")).toHaveValue("PWL Generated Output Test");
   await expect(page.locator('[data-segment-type="match"]').getByLabel("Full match story")).toContainText("Jay White");
