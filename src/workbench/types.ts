@@ -4,7 +4,7 @@ import type { PlannedSegment, PlannedSegmentType } from "../planner/types";
 export type WorkbenchMode = "quick-match" | "quick-angle" | "planned-show";
 export type OutputTone = "sports" | "dramatic" | "road-agent";
 export type OutputDetail = "concise" | "standard" | "detailed";
-export type RatingSourceKind = "Imported from TEW" | "Mapped from TEW" | "Derived" | "Manual Override" | "Missing";
+export type RatingSourceKind = "Imported from workbook" | "Imported from TEW" | "Mapped from TEW" | "Derived" | "Manual Override" | "Baseline placeholder" | "Missing";
 
 export interface WorkbenchDraftRevision {
   id: string;

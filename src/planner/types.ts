@@ -5,6 +5,7 @@ import type { CreativeControlData } from "../control/types";
 import type { HandoffUniverse } from "../handoff/types";
 import type { MatchApproachSetup, MatchEngineUniverse } from "../matchEngine/types";
 import type { ShowOperationsUniverse } from "../operations/types";
+import type { ProfileLibraryUniverse } from "../profileLibrary/types";
 import type { TrackerStoryline } from "../storylines/types";
 import type { TransferUniverse } from "../transfer/types";
 import type { WorkbenchUniverse } from "../workbench/types";
@@ -136,7 +137,7 @@ export interface PlannedShow {
 
 export interface PlannerBackup {
   product: "TEW IX Story Tracker";
-  version: 15;
+  version: 16;
   exportedAt: string;
   shows: PlannedShow[];
   storylines: TrackerStoryline[];
@@ -150,6 +151,7 @@ export interface PlannerBackup {
   transfer: TransferUniverse;
   operations: ShowOperationsUniverse;
   workbench: WorkbenchUniverse;
+  profileLibrary: ProfileLibraryUniverse;
 }
 
 export interface PlannerBackupBundle {
@@ -165,4 +167,5 @@ export interface PlannerBackupBundle {
   transfer: TransferUniverse;
   operations: ShowOperationsUniverse;
   workbench: WorkbenchUniverse;
+  profileLibrary: ProfileLibraryUniverse;
 }

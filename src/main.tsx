@@ -18,6 +18,7 @@ import "./bridge.css";
 import "./transfer.css";
 import "./operations.css";
 import "./workbench.css";
+import "./profile-library.css";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
