@@ -21,6 +21,9 @@ import type { MatchEngineUniverse } from "../matchEngine/types";
 import { emptyShowOperationsUniverse } from "../operations/model";
 import { loadShowOperationsUniverse, parseShowOperationsUniverse, saveShowOperationsUniverse } from "../operations/storage";
 import type { ShowOperationsUniverse } from "../operations/types";
+import { emptyProfileLibraryUniverse } from "../profileLibrary/model";
+import { loadProfileLibraryUniverse, parseProfileLibraryUniverse, saveProfileLibraryUniverse } from "../profileLibrary/storage";
+import type { ProfileLibraryUniverse } from "../profileLibrary/types";
 import { loadTrackerStorylines, parseTrackerStorylines, saveTrackerStorylines } from "../storylines/storage";
 import type { TrackerStoryline } from "../storylines/types";
 import { emptyTransferUniverse } from "../transfer/model";
@@ -293,6 +296,10 @@ function browserWorkbench(): WorkbenchUniverse {
   return typeof window === "undefined" ? emptyWorkbenchUniverse() : loadWorkbenchUniverse(window.localStorage);
 }
 
+function browserProfileLibrary(): ProfileLibraryUniverse {
+  return typeof window === "undefined" ? emptyProfileLibraryUniverse() : loadProfileLibraryUniverse(window.localStorage);
+}
+
 export function createPlannerBackup(
   shows: PlannedShow[],
   storylines: TrackerStoryline[] = browserStorylines(),
@@ -306,10 +313,11 @@ export function createPlannerBackup(
   transfer: TransferUniverse = browserTransfer(),
   operations: ShowOperationsUniverse = browserOperations(),
   workbench: WorkbenchUniverse = browserWorkbench(),
+  profileLibrary: ProfileLibraryUniverse = browserProfileLibrary(),
 ): PlannerBackup {
   return {
     product: "TEW IX Story Tracker",
-    version: 15,
+    version: 16,
     exportedAt: new Date().toISOString(),
     shows,
     storylines,
@@ -323,6 +331,7 @@ export function createPlannerBackup(
     transfer,
     operations,
     workbench,
+    profileLibrary,
   };
 }
 
@@ -332,7 +341,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
   if (
     !isRecord(value) ||
     value.product !== "TEW IX Story Tracker" ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].includes(typeof value.version === "number" ? value.version : -1)
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].includes(typeof value.version === "number" ? value.version : -1)
   ) throw new Error("The selected file is not a supported TEW Story Tracker backup.");
   const version = value.version as number;
   return {
@@ -348,6 +357,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
     transfer: version >= 13 ? parseTransferUniverse(value.transfer ?? emptyTransferUniverse()) : emptyTransferUniverse(),
     operations: version >= 14 ? parseShowOperationsUniverse(value.operations ?? emptyShowOperationsUniverse()) : emptyShowOperationsUniverse(),
     workbench: version >= 15 ? parseWorkbenchUniverse(value.workbench ?? emptyWorkbenchUniverse()) : emptyWorkbenchUniverse(),
+    profileLibrary: version >= 16 ? parseProfileLibraryUniverse(value.profileLibrary ?? emptyProfileLibraryUniverse()) : emptyProfileLibraryUniverse(),
   };
 }
 
@@ -365,6 +375,7 @@ export function parsePlannerBackup(textValue: string): PlannedShow[] {
     saveTransferUniverse(window.localStorage, bundle.transfer);
     saveShowOperationsUniverse(window.localStorage, bundle.operations);
     saveWorkbenchUniverse(window.localStorage, bundle.workbench);
+    saveProfileLibraryUniverse(window.localStorage, bundle.profileLibrary);
   }
   return bundle.shows;
 }
