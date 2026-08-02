@@ -6,7 +6,7 @@ test("runs one angle from creative output through permanent lineage and inline T
   await expect(page.getByRole("heading", { name: "Open one show, finish every segment, enter it in TEW, and reconcile the actual result" })).toBeVisible();
 
   await openAdvancedTools(page);
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Session Test");
   await page.getByLabel("Company").fill("PWL");
