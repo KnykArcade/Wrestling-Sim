@@ -30,7 +30,6 @@ import ResultsCoreWorkspace from "./workbench/ResultsCoreWorkspace";
 import SegmentWorkbench from "./workbench/SegmentWorkbench";
 import { loadWorkbenchUniverse, updateWorkbenchSettings } from "./workbench/storage";
 import WorkerHub from "./workers/WorkerHub";
-import ShowSessionWrapUpBridge from "./wrapUp/ShowSessionWrapUpBridge";
 
 type ViewName = "session" | "calendar" | "operations" | "workbench" | "outputs" | "profiles" | "transfer" | "results" | "bridge" | "control" | "planner" | "handoff" | "competitions" | "match-engine" | "storyline-hub" | "worker-hub" | "championship-hub" | "shows" | "tew-storylines" | "schema";
 
@@ -136,8 +135,9 @@ export default function App() {
     setError("");
     try {
       const imported = await readTewSnapshot(file);
-      const role = vault.manifest.length === 0 ? "Current TEW Save" as const : "After Show" as const;
-      const result = await importTewSnapshotToVault(imported, vault, role);
+      const currentVault = loadSnapshotVaultUniverse(window.localStorage);
+      const role = currentVault.manifest.length === 0 ? "Current TEW Save" as const : "After Show" as const;
+      const result = await importTewSnapshotToVault(imported, currentVault, role);
       setVault(result.universe);
       setSnapshot(result.record.snapshot);
       setSelectedShowId(imported.shows[0]?.id ?? "");
@@ -154,7 +154,8 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      const result = await activateStoredSnapshot(snapshotId, vault);
+      const currentVault = loadSnapshotVaultUniverse(window.localStorage);
+      const result = await activateStoredSnapshot(snapshotId, currentVault);
       if (!result.record) throw new Error("The parsed snapshot is missing from IndexedDB. Restore the Snapshot Vault package that contains it.");
       setVault(result.universe);
       setSnapshot(result.record.snapshot);
@@ -231,7 +232,6 @@ export default function App() {
       {view === "session" && <>
         <CompanionHomeWorkspace activeSnapshot={snapshot} vault={vault} vaultReady={vaultReady} snapshotLoading={loading} snapshotError={error} onImportSnapshot={(file) => void handleFile(file, "session")} onActivateSnapshot={activateSnapshot} onVaultChange={setVault} onContinueShow={scrollToShowSession} onOpenCalendar={() => setView("calendar")} onOpenResults={() => setView("results")} onOpenProfiles={() => setView("profiles")} onOpenStorylines={() => setView("storyline-hub")} onOpenWrapUp={openWrapUp} />
         <ShowSessionCalendarBridge onOpenCalendar={() => setView("calendar")} onOpenShow={() => openShowSession()} />
-        <ShowSessionWrapUpBridge onOpenCalendar={() => setView("calendar")} onRefreshShowSession={() => openShowSession()} />
         <ShowSessionWorkspace key={sessionKey} snapshot={snapshot} snapshotLoading={loading} snapshotError={error} onSnapshotFile={(file) => void handleFile(file, "session")} onOpenWorkbench={() => setView("workbench")} onOpenOutputLibrary={() => setView("outputs")} onOpenPlanner={() => setView("planner")} onOpenTransfer={() => setView("transfer")} />
       </>}
       {view === "calendar" && <PromotionCalendarWorkspace onOpenShowSession={() => openShowSession()} onOpenPlannedShow={openPlannedSegment} onOpenControl={() => setView("control")} onOpenStorylines={() => setView("storyline-hub")} onOpenWorkers={() => setView("worker-hub")} onOpenChampionships={() => setView("championship-hub")} onOpenCompetitions={() => setView("competitions")} />}
