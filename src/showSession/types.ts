@@ -1,6 +1,6 @@
 import type { OutputComparisonStatus, OutputLineageStage } from "../outputLibrary/types";
 
-export type ShowSessionStep = "overview" | "setup" | "creative" | "package" | "entry" | "result";
+export type ShowSessionStep = "overview" | "setup" | "creative" | "package" | "entry" | "result" | "wrap-up";
 
 export type SegmentSessionStatus =
   | "Not Started"
