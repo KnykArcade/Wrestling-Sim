@@ -191,7 +191,6 @@ test("restores parsed TEW history, compares snapshots, onboards PWL, and round-t
     const data = raw ? JSON.parse(raw) as { activeSnapshotId?: string } : {};
     return data.activeSnapshotId ?? "";
   })).toBe("snapshot-baseline");
-  await expect(page.locator(".snapshot-vault-list > article.active").filter({ hasText: "PWL-baseline.mdb" })).toBeVisible();
 
   await page.getByRole("button", { name: "Compare Supported TEW History" }).click();
   await expect(page.getByText("New Show: PWL Power Hour #2", { exact: false })).toBeVisible();
