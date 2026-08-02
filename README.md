@@ -1,121 +1,162 @@
 # TEW IX Story Tracker
 
-A browser-based **Total Extreme Wrestling IX companion** for match approaches, Match Stories, Angle Segment Outputs, road-agent packages, planned cards, assisted TEW entry, competitions, and permanent creative history.
+A browser-based **Total Extreme Wrestling IX companion** for planning cards, selecting match approaches, generating Match Stories and Angle Segment Outputs, preparing road-agent packages, assisting TEW entry, and preserving permanent creative history.
 
-**TEW remains the game.** The companion does not replace TEW’s contracts, finances, company simulation, wider world, actual match results, or ratings.
+**TEW remains the game.** The companion does not replace TEW’s contracts, finances, company simulation, wider world, actual match results, or ratings. MDB and ACCDB access remains read-only.
 
-## Phase 5F: Output Library and Road-Agent Workflow
+## Phase 5G: Unified Show Session and Automatic Output Lineage
 
-The new **Output Library** preserves creative work beyond the current draft and gives every saved segment a visible version history:
+The default **Show Session** workspace connects the complete companion workflow around one planned show:
 
-**Plan → Generated Draft → Applied Output → Entered in TEW Version → Reconciled Actual Version**
+**Setup → Approaches & Output → Production Package → TEW Entry → Result**
 
-The original plan is never silently overwritten.
+The selected show, segment, and workflow step are saved so an interrupted session can resume at the exact point where work stopped.
 
-### Central Output Library
+### Show-session overview
 
-Saved matches and angles retain:
+Each show displays:
 
-- Match Story or Angle Segment Output
-- Key moments and road-agent map
-- TEW-notes version
-- Full creative version
+- Complete running order
+- Match and angle count
+- Planned runtime
+- Segment-setup completion
+- Match-approach completion
+- Match Story and Angle Output completion
+- Current production-package count
+- TEW-entry progress
+- Reconciliation progress
+- The next unfinished segment
+
+Previous, next, and next-unfinished controls make it possible to work through the card in order without jumping between unrelated screens.
+
+### Segment workflow states
+
+Every segment has one visible status:
+
+- Not Started
+- Setup Incomplete
+- Creative In Progress
+- Ready for TEW
+- Entering in TEW
+- Entered
+- Awaiting Result
+- Reconciliation Needed
+- Reconciled
+
+The status is derived from the real segment data, approach setup, Output Library record, TEW-entry progress, and confirmed result state.
+
+### Connected match workflow
+
+A selected match keeps the following in one session:
+
 - Wrestlers, roles, and sides
-- Match aim and selected approaches
+- Match type and duration
+- Championship or competition stakes
 - Planned winner and finish
-- Championship, competition, storyline, and show links
-- Draft and revision lineage
-- Reconciliation status and actual TEW result
+- Match aim
+- Duration-controlled approach selection
+- Pace and stamina information
+- Match Story and key moments
+- Road-Agent Match Package
+- Direct TEW fields and suggested TEW notes
+- Companion-only strategy
+- Actual TEW result after reconciliation
 
-The library can be searched by wrestler, show, segment type, match aim, approach, championship, competition, storyline, or date.
+### Connected angle workflow
 
-### Road-Agent Match Package
-
-Every saved match receives a package divided into three clear groups:
-
-1. **Direct TEW fields** — match identity, participants, match type, duration, championship or competition stakes, winner, and finish.
-2. **Suggested TEW notes** — Match Story, key moments, interference, post-match activity, consequences, and follow-up.
-3. **Companion-only strategy** — match aim, wrestler approaches, pace, stamina costs, and any advisory preview.
-
-The package can be copied as a concise TEW handoff or as a complete production document.
-
-### Angle Production Package
-
-Angles receive the same structured treatment:
+A selected angle keeps the following together:
 
 - Participants and roles
 - Location and content type
 - Story purpose
-- Required output
 - Consequences and follow-up
 - Audience takeaway
-- TEW-notes version
-- Full creative and production guidance
+- Angle Segment Output
+- Angle Production Package
+- Direct TEW fields and suggested TEW notes
+- Reconciled show history
 
-The companion does not invent dialogue or actions that were not entered in the plan.
+The companion does not invent dialogue, actions, winners, or outcomes that were not entered in the creative plan.
 
-### Show-wide production packets
+### Automatic Output Library checkpoint offers
 
-A planned show can generate one ordered packet containing:
+The session offers a permanent checkpoint when a segment reaches a formal stage:
 
-- Show identity and running order
-- Every match package
-- Every angle package
-- Missing-output and missing-participant warnings
-- TEW-entry guidance
-- Post-show reconciliation checklist
-- Clean text export
-- Structured JSON export
+**Generated Draft → Applied Output → Ready for TEW → Entered in TEW Version → Reconciled Actual Version**
 
-### Reusable output structures
+Before saving, the session shows the fields that changed. Identical checkpoint versions are blocked, and dismissing an offer hides it only until the segment changes again. Earlier versions are never overwritten.
 
-Any saved output can become a reusable structure. The structure keeps duration, format, purpose, and required sections while removing:
+### Inline assisted TEW entry
 
-- Wrestler names
-- Planned winner
-- Championship name
-- Dialogue
-- Specific storyline outcome
+The selected segment can be entered without leaving Show Session. Information remains divided into:
 
-### Source transparency
+1. **Direct TEW Field** — fields with an equivalent TEW booking value.
+2. **TEW Notes** — Match Story, Angle Output, key moments, consequences, and production guidance.
+3. **Companion Only** — match approaches, pace, stamina, style compatibility, and advisory information that TEW does not directly represent.
 
-Every output version identifies whether its wording came from:
+Field statuses are:
 
-- The canonical approach phrase library
-- The entered creative plan
-- A generic structural fallback
+- Pending
+- Copied
+- Entered
+- Changed in TEW
+- Not Applicable
 
-Approaches without a supplied canonical phrase row remain explicitly labeled rather than receiving invented source language. Current fallback approaches include:
+The full TEW Transfer workspace remains available for detailed handoff research and exports.
 
-- Dirty Rulebreaker
-- Resilient Underdog
-- Strong Style Specialist
+### Changes made during TEW entry
 
-### Planned versus actual reporting
+A last-minute TEW change can preserve:
 
-After TEW reconciliation, a saved match compares:
+- Original tracker value
+- Value actually entered in TEW
+- Reason for the change
+- Whether the tracker plan was updated
+- Whether a new frozen or Output Library version is required
+- Date and time of the recorded change
 
-- Planned winner versus actual winner
-- Planned duration versus actual duration
-- Planned finish versus TEW result notes
-- Advisory preview versus TEW rating
-- Planned Match Story versus final narrative
-- Planned consequences and follow-up versus confirmed outcomes
+The original plan remains in permanent history.
 
-TEW remains authoritative for the actual result and rating.
+### Post-show result intake
+
+After the show runs in TEW, the same session can load the updated read-only database copy and suggest:
+
+- The completed TEW show
+- The matching result for each planned match
+- Running-order evidence
+- Participant overlap
+- Winner, duration, rating, and notes
+
+Every suggested match link must be confirmed or rejected. Confirmed results update tracker reconciliation, but TEW remains authoritative for the actual winner and rating.
+
+### Quick Segment connection
+
+A Quick Match or Quick Angle can be added to the current show as a linked copy. The original standalone Quick Segment remains unchanged, while the show copy gains running-order placement, entry tracking, reconciliation, and permanent Output Library lineage.
+
+### Recovery and integrity checks
+
+Show Session detects or surfaces:
+
+- Duplicate segment identifiers
+- A removed saved-resume segment
+- Orphaned TEW-entry progress
+- Output records linked to removed segments
+- Missing permanent lineage after entry begins
+- Production packages made stale by later card edits
+- Browser-storage usage
 
 ## Companion Core navigation
 
-The daily workflow centers on:
+The daily navigation now centers on:
 
-1. **Show Operations**
+1. **Show Session**
 2. **Match & Angle Workbench**
 3. **Output Library**
 4. **Wrestler Profiles**
 5. **TEW Entry**
 6. **Results**
 
-Advanced tools remain available for planned shows, championships, competitions, storylines, worker creative profiles, formulas, handoff research, and read-only TEW diagnostics.
+Legacy Show Operations diagnostics, Planned Shows, championships, competitions, storylines, worker creative profiles, formulas, handoff research, and read-only database diagnostics remain available through Advanced Tools.
 
 ## Match & Angle Workbench
 
@@ -140,68 +181,60 @@ Approach slots remain:
 - 16–24 minutes: 3 approaches per wrestler
 - 25 minutes or longer: 4 approaches per wrestler
 
-The Workbench now includes a direct **Save Current Segment to Output Library** action.
+## Output Library and production packages
+
+The Output Library preserves:
+
+- Original plan
+- Generated drafts
+- Applied output
+- Ready-for-TEW checkpoint
+- Entered-in-TEW version
+- Reconciled actual version
+- Road-Agent Match Package or Angle Production Package
+- Show-wide production packets
+- Reusable output structures
+- Planned-versus-actual reports
+
+Every output version identifies whether wording came from the canonical approach phrase library, the entered creative plan, or a generic structural fallback.
 
 ## Wrestler Profile Library
 
-The roster profile library stores reusable match-approach ratings and provenance for every wrestler.
-
-It supports browser-side read-only import from:
+The roster profile library stores reusable match-approach ratings and field-level provenance. It supports browser-side, read-only import from:
 
 - `.xlsx`
 - `.xlsm`
 - `.csv`
 - Tracker profile `.json`
 
-Workbook macros are never executed.
-
-Every rating is labeled as one of:
-
-- Imported from workbook
-- Imported from TEW
-- Mapped from TEW
-- Derived
-- Manual override
-- Missing
-- Baseline placeholder
-
-Manual overrides are preserved by default. Import sessions retain conflict decisions and can be rolled back.
-
-## Unified Show Operations
-
-Each show follows:
-
-**Draft → Creative Ready → Handoff Ready → Entering in TEW → Entered → Awaiting Results → Reconciliation Needed → Reconciled**
-
-The workspace checks card identity, runtime, repeated worker use, match setup, approaches, stamina, Match Stories, Angle Outputs, title stakes, competition links, handoff age, transfer age, and reconciliation status.
+Workbook macros are never executed. Manual overrides are preserved by default, and complete import sessions can be reviewed or rolled back.
 
 ## Guarded TEW transfer
 
-The assisted transfer workspace orders the finalized card for TEW entry and classifies information as:
-
-- Direct TEW Field
-- TEW Notes
-- Companion Only
+The assisted transfer workspace orders the finalized card for TEW entry and classifies information as Direct TEW Field, TEW Notes, or Companion Only.
 
 Raw before-and-after database research remains read-only. The installed Access reader does not provide a verified writer, so direct MDB or ACCDB modification remains disabled.
 
 ## Backup format
 
-Backup version **17** preserves:
+Backup version **18** preserves:
 
 - Planned shows and reconciliation
+- Exact Show Session resume state
+- Formal checkpoint history and dismissed offers
+- Awaiting-result and snapshot references
 - Storylines, workers, championships, and competitions
 - TEW handoff, transfer, and operations data
 - Match-engine profiles and approach setup
 - Quick Segments and draft history
 - Wrestler Profile Library and import sessions
-- Output Library items and version lineage
+- Output Library items and complete version lineage
 - Road-agent and angle production packages
 - Show-wide production packets
 - Reusable output structures
 - Planned-versus-actual reports
 
-Versions 1 through 16 remain importable.
+Versions 1 through 17 remain importable.
 
 ## Safety boundary
 
@@ -211,19 +244,20 @@ Versions 1 through 16 remain importable.
 - No workbook macros are executed.
 - No missing wrestler ratings are invented.
 - No output database is produced without a verified Access writer and complete evidence gates.
-- No contracts, finances, morale system, worker development, or independent wrestling world is added.
+- No contracts, finances, morale system, worker development, AI-controlled companies, or independent wrestling world is added.
+- No winner, rating, or TEW result is automatically changed.
 - Reconciled TEW results remain authoritative.
-- Browser data saves automatically to the current preview origin.
+- Browser data saves automatically to the current cloud-preview origin.
 
 ## Open in GitHub Codespaces
 
 1. Open this repository in GitHub.
 2. Choose **Code → Codespaces → Create codespace on the current branch**.
 3. Wait for dependency installation to finish.
-4. Run `npm run dev`.
+4. Run `npm run dev` in the Codespace terminal.
 5. Open the forwarded **TEW Story Tracker Preview** port.
 
-Export a full backup before deleting a Codespace or moving to another Codespaces URL. Never commit a TEW `.mdb` or `.accdb` file to GitHub.
+Export a complete version 18 backup before deleting a Codespace or moving to another Codespaces URL. Never commit a TEW `.mdb` or `.accdb` file to GitHub.
 
 ## Verification
 
