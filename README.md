@@ -1,104 +1,125 @@
 # TEW IX Story Tracker
 
-A browser-based **Total Extreme Wrestling IX companion** for planning cards, selecting match approaches, generating editable Match Stories and Angle Segment Outputs, managing competitions, preparing TEW handoff packages, and preserving creative history. TEW remains the game and the final authority for running every show.
+A browser-based **Total Extreme Wrestling IX companion** for planning cards, selecting match approaches, generating editable Match Stories and Angle Segment Outputs, managing competitions, preparing TEW transfer packages, and preserving creative history. TEW remains the game and the final authority for running every show.
 
-## Phase 5A: TEW Companion Mode and Safe Integration Bridge
+## Phase 5B: Guarded TEW Transfer Prototype
 
-The application now opens in **TEW Companion Mode**. Its default workflow is:
+The new **TEW Transfer** workspace makes the companion-to-TEW handoff more practical without pretending the browser can safely write an Access database.
+
+### Assisted TEW transfer
+
+A planned card can be translated into TEW entry order:
+
+1. Event information
+2. Pre-show segments
+3. Main-show segments
+4. Post-show segments
+5. Final review
+
+Every transfer field is identified as one of:
+
+- **Direct TEW Field** — intended for an equivalent TEW booking field
+- **TEW Notes** — creative direction best carried into road-agent or segment notes
+- **Companion Only** — the custom match-approach or advisory layer that TEW does not directly represent
+
+The workspace provides:
+
+- Individual-field copying
+- Complete-segment copying
+- Previous and next segment navigation
+- Alt+Left and Alt+Right keyboard navigation
+- Field status: Pending, Copied, Entered, or Not Applicable
+- Segment-completion tracking
+- Saved transfer progress
+- JSON and clean-text packages
+
+Match transfer sheets include the match aim, intended pace, selected approaches, stamina costs, Match Story, key moments, winner, finish, interference, and post-match direction. Angle sheets include participants, roles, location, content type, Segment Output, consequences, follow-up, and audience takeaway.
+
+### Raw before-and-after evidence
+
+A controlled research session can reopen only the candidate tables deliberately selected by the user from two copied databases:
+
+- Before entering a small test card manually in TEW
+- After entering that exact test card
+
+The read-only researcher can sample up to 2,000 rows per selected table and report:
+
+- Inserted rows
+- Removed rows
+- Changed rows
+- Field-level before-and-after values
+- Candidate record-identity columns
+- Possible automatically generated fields
+
+The output is evidence for investigation. It is not permission to write.
+
+### Evidence-gated mappings
+
+Mappings now progress through explicit stages:
+
+- Candidate
+- Corroborated
+- Verified
+- Export Eligible
+- Unsupported
+
+Verified and Export Eligible stages require repeatable controlled evidence. Export eligibility also requires:
+
+- A confirmed identity field
+- High confidence
+- Documented TEW value formatting
+- Documented required default values
+- Linked raw-evidence sessions
+
+Every accepted stage change is recorded in mapping history.
+
+### Guarded exporter audit
+
+The exporter prototype checks:
+
+- The source is a disposable copy
+- A second automatic backup would be required
+- Every required operation has an Export Eligible mapping
+- Mapping evidence is retained
+- Every participant resolves to a TEW identifier
+- Required show and segment values are complete
+- A verified Microsoft Access writer exists
+
+The final gate intentionally fails because the installed `mdb-reader` dependency is read-only. The prototype therefore produces a downloadable audit and dry run, but **does not create or modify an MDB/ACCDB file**.
+
+An externally produced output copy can be loaded for read-only round-trip validation. The tracker checks that the database remains readable, the expected show exists, the expected match count is present, and planned TEW-linked workers still resolve.
+
+### Backup version 13
+
+Version 13 backups include:
+
+- TEW-oriented transfer packages
+- Field and segment entry progress
+- Transfer audit logs
+- Raw evidence sessions
+- Mapping confidence history and export-eligibility decisions
+- Guarded exporter audits
+- Round-trip validation results
+- All Phase 5A and earlier creative, competition, championship, handoff, worker, storyline, and match-engine data
+
+Backup versions 1 through 12 remain importable.
+
+## TEW Companion workflow
+
+The default workflow remains:
 
 1. Import a current read-only TEW snapshot.
 2. Plan the card in the tracker.
 3. Select match approaches.
 4. Complete Match Stories and Angle Segment Outputs.
-5. Finalize the frozen TEW handoff package.
-6. Enter the card in TEW with the Entry Assistant.
+5. Finalize the frozen handoff package.
+6. Use TEW Transfer or the Entry Assistant.
 7. Run the show in TEW.
 8. Import the post-show snapshot and reconcile the actual results.
 
 TEW remains authoritative for winners, match ratings, company simulation, contracts, finances, and the wider game world.
 
-### Companion settings
-
-The TEW Companion workspace stores:
-
-- Whether Companion Mode is enabled
-- Whether Advanced Preview Tools should be shown
-- The preferred default Companion workspace view
-
-The advisory performance and star-preview systems remain available, but they are treated as optional advanced tools rather than the center of the workflow.
-
-### Read-only before-and-after comparison
-
-Two copied TEW databases can be loaded side by side:
-
-- Before manually entering a card
-- After manually entering that same card
-
-The comparison report identifies:
-
-- Table row-count changes
-- New or missing tables
-- Schema changes visible through column metadata
-- Added, removed, or changed normalized shows
-- Added, removed, or changed matches
-- Added, removed, or changed workers
-- Added, removed, or changed storylines
-- Candidate tables that deserve further investigation
-
-A changed table is evidence to investigate. It is not automatically treated as proof that direct writing is safe.
-
-### Field-mapping laboratory
-
-Tracker fields can be classified as:
-
-- Candidate
-- Verified
-- Unsupported
-
-Each mapping stores:
-
-- Tracker category and field
-- Candidate TEW table and field
-- Confidence level
-- Before-and-after evidence
-- Research notes
-
-A mapping should only be marked Verified after repeatable evidence identifies the table, field, identifiers, and relationships.
-
-### Bridge-readiness report
-
-Every planned show can generate a readiness report that separates:
-
-- Verified fields that may eventually support a guarded exporter
-- Candidate mappings that still need evidence
-- Manual fields that should continue through the Entry Assistant
-- Missing or unsupported values that block automation
-
-### Experimental dry-run package
-
-A selected card can generate a non-writing proposal containing:
-
-- Proposed target table
-- Proposed target field
-- Proposed value
-- Referenced tracker or TEW IDs
-- Validation status
-- Blocking problem or manual-entry instruction
-
-The dry-run package has a hard `writingEnabled: false` boundary. It cannot modify a TEW database.
-
-### Backup version 12
-
-Version 12 backups include:
-
-- Companion Mode settings
-- Field mappings and evidence
-- Saved before-and-after comparison reports
-- All competition, championship, handoff, match-engine, worker, storyline, booking, and planned-show data from previous versions
-
-Backup versions 1 through 11 remain importable.
-
-## Phase 4D: Tournament, Cup, League, and Classic Management
+## Competition management
 
 The **Competitions** workspace manages:
 
@@ -114,8 +135,6 @@ Ready-to-edit templates include:
 - **PWL World Classic**
 - **PWL World Tag Classic**
 - **PWL League**
-
-The Classic templates preserve trophy and ceremonial-jacket traditions, including a respectful handoff or an attack that launches the next rivalry.
 
 ## Match approach and output workflow
 
@@ -139,26 +158,15 @@ Approach slots remain:
 
 The output generator never promotes an advisory projected winner into the booking. TEW-authoritative mode remains the default.
 
-## Existing systems
-
-- Planned shows with ordered matches and angles
-- TEW Show Handoff and guided Entry Assistant
-- Read-only MDB/ACCDB snapshot import
-- Planned-versus-actual reconciliation
-- Storyline Hub and timelines
-- Worker creative profiles and relationships
-- Championship lineage, rankings, and programs
-- Creative Control Center and Future Booking Board
-- Competition brackets, league schedules, standings, and PWL Classic traditions
-
 ## Safety boundary
 
 - TEW database access remains read-only.
 - No database is uploaded to an application server.
 - No TEW executable or live save-file mutation is performed.
-- The before-and-after laboratory compares copied databases only.
-- Candidate field mappings do not enable writes.
-- Dry-run packages cannot execute database changes.
+- Raw research is limited to copied databases and deliberately selected tables.
+- Candidate mappings do not enable writes.
+- Export audits retain a hard `writingEnabled: false` boundary.
+- No output database is produced without a verified Access writer and complete evidence gates.
 - Reconciled TEW results remain authoritative.
 - Browser data saves automatically to the current preview origin.
 
