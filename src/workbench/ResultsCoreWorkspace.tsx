@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "../advanced-tools.css";
 import { createShowOperationsRecord } from "../operations/model";
 import ShowOperationsWorkspace from "../operations/ShowOperationsWorkspace";
 import { loadShowOperationsUniverse, saveShowOperationsUniverse } from "../operations/storage";
