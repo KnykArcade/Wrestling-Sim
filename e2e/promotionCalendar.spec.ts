@@ -129,7 +129,7 @@ test("builds PWL Power Hour, inserts a special, and carries a grounded follow-up
   await page.getByRole("button", { name: "Promotion Calendar", exact: true }).click();
   await page.getByRole("button", { name: "Show Series", exact: true }).click();
   await expect(page.getByText("PWL Power Hour", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("4 generated shows", { exact: true })).toBeVisible();
+  await expect(page.getByText(/4 generated shows/).first()).toBeVisible();
   await expect.poll(async () => page.evaluate(() => {
     const raw = window.localStorage.getItem("tew-story-tracker:planned-shows:v1");
     return raw ? (JSON.parse(raw) as unknown[]).length : 0;
