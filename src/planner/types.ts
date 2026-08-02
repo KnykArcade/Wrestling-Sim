@@ -4,6 +4,7 @@ import type { CompetitionUniverse } from "../competitions/types";
 import type { CreativeControlData } from "../control/types";
 import type { HandoffUniverse } from "../handoff/types";
 import type { MatchApproachSetup, MatchEngineUniverse } from "../matchEngine/types";
+import type { ShowOperationsUniverse } from "../operations/types";
 import type { TrackerStoryline } from "../storylines/types";
 import type { TransferUniverse } from "../transfer/types";
 import type { WorkerUniverse } from "../workers/types";
@@ -134,7 +135,7 @@ export interface PlannedShow {
 
 export interface PlannerBackup {
   product: "TEW IX Story Tracker";
-  version: 13;
+  version: 14;
   exportedAt: string;
   shows: PlannedShow[];
   storylines: TrackerStoryline[];
@@ -146,6 +147,7 @@ export interface PlannerBackup {
   competitions: CompetitionUniverse;
   bridge: BridgeUniverse;
   transfer: TransferUniverse;
+  operations: ShowOperationsUniverse;
 }
 
 export interface PlannerBackupBundle {
@@ -159,4 +161,5 @@ export interface PlannerBackupBundle {
   competitions: CompetitionUniverse;
   bridge: BridgeUniverse;
   transfer: TransferUniverse;
+  operations: ShowOperationsUniverse;
 }
