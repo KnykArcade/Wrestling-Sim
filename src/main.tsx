@@ -8,6 +8,7 @@ import "./storylines.css";
 import "./workers.css";
 import "./control.css";
 import "./championships.css";
+import "./competitions.css";
 import "./handoff.css";
 import "./match-engine.css";
 import "./match-setup.css";

@@ -1,99 +1,120 @@
 # TEW IX Story Tracker
 
-A browser-based **Total Extreme Wrestling IX companion** for planning cards, selecting match approaches, writing Match Stories and Angle Segment Outputs, preparing TEW handoff packages, and preserving creative history. TEW remains the game and the final authority for running every show.
+A browser-based **Total Extreme Wrestling IX companion** for planning cards, selecting match approaches, generating editable Match Stories and Angle Segment Outputs, managing competitions, preparing TEW handoff packages, and preserving creative history. TEW remains the game and the final authority for running every show.
 
-## Phase 4C4: Generated Match Stories and Angle Outputs
+## Phase 4D: Tournament, Cup, League, and Classic Management
 
-Every planned match and angle now includes an editable output assistant inside the Planned Show Workspace.
+The new **Competitions** workspace manages multi-match structures while keeping every actual match inside the existing TEW workflow.
 
-### Generated Match Story drafts
+### Supported competition types
 
-A match draft can use:
+- Tournament
+- Cup
+- League
+- Classic
+- Custom competition
 
-- The selected match aim and ideal pace
-- Each wrestler’s chosen approaches
-- Source-derived approach phrases from the uploaded phrase library
-- Stamina usage and pace evaluation
-- The optional saved performance preview
-- Mental state and projected execution differences
-- The booker-entered winner and finish
-- Interference, post-match events, consequences, and follow-up
+Supported structures:
 
-The draft is divided into:
+- Single elimination
+- Round robin
+- Double round robin
+- Singles, tag-team, trios, or custom participant divisions
 
-- Opening
-- Middle
-- Turning point
-- Finish
-- Aftermath
+### PWL competition templates
 
-The complete draft remains editable before it is applied. It can replace or append to the existing Match Story, and its phase map can be copied into Key Moments.
+The workspace includes ready-to-edit templates for:
 
-The generator never promotes an advisory projected winner into the booking. When no planned winner is entered, the finish deliberately remains unresolved for TEW or later booking.
+- **PWL World Classic**
+- **PWL World Tag Classic**
+- **PWL League**
 
-### Generated Angle Segment Outputs
+The Classic templates preserve the established presentation ideas:
 
-Angle drafts use only information already entered in the tracker:
+- Permanent named trophy
+- Ceremonial winner jacket
+- Previous winner or winning team presenting the award
+- A respectful handoff or an attack that launches the next rivalry
+- Editable annual traditions and winner-presentation notes
 
-- Workers and roles
-- Location
-- Content type
-- Story purpose
-- Storyline consequences
-- Planned follow-up
-- Intended audience takeaway
+### Participants and seeding
 
-No unsupplied dialogue or detailed action is presented as source material. The generator supplies editable structural connector text around the facts entered by the user.
+Competitions can use:
 
-### Source transparency
+- Wrestlers linked from a loaded TEW snapshot
+- Manual singles participants
+- Manual tag teams or trios with member lists
+- Seeds
+- Active, eliminated, withdrawn, and champion statuses
 
-The output assistant distinguishes between:
+### Brackets and league schedules
 
-- Source-derived approach wording
-- Existing tracker facts
-- Editable tracker template sentences
+Single-elimination competitions generate the complete bracket, including automatic byes and later-round placeholders. Confirmed winners automatically advance through the bracket.
 
-When an approach has no dedicated phrase-library row, its source summary is used and a warning is displayed. Nothing is silently treated as recovered TEW text.
+Round-robin competitions generate a balanced schedule. Double round robin creates the reverse fixtures as a second leg.
 
-### Applying an output
+League tables calculate:
 
-Generated drafts can be:
+- Matches played
+- Wins
+- Draws
+- Losses
+- No contests
+- Points
+- Rank
 
-- Edited directly in the preview
-- Copied to the clipboard
-- Used to replace the permanent Match Story or Segment Output
-- Appended to existing writing
-- Applied to the match Key Moments phase map
+Points for wins, draws, losses, and no contests remain editable. Ties are ordered transparently by points, wins, fewer losses, then name.
 
-Once applied, the normal tracker systems already carry the output into:
+### Planned-show and TEW workflow
 
-- TEW handoff packages
-- Storyline timelines
-- Worker appearance histories
-- Planned-versus-actual reconciliation
-- Permanent enhanced show history
+Every ready fixture can be added to an existing planned show. The generated match carries:
 
-## Phase 4C3: Advisory Performance Preview
+- Competition and fixture identifiers
+- Round label
+- Participants and teams
+- Correct match-side assignments
+- Competition purpose and advancement consequences
+- Winner-presentation notes
+- The existing match-approach, output-generator, handoff, and reconciliation tools
 
-The optional preview evaluates approaches, mental state, luck, consistency, pace, and stamina. It produces an advisory match score and star preview while TEW remains authoritative by default.
+A fixture cannot be added twice accidentally. The Competition Hub can reopen its exact planned match.
 
-Available result modes:
+After the show is run in TEW and reconciled, **Sync Reconciled Results** reads the actual recorded winner from the linked planned segment and updates the bracket or standings. TEW remains authoritative for the real winner and rating.
 
-- **TEW authoritative:** no winner is selected in the tracker.
-- **Booker-selected winner:** the booked winner remains fixed.
-- **Competitive preview:** an advisory probability is shown without changing the booking or TEW result.
+### Integrity warnings
 
-## Phase 4C2: Match Setup and Approach AI
+The Competition Hub warns about:
 
-Every planned match supports:
+- Too few participants
+- A field without a generated structure
+- Duplicate participant names
+- Scheduled fixtures without a show
+- Fixtures linked to deleted planned segments
+- Completed decisions without a winner
+- Completed competitions without a champion
+
+### Backup version 11
+
+Version 11 backups include:
+
+- Competitions, participants, fixtures, brackets, standings rules, traditions, and winners
+- Competition links on planned matches
+- All previous planned shows, narratives, approaches, performance previews, storylines, workers, relationships, championships, booking ideas, and TEW handoff data
+
+Backup versions 1 through 10 remain importable.
+
+## Match approach and output workflow
+
+Every planned match can still use:
 
 - Nineteen match aims
 - Duration-controlled approach slots
 - Tracker-side wrestler ratings and styles
 - Eighteen approach skills
-- Workbook stamina-rating and capacity bands
-- Combination-level approach selection
-- Manual approach choices and locks
+- Combination-level approach AI
+- Manual locks and stamina budgeting
+- Optional advisory performance and star preview
+- Editable opening, middle, turning-point, finish, and aftermath drafts
 
 Approach slots remain:
 
@@ -101,6 +122,8 @@ Approach slots remain:
 - 6–15 minutes: 2 approaches per wrestler
 - 16–24 minutes: 3 approaches per wrestler
 - 25 minutes or longer: 4 approaches per wrestler
+
+The output generator never promotes an advisory projected winner into the booking. TEW-authoritative mode remains the default.
 
 ## Existing systems
 
@@ -113,19 +136,13 @@ Approach slots remain:
 - Championship lineage, rankings, and programs
 - Creative Control Center and Future Booking Board
 
-## Backups
-
-Version 10 backups continue to include planned and reconciled shows, applied Match Stories and Segment Outputs, approach setup, wrestler match profiles, saved performance previews, storylines, workers, relationships, booking ideas, championships, and TEW handoff data.
-
-Generated drafts are temporary until the user applies them. Applied text is stored in the existing Match Story, Key Moments, or Segment Output fields, so no new backup format is required for Phase 4C4.
-
 ## Safety boundary
 
 - TEW database access remains read-only.
 - No database is uploaded to an application server.
 - No TEW executable or live save-file mutation is performed.
-- Generated text is editable companion data.
-- Advisory previews never overwrite TEW results.
+- Brackets, standings, approaches, and generated text are editable companion data.
+- Reconciled TEW results remain the authoritative competition result source.
 - Browser data saves automatically to the current preview origin.
 
 ## Open in GitHub Codespaces
