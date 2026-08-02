@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { openAdvancedTools } from "./helpers";
 
 test("generates and persists a TEW-authoritative match performance preview", async ({ page }) => {
   await page.goto("/");
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Performance Preview");
@@ -27,6 +29,7 @@ test("generates and persists a TEW-authoritative match performance preview", asy
   const savedSeed = await match.locator(".match-performance-seed span").first().textContent();
 
   await page.reload();
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows" }).click();
   const persistedMatch = page.locator('[data-segment-type="match"]');
   await expect(page.getByLabel("Show name")).toHaveValue("PWL Performance Preview");
