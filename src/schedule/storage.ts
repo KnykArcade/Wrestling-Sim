@@ -44,7 +44,7 @@ const seriesStatuses: ShowSeriesStatus[] = ["Active", "Paused", "Completed", "In
 const recurrenceKinds: ShowRecurrenceKind[] = ["Weekly", "Biweekly", "Monthly", "Interval Days", "One-Off"];
 const venueModes: VenueMode[] = ["Fixed", "Manual Per Show"];
 const calendarViews: CalendarViewMode[] = ["month", "list", "series", "templates", "obligations"];
-const promotionStages: Array<"All" | PromotionShowStage> = ["All", "Scheduled", "Card Started", "Creative In Progress", "Ready for TEW", "Entering in TEW", "Awaiting Results", "Reconciliation Needed", "Reconciled"];
+const promotionStages: Array<"All" | PromotionShowStage> = ["All", "Scheduled", "Card Started", "Creative In Progress", "Ready for TEW", "Entering in TEW", "Awaiting Results", "Reconciliation Needed", "Reconciled", "Reconciled — Wrap-Up Pending", "Reconciled — Closed"];
 
 function normalizeSlot(value: unknown): SeriesTemplateSlot | null {
   if (!isRecord(value) || !text(value.id) || (value.type !== "match" && value.type !== "angle")) return null;
