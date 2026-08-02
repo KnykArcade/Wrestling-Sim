@@ -31,7 +31,7 @@ test("uses TEW Companion Mode and persists a verified field mapping", async ({ p
 test("shows the guided TEW workflow and non-writing dry-run for a planned card", async ({ page }) => {
   await page.goto("/");
   await openAdvancedTools(page);
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Companion Night");
   await page.getByLabel("Company").fill("PWL");
