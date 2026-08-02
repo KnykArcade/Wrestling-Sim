@@ -220,7 +220,7 @@ describe("planned show workspace", () => {
     expect(backup.bridge).toEqual(bridge);
     expect(backup.transfer).toEqual(transfer);
     expect(parsePlannerBackup(JSON.stringify(backup))).toEqual([show]);
-    expect(parsePlannerBackupBundle(JSON.stringify(backup))).toEqual({ shows: [show], storylines: [], workers, control, championships, handoff, matchEngine, competitions, bridge: { ...bridge, rawEvidenceSessions: [], exportAudits: [] }, transfer });
+    expect(parsePlannerBackupBundle(JSON.stringify(backup))).toEqual({ shows: [show], storylines: [], workers, control, championships, handoff, matchEngine, competitions, bridge, transfer });
   });
 
   test("migrates Phase 2A planned shows without losing the card", () => {
