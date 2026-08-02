@@ -20,6 +20,7 @@ import "./operations.css";
 import "./workbench.css";
 import "./profile-library.css";
 import "./output-library.css";
+import "./show-session.css";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
