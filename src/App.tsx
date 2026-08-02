@@ -6,6 +6,8 @@ import CreativeControlCenter from "./control/CreativeControlCenter";
 import HandoffWorkspace from "./handoff/HandoffWorkspace";
 import MatchEngineFoundation from "./matchEngine/MatchEngineFoundation";
 import ShowOperationsWorkspace from "./operations/ShowOperationsWorkspace";
+import OutputLibraryWorkspace from "./outputLibrary/OutputLibraryWorkspace";
+import WorkbenchOutputLibraryBridge from "./outputLibrary/WorkbenchOutputLibraryBridge";
 import PlannedShowWorkspace from "./planner/PlannedShowWorkspace";
 import ProfileLibraryWorkspace from "./profileLibrary/ProfileLibraryWorkspace";
 import StorylineHub from "./storylines/StorylineHub";
@@ -17,7 +19,7 @@ import SegmentWorkbench from "./workbench/SegmentWorkbench";
 import { loadWorkbenchUniverse, updateWorkbenchSettings } from "./workbench/storage";
 import WorkerHub from "./workers/WorkerHub";
 
-type ViewName = "operations" | "workbench" | "profiles" | "transfer" | "results" | "bridge" | "control" | "planner" | "handoff" | "competitions" | "match-engine" | "storyline-hub" | "worker-hub" | "championship-hub" | "shows" | "tew-storylines" | "schema";
+type ViewName = "operations" | "workbench" | "outputs" | "profiles" | "transfer" | "results" | "bridge" | "control" | "planner" | "handoff" | "competitions" | "match-engine" | "storyline-hub" | "worker-hub" | "championship-hub" | "shows" | "tew-storylines" | "schema";
 
 const advancedViews: ViewName[] = ["bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub", "shows", "tew-storylines", "schema"];
 
@@ -123,13 +125,14 @@ export default function App() {
   }
 
   const needsSnapshot = (view === "shows" || view === "tew-storylines" || view === "schema") && snapshot === null;
-  const standaloneViews: ViewName[] = ["operations", "workbench", "profiles", "transfer", "results", "bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
+  const standaloneViews: ViewName[] = ["operations", "workbench", "outputs", "profiles", "transfer", "results", "bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
 
   return <div className="app-shell">
-    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>TEW IX Story Tracker</h1></div><div className="phase-badge">PHASE 5E · ROSTER PROFILES</div></header>
+    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>TEW IX Story Tracker</h1></div><div className="phase-badge">PHASE 5F · OUTPUT WORKFLOW</div></header>
     <nav className="global-tabbar" aria-label="TEW Companion Core sections">
       <button className={view === "operations" ? "active" : ""} onClick={() => setView("operations")} type="button">Show Operations</button>
       <button className={view === "workbench" ? "active" : ""} onClick={() => setView("workbench")} type="button">Match &amp; Angle Workbench</button>
+      <button className={view === "outputs" ? "active" : ""} onClick={() => setView("outputs")} type="button">Output Library</button>
       <button className={view === "profiles" ? "active" : ""} onClick={() => setView("profiles")} type="button">Wrestler Profiles</button>
       <button className={view === "transfer" ? "active" : ""} onClick={() => setView("transfer")} type="button">TEW Entry</button>
       <button className={view === "results" ? "active" : ""} onClick={() => setView("results")} type="button">Results</button>
@@ -154,7 +157,8 @@ export default function App() {
     </nav>
     <main>
       {view === "operations" && <ShowOperationsWorkspace key="operations-overview" snapshot={snapshot} onOpenShow={openPlannedSegment} onOpenHandoff={() => setView("handoff")} onOpenTransfer={() => setView("transfer")} />}
-      {view === "workbench" && <SegmentWorkbench snapshot={snapshot} onOpenPlannedSegment={openPlannedSegment} />}
+      {view === "workbench" && <><WorkbenchOutputLibraryBridge onOpenOutputLibrary={() => setView("outputs")} /><SegmentWorkbench snapshot={snapshot} onOpenPlannedSegment={openPlannedSegment} /></>}
+      {view === "outputs" && <OutputLibraryWorkspace onOpenPlannedSegment={openPlannedSegment} onOpenWorkbench={() => setView("workbench")} />}
       {view === "profiles" && <ProfileLibraryWorkspace snapshot={snapshot} />}
       {view === "transfer" && <TransferWorkspace onOpenShow={openPlannedSegment} />}
       {view === "results" && <ResultsCoreWorkspace key="operations-results" snapshot={snapshot} onOpenShow={openPlannedSegment} onOpenHandoff={() => setView("handoff")} onOpenTransfer={() => setView("transfer")} />}
@@ -176,6 +180,6 @@ export default function App() {
         {view === "schema" && <section className="diagnostics-layout"><div className="content-panel"><div className="panel-heading large"><div><span>Matched TEW Tables</span><p>These mappings drive the read-only show, match, worker, and storyline views.</p></div></div><dl className="mapping-list">{Object.entries(snapshot.diagnostics.matchedTables).map(([purpose, table]) => <div key={purpose}><dt>{purpose}</dt><dd className={table ? "matched" : "missing"}>{table ?? "Not found"}</dd></div>)}</dl><div className="warning-list"><h3>Warnings</h3>{snapshot.diagnostics.warnings.length > 0 ? snapshot.diagnostics.warnings.map((warning, index) => <p key={`${warning}-${index}`}>{warning}</p>) : <p>No mapping warnings were generated.</p>}</div></div><div className="content-panel table-inventory"><div className="panel-heading large"><div><span>Database Table Inventory</span><p>Only recognized history tables are loaded into memory.</p></div><strong>{snapshot.tables.length}</strong></div><div className="inventory-list">{snapshot.tables.map((table) => <details key={table.name}><summary><span>{table.name}</span><small>{table.rowCount.toLocaleString()} rows · {table.columnCount} columns</small><b>{table.loaded ? "Mapped" : "Metadata only"}</b></summary><p>{table.columns.join(", ") || "No column names were returned."}</p>{table.truncated && <p className="truncate-warning">This table exceeded the Phase 1 row limit.</p>}</details>)}</div></div></section>}
       </>}
     </main>
-    <footer>TEW remains the game. Wrestler profiles and workbook ratings are tracker-side companion data; TEW databases and workbook macros remain untouched. Match approaches, outputs, assisted entry, and result reconciliation continue to use TEW as the authority.</footer>
+    <footer>TEW remains the game. The Output Library preserves Match Stories, Angle Outputs, road-agent packages, show production packets, and planned-versus-actual history while TEW remains authoritative for actual results and ratings.</footer>
   </div>;
 }

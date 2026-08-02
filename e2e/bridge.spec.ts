@@ -45,7 +45,7 @@ test("shows the guided TEW workflow and non-writing dry-run for a planned card",
   await page.getByRole("button", { name: "TEW Companion Research", exact: true }).click();
   await expect(page.getByRole("heading", { name: "PWL Companion Night" })).toBeVisible();
   await expect(page.getByText("Plan the card", { exact: true })).toBeVisible();
-  await expect(page.getByText("TEW remains authoritative for actual results and ratings.")).toBeVisible();
+  await expect(page.getByText("TEW remains authoritative for actual results and ratings.", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Dry-Run Package" }).click();
   await expect(page.getByRole("heading", { name: "PWL Companion Night" })).toBeVisible();
