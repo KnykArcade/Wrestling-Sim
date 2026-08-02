@@ -20,7 +20,7 @@ export interface SnapshotManifestRecord {
   fileSize: number;
   databaseCreatedAt: string;
   importedAt: string;
-  role: SnapshotRole;
+  role: SnapshotRole | (string & {});
   notes: string;
   tableCount: number;
   mappedTableCount: number;
@@ -223,7 +223,7 @@ export interface WorkerIdentityCandidate {
   exactIdProfileKeys: string[];
   exactNameProfileKeys: string[];
   candidateProfileKeys: string[];
-  recommendedDecision: WorkerIdentityDecisionKind;
+  recommendedDecision: WorkerIdentityDecisionKind | (string & {});
   conflict: boolean;
 }
 
@@ -233,6 +233,6 @@ export interface StorylineIdentityCandidate {
   linkedTrackerStorylineIds: string[];
   exactNameStorylineIds: string[];
   candidateStorylineIds: string[];
-  recommendedDecision: StorylineIdentityDecisionKind;
+  recommendedDecision: StorylineIdentityDecisionKind | (string & {});
   conflict: boolean;
 }
