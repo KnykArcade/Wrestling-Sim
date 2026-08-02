@@ -46,9 +46,10 @@ test("imports a roster profile with provenance and preserves it after reload", a
   await page.getByRole("button", { name: "Profile Library" }).click();
   await expect(page.getByText("Jay White", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Ready · 100%", { exact: true })).toBeVisible();
+  const overallField = page.locator(".profile-library-core-fields .field").filter({ has: page.getByLabel("Library overall") });
   await expect(page.getByLabel("Library overall")).toHaveValue("82");
   await expect(page.getByLabel("Library Psychology rating")).not.toHaveValue("60");
-  await expect(page.getByText("Imported from workbook", { exact: true }).first()).toBeVisible();
+  await expect(overallField.getByText("Imported from workbook", { exact: true })).toBeVisible();
 
   await page.reload();
   await page.getByRole("button", { name: "Wrestler Profiles" }).click();
@@ -64,7 +65,8 @@ test("creates a manual profile with visible baseline placeholders", async ({ pag
   await page.getByRole("button", { name: "Create Manual Profile" }).click();
   await page.getByLabel("Profile wrestler name").fill("Test Prospect");
   await expect(page.getByText("Incomplete", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Baseline placeholder", { exact: true }).first()).toBeVisible();
+  const overallField = page.locator(".profile-library-core-fields .field").filter({ has: page.getByLabel("Library overall") });
+  await expect(overallField.getByText("Baseline placeholder", { exact: true })).toBeVisible();
   await page.getByLabel("Library overall").fill("75");
-  await expect(page.getByText("Manual override", { exact: true }).first()).toBeVisible();
+  await expect(overallField.getByText("Manual override", { exact: true })).toBeVisible();
 });
