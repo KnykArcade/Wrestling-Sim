@@ -30,10 +30,10 @@ test("creates and persists a Quick Match output revision in Companion Core", asy
 test("keeps Advanced Tools hidden until explicitly opened", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "Show Advanced Tools" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Planned Shows" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Planned Shows", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Show Advanced Tools" }).click();
   await page.locator("details.advanced-tools-menu summary").click();
-  await expect(page.getByRole("button", { name: "Planned Shows" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Planned Shows", exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("button", { name: "Hide Advanced Tools" })).toBeVisible();
 });
