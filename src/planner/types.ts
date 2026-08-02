@@ -1,3 +1,4 @@
+import type { BridgeUniverse } from "../bridge/types";
 import type { ChampionshipMatchPurpose, ChampionshipUniverse, TitleResultDecision } from "../championships/types";
 import type { CompetitionUniverse } from "../competitions/types";
 import type { CreativeControlData } from "../control/types";
@@ -132,7 +133,7 @@ export interface PlannedShow {
 
 export interface PlannerBackup {
   product: "TEW IX Story Tracker";
-  version: 11;
+  version: 12;
   exportedAt: string;
   shows: PlannedShow[];
   storylines: TrackerStoryline[];
@@ -142,6 +143,7 @@ export interface PlannerBackup {
   handoff: HandoffUniverse;
   matchEngine: MatchEngineUniverse;
   competitions: CompetitionUniverse;
+  bridge: BridgeUniverse;
 }
 
 export interface PlannerBackupBundle {
@@ -153,4 +155,5 @@ export interface PlannerBackupBundle {
   handoff: HandoffUniverse;
   matchEngine: MatchEngineUniverse;
   competitions: CompetitionUniverse;
+  bridge: BridgeUniverse;
 }
