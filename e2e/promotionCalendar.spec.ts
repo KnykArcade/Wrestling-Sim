@@ -25,7 +25,7 @@ test("builds PWL Power Hour, inserts a special, and carries a grounded follow-up
   await page.getByLabel("Calendar special event company").fill("PWL");
   await page.getByLabel("Calendar special event venue").fill("PWL Arena");
   await page.getByRole("button", { name: "Insert One-Off Event" }).click();
-  await expect(page.getByText("PWL Summer Spectacular", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "PWL Summer Spectacular", exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "PWL Power Hour #1", exact: false }).first().click();
   await page.getByLabel("Calendar reschedule date").fill("2026-08-05");
