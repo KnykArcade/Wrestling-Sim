@@ -23,7 +23,7 @@ test("saves a Workbench match into permanent output lineage and restores it afte
   })).toBe("Jay White vs PAC");
 
   await page.getByRole("button", { name: "Save Current Segment to Output Library" }).click();
-  await expect(page.getByRole("status")).toContainText("saved");
+  await expect(page.locator(".workbench-output-library-bridge").getByRole("status")).toContainText("saved");
   await page.getByRole("button", { name: "Open Output Library" }).click();
 
   await expect(page.getByRole("heading", { name: "Output Library and Road-Agent Workflow" })).toBeVisible();
@@ -35,12 +35,13 @@ test("saves a Workbench match into permanent output lineage and restores it afte
 
   await page.getByLabel("Reusable output structure name").fill("Main Event Escape Structure");
   await page.getByRole("button", { name: "Create Reusable Structure" }).click();
-  await page.getByRole("button", { name: "Reusable Structures" }).click();
+  await page.locator(".output-library-tabs").getByRole("button", { name: "Reusable Structures" }).click();
   await expect(page.getByRole("heading", { name: "Production guidance without prebooking wrestlers or outcomes" })).toBeVisible();
   await expect(page.getByText("Main Event Escape Structure", { exact: true })).toBeVisible();
 
   await page.reload();
-  await page.getByRole("button", { name: "Output Library" }).click();
+  await page.locator(".global-tabbar").getByRole("button", { name: "Output Library" }).click();
+  await page.locator(".output-library-tabs").getByRole("button", { name: "Output Library" }).click();
   await expect(page.getByText("Jay White vs PAC", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Road-Agent Match Package" })).toBeVisible();
 });
