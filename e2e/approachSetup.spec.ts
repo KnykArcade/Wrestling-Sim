@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { openAdvancedTools } from "./helpers";
 
 test("selects and persists wrestler approaches inside a planned TEW match", async ({ page }) => {
   await page.goto("/");
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Approach Test");
@@ -36,6 +38,7 @@ test("selects and persists wrestler approaches inside a planned TEW match", asyn
   await expect(jay.locator(".selected-approach-row strong").filter({ hasText: lockedName ?? "" })).toBeVisible();
 
   await page.reload();
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows" }).click();
   const persistedMatch = page.locator('[data-segment-type="match"]');
   await expect(page.getByLabel("Show name")).toHaveValue("PWL Approach Test");
