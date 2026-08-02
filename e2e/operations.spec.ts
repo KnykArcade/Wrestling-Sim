@@ -6,7 +6,7 @@ test("guides a planned show through preflight and preserves entry changes", asyn
   await expect(page.getByRole("heading", { name: /Open one show, finish every segment/ })).toBeVisible();
 
   await openAdvancedTools(page);
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").first().fill("PWL Operations Test");
   await page.getByRole("button", { name: "Add Match" }).click();
