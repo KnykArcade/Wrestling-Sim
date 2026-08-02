@@ -107,7 +107,7 @@ function normalizeTemplate(value: unknown): WorkbenchTemplate | null {
 
 function normalizeSource(value: unknown, field: string): RatingFieldSource {
   if (!isRecord(value)) return { field, source: "Missing", importedValue: null, overrideValue: null, note: "No rating source has been recorded." };
-  const validSources = ["Imported from TEW", "Mapped from TEW", "Derived", "Manual Override", "Missing"];
+  const validSources = ["Imported from workbook", "Imported from TEW", "Mapped from TEW", "Derived", "Manual Override", "Baseline placeholder", "Missing"];
   return {
     field: text(value.field, field),
     source: validSources.includes(text(value.source)) ? text(value.source) as RatingFieldSource["source"] : "Missing",
