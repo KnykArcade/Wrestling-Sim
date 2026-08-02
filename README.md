@@ -2,9 +2,93 @@
 
 A browser-based **Total Extreme Wrestling IX companion** for planning cards, selecting match approaches, generating editable Match Stories and Angle Segment Outputs, managing competitions, preparing TEW transfer packages, and preserving creative history. TEW remains the game and the final authority for running every show.
 
+## Phase 5C: Unified TEW Show Operations
+
+The new default **Show Operations** workspace connects the existing systems into one show-centered workflow:
+
+1. Draft the card.
+2. Complete match approaches, Match Stories, and Angle Outputs.
+3. Resolve the full-card preflight.
+4. Finalize a frozen handoff version.
+5. Generate and complete assisted TEW entry.
+6. Run the show in TEW.
+7. Load the updated read-only TEW snapshot.
+8. Review and confirm suggested result links.
+9. Complete downstream championship, competition, storyline, and ranking confirmations.
+
+### Operational stages
+
+Each show receives a derived stage:
+
+- Draft
+- Creative Ready
+- Handoff Ready
+- Entering in TEW
+- Entered
+- Awaiting Results
+- Reconciliation Needed
+- Reconciled
+
+The workspace identifies the next required action and opens the affected show or segment rather than leaving the user with a passive warning list.
+
+### Full-card preflight
+
+Show-level checks cover identity, target runtime, repeated worker use, finalized-version age, and transfer-package age.
+
+Match checks cover participants, roles, match type, booked outcome requirements, Match Story, duration-controlled approach count, stamina load, pace conflicts, title stakes, and competition links.
+
+Angle checks cover participants, roles, location, purpose, audience takeaway, and complete Segment Output.
+
+Issues are classified as **Blocking**, **Important**, or **Advisory**. Deliberate booking choices can be acknowledged without deleting the original warning.
+
+### Show-day operations
+
+The operational entry view summarizes:
+
+- Event-field progress
+- Segments entered
+- Exact saved resume position
+- Running order
+- Stale-package warnings
+- Current finalized handoff version
+
+The detailed copy and field-entry controls remain in **TEW Transfer**.
+
+### Controlled entry changes
+
+Late changes made while entering the card in TEW can record:
+
+- Original tracker value
+- Value entered into TEW
+- Reason for the change
+- Segment affected
+- Whether the creative plan must be updated
+- Whether a new handoff version is required
+
+The original plan is never silently overwritten.
+
+### Post-show result intake
+
+The loaded read-only TEW snapshot can be analyzed against the planned show. Suggested matches use:
+
+- Show name, date, company, and venue
+- Participant overlap
+- Match-description similarity
+- Card section
+- Planned versus actual duration
+- Winner agreement
+
+Every suggestion receives a confidence score and must be Confirmed or Rejected. Confirmed links update tracker reconciliation only after an explicit apply action. TEW remains authoritative for the actual result and rating.
+
+### Recovery and persistence
+
+The workspace stores issue acknowledgements, last-viewed section, entry-change notes, result-intake sessions, and applied-link history. It also surfaces browser-storage usage, stale handoff or transfer versions, duplicate segment identifiers, and saved TEW-entry resume position.
+
+Backup version **14** includes Show Operations data. Versions 1 through 13 remain importable.
+
 ## Phase 5B: Guarded TEW Transfer Prototype
 
-The new **TEW Transfer** workspace makes the companion-to-TEW handoff more practical without pretending the browser can safely write an Access database.
+The **TEW Transfer** workspace makes the companion-to-TEW handoff more practical without pretending the browser can safely write an Access database.
 
 ### Assisted TEW transfer
 
@@ -55,7 +139,7 @@ The output is evidence for investigation. It is not permission to write.
 
 ### Evidence-gated mappings
 
-Mappings now progress through explicit stages:
+Mappings progress through:
 
 - Candidate
 - Corroborated
@@ -63,72 +147,21 @@ Mappings now progress through explicit stages:
 - Export Eligible
 - Unsupported
 
-Verified and Export Eligible stages require repeatable controlled evidence. Export eligibility also requires:
-
-- A confirmed identity field
-- High confidence
-- Documented TEW value formatting
-- Documented required default values
-- Linked raw-evidence sessions
-
-Every accepted stage change is recorded in mapping history.
+Verified and Export Eligible stages require repeatable controlled evidence. Export eligibility also requires a confirmed identity field, High confidence, documented TEW value formatting, documented required defaults, and linked raw-evidence sessions.
 
 ### Guarded exporter audit
 
-The exporter prototype checks:
+The exporter prototype checks the source-copy confirmation, backup requirement, mapping eligibility, retained evidence, TEW participant IDs, required card information, and Access writer availability.
 
-- The source is a disposable copy
-- A second automatic backup would be required
-- Every required operation has an Export Eligible mapping
-- Mapping evidence is retained
-- Every participant resolves to a TEW identifier
-- Required show and segment values are complete
-- A verified Microsoft Access writer exists
-
-The final gate intentionally fails because the installed `mdb-reader` dependency is read-only. The prototype therefore produces a downloadable audit and dry run, but **does not create or modify an MDB/ACCDB file**.
-
-An externally produced output copy can be loaded for read-only round-trip validation. The tracker checks that the database remains readable, the expected show exists, the expected match count is present, and planned TEW-linked workers still resolve.
-
-### Backup version 13
-
-Version 13 backups include:
-
-- TEW-oriented transfer packages
-- Field and segment entry progress
-- Transfer audit logs
-- Raw evidence sessions
-- Mapping confidence history and export-eligibility decisions
-- Guarded exporter audits
-- Round-trip validation results
-- All Phase 5A and earlier creative, competition, championship, handoff, worker, storyline, and match-engine data
-
-Backup versions 1 through 12 remain importable.
+The final gate intentionally fails because the installed `mdb-reader` dependency is read-only. The prototype produces an audit and dry run, but **does not create or modify an MDB/ACCDB file**.
 
 ## TEW Companion workflow
-
-The default workflow remains:
-
-1. Import a current read-only TEW snapshot.
-2. Plan the card in the tracker.
-3. Select match approaches.
-4. Complete Match Stories and Angle Segment Outputs.
-5. Finalize the frozen handoff package.
-6. Use TEW Transfer or the Entry Assistant.
-7. Run the show in TEW.
-8. Import the post-show snapshot and reconcile the actual results.
 
 TEW remains authoritative for winners, match ratings, company simulation, contracts, finances, and the wider game world.
 
 ## Competition management
 
-The **Competitions** workspace manages:
-
-- Tournaments, Cups, leagues, Classics, and custom competitions
-- Single elimination, round robin, and double round robin
-- Singles, tag-team, trios, and custom participants
-- Seeded brackets, automatic byes, winner advancement, and result resets
-- Editable league points and transparent standings
-- Planned-show scheduling and TEW result synchronization
+The **Competitions** workspace manages tournaments, Cups, leagues, Classics, custom competitions, seeded brackets, round-robin schedules, standings, planned-show scheduling, and TEW result synchronization.
 
 Ready-to-edit templates include:
 
@@ -138,16 +171,7 @@ Ready-to-edit templates include:
 
 ## Match approach and output workflow
 
-Every planned match can use:
-
-- Nineteen match aims
-- Duration-controlled approach slots
-- Tracker-side wrestler ratings and styles
-- Eighteen approach skills
-- Combination-level approach AI
-- Manual locks and stamina budgeting
-- Optional advisory performance and star preview
-- Editable opening, middle, turning-point, finish, and aftermath drafts
+Every planned match can use nineteen match aims, duration-controlled approach slots, tracker-side wrestler ratings and styles, eighteen approach skills, combination-level approach AI, manual locks, stamina budgeting, optional advisory performance previews, and editable match-phase drafts.
 
 Approach slots remain:
 

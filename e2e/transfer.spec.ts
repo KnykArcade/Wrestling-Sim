@@ -18,8 +18,9 @@ test("generates and persists an assisted TEW transfer package", async ({ page })
   await match.getByRole("button", { name: "Add Manual Worker" }).click();
   await angle.getByLabel("Segment name").fill("Post-Match Confrontation");
   await angle.getByLabel("Full Segment Output").fill("The next challenger confronts the winner without physical contact.");
+  await expect(page.locator(".save-state")).toHaveText("Saved");
 
-  await page.getByRole("button", { name: "TEW Transfer" }).click();
+  await page.getByRole("button", { name: "TEW Transfer", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Translate the tracker card into TEW entry order/ })).toBeVisible();
   await page.getByRole("button", { name: "Generate Transfer Package" }).click();
   await expect(page.getByRole("heading", { name: "1. Event Information" })).toBeVisible();
@@ -32,7 +33,7 @@ test("generates and persists an assisted TEW transfer package", async ({ page })
   await expect(enteredSummary.getByText("1", { exact: true })).toBeVisible();
 
   await page.reload();
-  await page.getByRole("button", { name: "TEW Transfer" }).click();
+  await page.getByRole("button", { name: "TEW Transfer", exact: true }).click();
   await expect(page.getByRole("button", { name: "Regenerate Package" })).toBeVisible();
   await expect(page.getByText("Jay White vs PAC", { exact: true }).first()).toBeVisible();
 });

@@ -5,6 +5,7 @@ import CompetitionHub from "./competitions/CompetitionHub";
 import CreativeControlCenter from "./control/CreativeControlCenter";
 import HandoffWorkspace from "./handoff/HandoffWorkspace";
 import MatchEngineFoundation from "./matchEngine/MatchEngineFoundation";
+import ShowOperationsWorkspace from "./operations/ShowOperationsWorkspace";
 import PlannedShowWorkspace from "./planner/PlannedShowWorkspace";
 import StorylineHub from "./storylines/StorylineHub";
 import { readTewSnapshot } from "./tew/reader";
@@ -12,7 +13,7 @@ import type { MatchRecord, ShowRecord, StorylineRecord, TewSnapshot } from "./te
 import TransferWorkspace from "./transfer/TransferWorkspace";
 import WorkerHub from "./workers/WorkerHub";
 
-type ViewName = "bridge" | "transfer" | "control" | "planner" | "handoff" | "competitions" | "match-engine" | "storyline-hub" | "worker-hub" | "championship-hub" | "shows" | "tew-storylines" | "schema";
+type ViewName = "operations" | "bridge" | "transfer" | "control" | "planner" | "handoff" | "competitions" | "match-engine" | "storyline-hub" | "worker-hub" | "championship-hub" | "shows" | "tew-storylines" | "schema";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -75,7 +76,7 @@ function SnapshotHeader({ snapshot, onClose }: { snapshot: TewSnapshot; onClose:
 export default function App() {
   const [snapshot, setSnapshot] = useState<TewSnapshot | null>(null);
   const [selectedShowId, setSelectedShowId] = useState("");
-  const [view, setView] = useState<ViewName>("bridge");
+  const [view, setView] = useState<ViewName>("operations");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [plannerTarget, setPlannerTarget] = useState<{ showId: string; segmentId: string; key: number } | null>(null);
@@ -109,11 +110,12 @@ export default function App() {
   }
 
   const needsSnapshot = (view === "shows" || view === "tew-storylines" || view === "schema") && snapshot === null;
-  const standaloneViews: ViewName[] = ["bridge", "transfer", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
+  const standaloneViews: ViewName[] = ["operations", "bridge", "transfer", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
 
   return <div className="app-shell">
-    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>TEW IX Story Tracker</h1></div><div className="phase-badge">PHASE 5B · GUARDED TEW TRANSFER</div></header>
+    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>TEW IX Story Tracker</h1></div><div className="phase-badge">PHASE 5C · SHOW OPERATIONS</div></header>
     <nav className="global-tabbar" aria-label="Story Tracker sections">
+      <button className={view === "operations" ? "active" : ""} onClick={() => setView("operations")} type="button">Show Operations</button>
       <button className={view === "bridge" ? "active" : ""} onClick={() => setView("bridge")} type="button">TEW Companion</button>
       <button className={view === "transfer" ? "active" : ""} onClick={() => setView("transfer")} type="button">TEW Transfer</button>
       <button className={view === "control" ? "active" : ""} onClick={() => setView("control")} type="button">Control Center</button>
@@ -129,6 +131,7 @@ export default function App() {
       <button className={view === "schema" ? "active" : ""} onClick={() => setView("schema")} type="button">Import Diagnostics</button>
     </nav>
     <main>
+      {view === "operations" && <ShowOperationsWorkspace snapshot={snapshot} onOpenShow={openPlannedSegment} onOpenHandoff={() => setView("handoff")} onOpenTransfer={() => setView("transfer")} />}
       {view === "bridge" && <BridgeWorkspace onOpenShow={openPlannedSegment} />}
       {view === "transfer" && <TransferWorkspace onOpenShow={openPlannedSegment} />}
       {view === "control" && <CreativeControlCenter snapshot={snapshot} onOpenShow={openPlannedSegment} onOpenStoryline={() => setView("storyline-hub")} onOpenWorker={() => setView("worker-hub")} />}
@@ -148,6 +151,6 @@ export default function App() {
         {view === "schema" && <section className="diagnostics-layout"><div className="content-panel"><div className="panel-heading large"><div><span>Matched TEW Tables</span><p>These mappings drive the read-only show, match, worker, and storyline views.</p></div></div><dl className="mapping-list">{Object.entries(snapshot.diagnostics.matchedTables).map(([purpose, table]) => <div key={purpose}><dt>{purpose}</dt><dd className={table ? "matched" : "missing"}>{table ?? "Not found"}</dd></div>)}</dl><div className="warning-list"><h3>Warnings</h3>{snapshot.diagnostics.warnings.length > 0 ? snapshot.diagnostics.warnings.map((warning, index) => <p key={`${warning}-${index}`}>{warning}</p>) : <p>No mapping warnings were generated.</p>}</div></div><div className="content-panel table-inventory"><div className="panel-heading large"><div><span>Database Table Inventory</span><p>Only recognized history tables are loaded into memory.</p></div><strong>{snapshot.tables.length}</strong></div><div className="inventory-list">{snapshot.tables.map((table) => <details key={table.name}><summary><span>{table.name}</span><small>{table.rowCount.toLocaleString()} rows · {table.columnCount} columns</small><b>{table.loaded ? "Mapped" : "Metadata only"}</b></summary><p>{table.columns.join(", ") || "No column names were returned."}</p>{table.truncated && <p className="truncate-warning">This table exceeded the Phase 1 row limit.</p>}</details>)}</div></div></section>}
       </>}
     </main>
-    <footer>TEW remains the game. The tracker prepares cards, approaches, Match Stories, Angle Outputs, competitions, assisted transfer packages, raw mapping evidence, and reconciliation. Database writing stays blocked until every safety gate and a verified Access writer exist.</footer>
+    <footer>TEW remains the game. Show Operations connects card planning, approaches, outputs, handoff, assisted entry, read-only result intake, and controlled reconciliation. Database writing remains disabled.</footer>
   </div>;
 }

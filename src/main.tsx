@@ -16,6 +16,7 @@ import "./match-performance.css";
 import "./narrative-generator.css";
 import "./bridge.css";
 import "./transfer.css";
+import "./operations.css";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
