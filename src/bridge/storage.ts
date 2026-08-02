@@ -1,5 +1,13 @@
 import { emptyBridgeUniverse } from "./model";
-import type { BridgeFieldMapping, BridgeUniverse, CompanionModeSettings, TewComparisonReport } from "./types";
+import type {
+  BridgeFieldMapping,
+  BridgeMappingHistoryEntry,
+  BridgeUniverse,
+  CompanionModeSettings,
+  GuardedExportAudit,
+  RawEvidenceSession,
+  TewComparisonReport,
+} from "./types";
 
 export const BRIDGE_STORAGE_KEY = "tew-story-tracker:bridge:v1";
 
@@ -9,6 +17,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function text(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
+}
+
+function strings(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function normalizeSettings(value: unknown): CompanionModeSettings {
@@ -24,6 +36,18 @@ function normalizeSettings(value: unknown): CompanionModeSettings {
   };
 }
 
+function normalizeHistory(value: unknown): BridgeMappingHistoryEntry | null {
+  if (!isRecord(value) || !text(value.id)) return null;
+  const stages = ["Candidate", "Corroborated", "Verified", "Export Eligible", "Unsupported"];
+  return {
+    id: text(value.id),
+    changedAt: text(value.changedAt),
+    fromStage: stages.includes(text(value.fromStage)) ? text(value.fromStage) as BridgeMappingHistoryEntry["fromStage"] : "Candidate",
+    toStage: stages.includes(text(value.toStage)) ? text(value.toStage) as BridgeMappingHistoryEntry["toStage"] : "Candidate",
+    reason: text(value.reason),
+  };
+}
+
 function normalizeMapping(value: unknown): BridgeFieldMapping | null {
   if (!isRecord(value) || !text(value.id) || !text(value.trackerField)) return null;
   const category = ["Show", "Match", "Angle", "Worker", "Storyline", "Championship", "Competition"].includes(text(value.category))
@@ -35,6 +59,8 @@ function normalizeMapping(value: unknown): BridgeFieldMapping | null {
   const confidence = ["Low", "Medium", "High"].includes(text(value.confidence))
     ? text(value.confidence) as BridgeFieldMapping["confidence"]
     : "Low";
+  const stages = ["Candidate", "Corroborated", "Verified", "Export Eligible", "Unsupported"];
+  const fallbackStage = status === "Verified" ? "Verified" : status === "Unsupported" ? "Unsupported" : "Candidate";
   return {
     id: text(value.id),
     category,
@@ -43,7 +69,13 @@ function normalizeMapping(value: unknown): BridgeFieldMapping | null {
     tewTable: text(value.tewTable),
     tewField: text(value.tewField),
     status,
+    verificationStage: stages.includes(text(value.verificationStage)) ? text(value.verificationStage) as BridgeFieldMapping["verificationStage"] : fallbackStage,
     confidence,
+    identityField: text(value.identityField),
+    requiredDefaults: text(value.requiredDefaults),
+    formatNotes: text(value.formatNotes),
+    evidenceSessionIds: strings(value.evidenceSessionIds),
+    history: Array.isArray(value.history) ? value.history.map(normalizeHistory).filter((item): item is BridgeMappingHistoryEntry => item !== null) : [],
     evidence: text(value.evidence),
     notes: text(value.notes),
     updatedAt: text(value.updatedAt),
@@ -75,14 +107,24 @@ function normalizeComparison(value: unknown): TewComparisonReport | null {
       changeType: ["Added", "Removed", "Changed"].includes(text(item.changeType)) ? text(item.changeType) as TewComparisonReport["entityChanges"][number]["changeType"] : "Changed",
       fieldChanges: Array.isArray(item.fieldChanges) ? item.fieldChanges.filter(isRecord).map((field) => ({ field: text(field.field), beforeValue: text(field.beforeValue), afterValue: text(field.afterValue) })) : [],
     })) : [],
-    candidateTables: Array.isArray(value.candidateTables) ? value.candidateTables.filter((item): item is string => typeof item === "string") : [],
+    candidateTables: strings(value.candidateTables),
     notes: text(value.notes),
   };
 }
 
+function normalizeRawEvidence(value: unknown): RawEvidenceSession | null {
+  if (!isRecord(value) || !text(value.id)) return null;
+  return value as unknown as RawEvidenceSession;
+}
+
+function normalizeExportAudit(value: unknown): GuardedExportAudit | null {
+  if (!isRecord(value) || !text(value.id) || !text(value.showId)) return null;
+  return value as unknown as GuardedExportAudit;
+}
+
 export function parseBridgeUniverse(value: unknown): BridgeUniverse {
   const defaults = emptyBridgeUniverse();
-  if (!isRecord(value)) return defaults;
+  if (!isRecord(value)) return { ...defaults, rawEvidenceSessions: [], exportAudits: [] };
   const mappings = Array.isArray(value.mappings)
     ? value.mappings.map(normalizeMapping).filter((item): item is BridgeFieldMapping => item !== null)
     : [];
@@ -91,15 +133,17 @@ export function parseBridgeUniverse(value: unknown): BridgeUniverse {
     : [];
   return {
     settings: normalizeSettings(value.settings),
-    mappings: mappings.length > 0 ? mappings : defaults.mappings,
+    mappings: mappings.length > 0 ? mappings : defaults.mappings.map((mapping) => normalizeMapping(mapping) ?? mapping),
     comparisonReports: comparisons,
+    rawEvidenceSessions: Array.isArray(value.rawEvidenceSessions) ? value.rawEvidenceSessions.map(normalizeRawEvidence).filter((item): item is RawEvidenceSession => item !== null) : [],
+    exportAudits: Array.isArray(value.exportAudits) ? value.exportAudits.map(normalizeExportAudit).filter((item): item is GuardedExportAudit => item !== null) : [],
   };
 }
 
 export function loadBridgeUniverse(storage: Pick<Storage, "getItem">): BridgeUniverse {
   const stored = storage.getItem(BRIDGE_STORAGE_KEY);
-  if (!stored) return emptyBridgeUniverse();
-  try { return parseBridgeUniverse(JSON.parse(stored) as unknown); } catch { return emptyBridgeUniverse(); }
+  if (!stored) return parseBridgeUniverse(emptyBridgeUniverse());
+  try { return parseBridgeUniverse(JSON.parse(stored) as unknown); } catch { return parseBridgeUniverse(emptyBridgeUniverse()); }
 }
 
 export function saveBridgeUniverse(storage: Pick<Storage, "setItem">, universe: BridgeUniverse): void {
