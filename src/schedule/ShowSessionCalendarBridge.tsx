@@ -3,6 +3,8 @@ import { loadPlannedShows } from "../planner/storage";
 import type { PlannedShow } from "../planner/types";
 import { showSessionRecord, upsertShowSessionRecord } from "../showSession/model";
 import { loadShowSessionUniverse, saveShowSessionUniverse } from "../showSession/storage";
+import ShowSessionWrapUpBridge from "../wrapUp/ShowSessionWrapUpBridge";
+import { loadWrapUpUniverse } from "../wrapUp/storage";
 import { ensureScheduleLinks, linkForShow, nextScheduledShow, seriesForShow } from "./model";
 import { loadPromotionScheduleUniverse, savePromotionScheduleUniverse } from "./storage";
 
@@ -40,7 +42,10 @@ export default function ShowSessionCalendarBridge({ onOpenCalendar, onOpenShow }
   const link = show ? linkForShow(show.id, schedule) : null;
   const previous = show ? nextScheduledShow(show.id, current.shows, -1) : null;
   const next = show ? nextScheduledShow(show.id, current.shows, 1) : null;
-  const nextUnfinished = show ? nextScheduledShow(show.id, current.shows, 1, true) : null;
+  const wrapUp = loadWrapUpUniverse(window.localStorage);
+  const closedShowIds = new Set(wrapUp.sessions.filter((session) => session.status === "Closed").map((session) => session.showId));
+  const currentWrapUp = show ? wrapUp.sessions.find((session) => session.showId === show.id) : null;
+  const nextUnfinished = show ? nextScheduledShow(show.id, current.shows, 1, true, closedShowIds) : null;
 
   function selectShow(target: PlannedShow | null): void {
     if (!target) return;
@@ -61,19 +66,37 @@ export default function ShowSessionCalendarBridge({ onOpenCalendar, onOpenShow }
     onOpenShow(target.id);
   }
 
-  if (!show) return null;
+  function openCurrentWrapUp(): void {
+    if (!show) return;
+    const sessions = loadShowSessionUniverse(window.localStorage);
+    const record = showSessionRecord(show.id, sessions, show.segments[0]?.id ?? "");
+    saveShowSessionUniverse(window.localStorage, upsertShowSessionRecord(sessions, {
+      ...record,
+      activeStep: "wrap-up",
+      lastOpenedAt: new Date().toISOString(),
+    }));
+    onOpenShow(show.id);
+  }
 
-  return <section className="session-calendar-bridge" aria-label="Promotion calendar navigation">
-    <div>
-      <span>Promotion schedule</span>
-      <strong>{series ? `${series.name}${link?.episodeNumber ? ` · Episode ${link.episodeNumber}` : ""}` : "One-Off / Unassigned Series"}</strong>
-      <small>{show.date || "Unscheduled"} · {show.status}</small>
-    </div>
-    <nav>
-      <button className="secondary-button" type="button" onClick={onOpenCalendar}>Return to Promotion Calendar</button>
-      <button className="secondary-button" type="button" disabled={!previous} onClick={() => selectShow(previous)}>Previous Scheduled Show</button>
-      <button className="secondary-button" type="button" disabled={!next} onClick={() => selectShow(next)}>Next Scheduled Show</button>
-      <button className="primary-button" type="button" disabled={!nextUnfinished} onClick={() => selectShow(nextUnfinished)}>{show.status === "Reconciled" ? "Complete This Show and Continue" : "Next Unfinished Show"}</button>
-    </nav>
-  </section>;
+  if (!show) return null;
+  const needsWrapUp = show.status === "Reconciled" && currentWrapUp?.status !== "Closed";
+
+  return <>
+    <section className="session-calendar-bridge" aria-label="Promotion calendar navigation">
+      <div>
+        <span>Promotion schedule</span>
+        <strong>{series ? `${series.name}${link?.episodeNumber ? ` · Episode ${link.episodeNumber}` : ""}` : "One-Off / Unassigned Series"}</strong>
+        <small>{show.date || "Unscheduled"} · {show.status}{show.status === "Reconciled" ? ` · ${currentWrapUp?.status ?? "Wrap-Up Not Reviewed"}` : ""}</small>
+      </div>
+      <nav>
+        <button className="secondary-button" type="button" onClick={onOpenCalendar}>Return to Promotion Calendar</button>
+        <button className="secondary-button" type="button" disabled={!previous} onClick={() => selectShow(previous)}>Previous Scheduled Show</button>
+        <button className="secondary-button" type="button" disabled={!next} onClick={() => selectShow(next)}>Next Scheduled Show</button>
+        {needsWrapUp
+          ? <button className="primary-button" type="button" onClick={openCurrentWrapUp}>Finish Post-Show Wrap-Up</button>
+          : <button className="primary-button" type="button" disabled={!nextUnfinished} onClick={() => selectShow(nextUnfinished)}>{show.status === "Reconciled" ? "Complete This Show and Continue" : "Next Unfinished Show"}</button>}
+      </nav>
+    </section>
+    <ShowSessionWrapUpBridge onOpenCalendar={onOpenCalendar} onRefreshShowSession={onOpenShow} />
+  </>;
 }
