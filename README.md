@@ -2,110 +2,124 @@
 
 A browser-based **Total Extreme Wrestling IX companion** for planning cards, selecting match approaches, generating editable Match Stories and Angle Segment Outputs, managing competitions, preparing TEW handoff packages, and preserving creative history. TEW remains the game and the final authority for running every show.
 
+## Phase 5A: TEW Companion Mode and Safe Integration Bridge
+
+The application now opens in **TEW Companion Mode**. Its default workflow is:
+
+1. Import a current read-only TEW snapshot.
+2. Plan the card in the tracker.
+3. Select match approaches.
+4. Complete Match Stories and Angle Segment Outputs.
+5. Finalize the frozen TEW handoff package.
+6. Enter the card in TEW with the Entry Assistant.
+7. Run the show in TEW.
+8. Import the post-show snapshot and reconcile the actual results.
+
+TEW remains authoritative for winners, match ratings, company simulation, contracts, finances, and the wider game world.
+
+### Companion settings
+
+The TEW Companion workspace stores:
+
+- Whether Companion Mode is enabled
+- Whether Advanced Preview Tools should be shown
+- The preferred default Companion workspace view
+
+The advisory performance and star-preview systems remain available, but they are treated as optional advanced tools rather than the center of the workflow.
+
+### Read-only before-and-after comparison
+
+Two copied TEW databases can be loaded side by side:
+
+- Before manually entering a card
+- After manually entering that same card
+
+The comparison report identifies:
+
+- Table row-count changes
+- New or missing tables
+- Schema changes visible through column metadata
+- Added, removed, or changed normalized shows
+- Added, removed, or changed matches
+- Added, removed, or changed workers
+- Added, removed, or changed storylines
+- Candidate tables that deserve further investigation
+
+A changed table is evidence to investigate. It is not automatically treated as proof that direct writing is safe.
+
+### Field-mapping laboratory
+
+Tracker fields can be classified as:
+
+- Candidate
+- Verified
+- Unsupported
+
+Each mapping stores:
+
+- Tracker category and field
+- Candidate TEW table and field
+- Confidence level
+- Before-and-after evidence
+- Research notes
+
+A mapping should only be marked Verified after repeatable evidence identifies the table, field, identifiers, and relationships.
+
+### Bridge-readiness report
+
+Every planned show can generate a readiness report that separates:
+
+- Verified fields that may eventually support a guarded exporter
+- Candidate mappings that still need evidence
+- Manual fields that should continue through the Entry Assistant
+- Missing or unsupported values that block automation
+
+### Experimental dry-run package
+
+A selected card can generate a non-writing proposal containing:
+
+- Proposed target table
+- Proposed target field
+- Proposed value
+- Referenced tracker or TEW IDs
+- Validation status
+- Blocking problem or manual-entry instruction
+
+The dry-run package has a hard `writingEnabled: false` boundary. It cannot modify a TEW database.
+
+### Backup version 12
+
+Version 12 backups include:
+
+- Companion Mode settings
+- Field mappings and evidence
+- Saved before-and-after comparison reports
+- All competition, championship, handoff, match-engine, worker, storyline, booking, and planned-show data from previous versions
+
+Backup versions 1 through 11 remain importable.
+
 ## Phase 4D: Tournament, Cup, League, and Classic Management
 
-The new **Competitions** workspace manages multi-match structures while keeping every actual match inside the existing TEW workflow.
+The **Competitions** workspace manages:
 
-### Supported competition types
+- Tournaments, Cups, leagues, Classics, and custom competitions
+- Single elimination, round robin, and double round robin
+- Singles, tag-team, trios, and custom participants
+- Seeded brackets, automatic byes, winner advancement, and result resets
+- Editable league points and transparent standings
+- Planned-show scheduling and TEW result synchronization
 
-- Tournament
-- Cup
-- League
-- Classic
-- Custom competition
-
-Supported structures:
-
-- Single elimination
-- Round robin
-- Double round robin
-- Singles, tag-team, trios, or custom participant divisions
-
-### PWL competition templates
-
-The workspace includes ready-to-edit templates for:
+Ready-to-edit templates include:
 
 - **PWL World Classic**
 - **PWL World Tag Classic**
 - **PWL League**
 
-The Classic templates preserve the established presentation ideas:
-
-- Permanent named trophy
-- Ceremonial winner jacket
-- Previous winner or winning team presenting the award
-- A respectful handoff or an attack that launches the next rivalry
-- Editable annual traditions and winner-presentation notes
-
-### Participants and seeding
-
-Competitions can use:
-
-- Wrestlers linked from a loaded TEW snapshot
-- Manual singles participants
-- Manual tag teams or trios with member lists
-- Seeds
-- Active, eliminated, withdrawn, and champion statuses
-
-### Brackets and league schedules
-
-Single-elimination competitions generate the complete bracket, including automatic byes and later-round placeholders. Confirmed winners automatically advance through the bracket.
-
-Round-robin competitions generate a balanced schedule. Double round robin creates the reverse fixtures as a second leg.
-
-League tables calculate:
-
-- Matches played
-- Wins
-- Draws
-- Losses
-- No contests
-- Points
-- Rank
-
-Points for wins, draws, losses, and no contests remain editable. Ties are ordered transparently by points, wins, fewer losses, then name.
-
-### Planned-show and TEW workflow
-
-Every ready fixture can be added to an existing planned show. The generated match carries:
-
-- Competition and fixture identifiers
-- Round label
-- Participants and teams
-- Correct match-side assignments
-- Competition purpose and advancement consequences
-- Winner-presentation notes
-- The existing match-approach, output-generator, handoff, and reconciliation tools
-
-A fixture cannot be added twice accidentally. The Competition Hub can reopen its exact planned match.
-
-After the show is run in TEW and reconciled, **Sync Reconciled Results** reads the actual recorded winner from the linked planned segment and updates the bracket or standings. TEW remains authoritative for the real winner and rating.
-
-### Integrity warnings
-
-The Competition Hub warns about:
-
-- Too few participants
-- A field without a generated structure
-- Duplicate participant names
-- Scheduled fixtures without a show
-- Fixtures linked to deleted planned segments
-- Completed decisions without a winner
-- Completed competitions without a champion
-
-### Backup version 11
-
-Version 11 backups include:
-
-- Competitions, participants, fixtures, brackets, standings rules, traditions, and winners
-- Competition links on planned matches
-- All previous planned shows, narratives, approaches, performance previews, storylines, workers, relationships, championships, booking ideas, and TEW handoff data
-
-Backup versions 1 through 10 remain importable.
+The Classic templates preserve trophy and ceremonial-jacket traditions, including a respectful handoff or an attack that launches the next rivalry.
 
 ## Match approach and output workflow
 
-Every planned match can still use:
+Every planned match can use:
 
 - Nineteen match aims
 - Duration-controlled approach slots
@@ -135,14 +149,17 @@ The output generator never promotes an advisory projected winner into the bookin
 - Worker creative profiles and relationships
 - Championship lineage, rankings, and programs
 - Creative Control Center and Future Booking Board
+- Competition brackets, league schedules, standings, and PWL Classic traditions
 
 ## Safety boundary
 
 - TEW database access remains read-only.
 - No database is uploaded to an application server.
 - No TEW executable or live save-file mutation is performed.
-- Brackets, standings, approaches, and generated text are editable companion data.
-- Reconciled TEW results remain the authoritative competition result source.
+- The before-and-after laboratory compares copied databases only.
+- Candidate field mappings do not enable writes.
+- Dry-run packages cannot execute database changes.
+- Reconciled TEW results remain authoritative.
 - Browser data saves automatically to the current preview origin.
 
 ## Open in GitHub Codespaces
