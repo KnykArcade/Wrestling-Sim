@@ -62,7 +62,7 @@ describe("Phase 5G unified show session", () => {
     const operationsRecord = emptyShowOperationsUniverse().records[0] ?? null;
 
     let summary = buildUnifiedShowSessionSummary({ show, session, outputLibrary, transfer, operationsRecord });
-    expect(summary.segments[0].status).toBe("Not Started");
+    expect(summary.segments[0].status).toBe("Creative In Progress");
 
     match.matchStory = "PAC pushes the pace before White exploits one mistake and wins.";
     summary = buildUnifiedShowSessionSummary({ show, session, outputLibrary, transfer, operationsRecord });
