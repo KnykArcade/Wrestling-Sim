@@ -24,6 +24,7 @@ import {
   savePlannedShows,
 } from "../src/planner/storage";
 import { emptyProfileLibraryUniverse } from "../src/profileLibrary/model";
+import { emptyPromotionScheduleUniverse } from "../src/schedule/model";
 import { emptyShowSessionUniverse } from "../src/showSession/model";
 import { emptyTransferUniverse } from "../src/transfer/model";
 import { emptyWorkbenchUniverse } from "../src/workbench/model";
@@ -194,7 +195,7 @@ describe("planned show workspace", () => {
     expect(duplicate.segments[0].matchApproachSetup.performancePreview).toBeNull();
   });
 
-  test("saves loads exports and imports Phase 5G Show Session data", () => {
+  test("saves loads exports and imports Phase 5H Promotion Calendar data", () => {
     const storage = new MemoryStorage();
     const show = createPlannedShow(1);
     const match = createPlannedSegment("match");
@@ -217,6 +218,7 @@ describe("planned show workspace", () => {
     const profileLibrary = emptyProfileLibraryUniverse();
     const outputLibrary = emptyOutputLibraryUniverse();
     const showSession = emptyShowSessionUniverse();
+    const promotionSchedule = emptyPromotionScheduleUniverse();
     const backup = createPlannerBackup(
       [show],
       [],
@@ -233,13 +235,15 @@ describe("planned show workspace", () => {
       profileLibrary,
       outputLibrary,
       showSession,
+      promotionSchedule,
     );
 
-    expect(backup.version).toBe(18);
+    expect(backup.version).toBe(19);
     expect(backup.workbench).toEqual(workbench);
     expect(backup.profileLibrary).toEqual(profileLibrary);
     expect(backup.outputLibrary).toEqual(outputLibrary);
     expect(backup.showSession).toEqual(showSession);
+    expect(backup.promotionSchedule).toEqual(promotionSchedule);
     expect(parsePlannerBackup(JSON.stringify(backup))).toEqual([show]);
     expect(parsePlannerBackupBundle(JSON.stringify(backup))).toEqual({
       shows: [show],
@@ -257,7 +261,36 @@ describe("planned show workspace", () => {
       profileLibrary,
       outputLibrary,
       showSession,
+      promotionSchedule,
     });
+  });
+
+  test("migrates version 18 shows into one-off schedule links without losing cards", () => {
+    const show = createPlannedShow(1);
+    show.name = "Legacy Scheduled Show";
+    const version18 = {
+      product: "TEW IX Story Tracker",
+      version: 18,
+      exportedAt: "2026-08-01T00:00:00.000Z",
+      shows: [show],
+      storylines: [],
+      workers: { profiles: [], relationships: [] },
+      control: emptyCreativeControlData(),
+      championships: emptyChampionshipUniverse(),
+      handoff: emptyHandoffUniverse(),
+      matchEngine: emptyMatchEngineUniverse(),
+      competitions: emptyCompetitionUniverse(),
+      bridge: emptyBridgeUniverse(),
+      transfer: emptyTransferUniverse(),
+      operations: emptyShowOperationsUniverse(),
+      workbench: emptyWorkbenchUniverse(),
+      profileLibrary: emptyProfileLibraryUniverse(),
+      outputLibrary: emptyOutputLibraryUniverse(),
+      showSession: emptyShowSessionUniverse(),
+    };
+    const parsed = parsePlannerBackupBundle(JSON.stringify(version18));
+    expect(parsed.shows[0].name).toBe("Legacy Scheduled Show");
+    expect(parsed.promotionSchedule.links[0]).toMatchObject({ showId: show.id, seriesId: "", episodeNumber: 0 });
   });
 
   test("migrates Phase 2A planned shows without losing the card", () => {
@@ -296,12 +329,12 @@ describe("planned show workspace", () => {
     });
   });
 
-  test("accepts versions 1 through 18 and rejects future unsupported versions", () => {
-    for (let version = 1; version <= 17; version += 1) {
+  test("accepts versions 1 through 19 and rejects future unsupported versions", () => {
+    for (let version = 1; version <= 18; version += 1) {
       expect(parsePlannerBackup(JSON.stringify({ product: "TEW IX Story Tracker", version, shows: [] }))).toEqual([]);
     }
-    const version18 = createPlannerBackup([], [], { profiles: [], relationships: [] }, emptyCreativeControlData(), emptyChampionshipUniverse(), emptyHandoffUniverse(), emptyMatchEngineUniverse(), emptyCompetitionUniverse(), emptyBridgeUniverse(), emptyTransferUniverse(), emptyShowOperationsUniverse(), emptyWorkbenchUniverse(), emptyProfileLibraryUniverse(), emptyOutputLibraryUniverse(), emptyShowSessionUniverse());
-    expect(parsePlannerBackup(JSON.stringify(version18))).toEqual([]);
-    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":19,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
+    const version19 = createPlannerBackup([], [], { profiles: [], relationships: [] }, emptyCreativeControlData(), emptyChampionshipUniverse(), emptyHandoffUniverse(), emptyMatchEngineUniverse(), emptyCompetitionUniverse(), emptyBridgeUniverse(), emptyTransferUniverse(), emptyShowOperationsUniverse(), emptyWorkbenchUniverse(), emptyProfileLibraryUniverse(), emptyOutputLibraryUniverse(), emptyShowSessionUniverse(), emptyPromotionScheduleUniverse());
+    expect(parsePlannerBackup(JSON.stringify(version19))).toEqual([]);
+    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":20,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
   });
 });
