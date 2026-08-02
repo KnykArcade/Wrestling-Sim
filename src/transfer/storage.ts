@@ -20,7 +20,7 @@ function text(value: unknown, fallback = ""): string {
 
 function normalizeFieldProgress(value: unknown): TransferFieldProgress | null {
   if (!isRecord(value) || !text(value.fieldKey)) return null;
-  const status = ["Pending", "Copied", "Entered", "Not Applicable"].includes(text(value.status))
+  const status = ["Pending", "Copied", "Entered", "Changed in TEW", "Not Applicable"].includes(text(value.status))
     ? text(value.status) as TransferFieldProgress["status"]
     : "Pending";
   return { fieldKey: text(value.fieldKey), status, updatedAt: text(value.updatedAt) };
@@ -61,7 +61,7 @@ function normalizeRecord(value: unknown): TransferRecord | null {
 
 function normalizeAudit(value: unknown): TransferAuditLog | null {
   if (!isRecord(value) || !text(value.id) || !text(value.showId)) return null;
-  const action = ["Package Generated", "Field Copied", "Field Entered", "Segment Completed", "Export Plan Downloaded"].includes(text(value.action))
+  const action = ["Package Generated", "Field Copied", "Field Entered", "Field Changed in TEW", "Segment Completed", "Export Plan Downloaded"].includes(text(value.action))
     ? text(value.action) as TransferAuditLog["action"]
     : "Package Generated";
   return { id: text(value.id), showId: text(value.showId), createdAt: text(value.createdAt), action, detail: text(value.detail) };
