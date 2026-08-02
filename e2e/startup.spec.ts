@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openAdvancedTools } from "./helpers";
 
 test("creates and persists match and angle narratives without browser errors", async ({ page }) => {
   const pageErrors: string[] = [];
@@ -9,6 +10,7 @@ test("creates and persists match and angle narratives without browser errors", a
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "TEW IX Story Tracker" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "One show. One operational path. TEW remains the game." })).toBeVisible();
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await expect(page.getByRole("heading", { name: "Plan the show for TEW, add match approaches, then preserve what actually happened" })).toBeVisible();
 
@@ -37,6 +39,7 @@ test("creates and persists match and angle narratives without browser errors", a
   await page.getByRole("button", { name: "Plan Card" }).click();
 
   await page.reload();
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await expect(page.getByLabel("Show name")).toHaveValue("Monday Night Test");
   await expect(page.locator('[data-segment-type="match"]').getByLabel("Full match story")).toContainText("Bret controls the knee");
@@ -48,6 +51,7 @@ test("creates and persists match and angle narratives without browser errors", a
 
 test("creates a storyline and builds its timeline from planned segments", async ({ page }) => {
   await page.goto("/");
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("Timeline Test Show");
@@ -60,6 +64,7 @@ test("creates a storyline and builds its timeline from planned segments", async 
   await angle.getByLabel("Manual storyline name").fill("World Title Rivalry");
   await angle.getByRole("button", { name: "Add Manual Storyline" }).click();
 
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Storyline Hub" }).click();
   await expect(page.getByRole("heading", { name: "Storyline Hub and Timeline" })).toBeVisible();
   await page.getByRole("button", { name: "Create Storyline" }).first().click();
@@ -74,8 +79,10 @@ test("creates a storyline and builds its timeline from planned segments", async 
   await expect(page.getByLabel("Show name")).toHaveValue("Timeline Test Show");
   await expect(page.locator('[data-segment-id]').getByLabel("Segment name")).toHaveValue("Opening Challenge");
 
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Storyline Hub" }).click();
   await page.reload();
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Storyline Hub" }).click();
   await expect(page.getByLabel("Storyline name")).toHaveValue("World Title Rivalry");
   await expect(page.getByText("Bret Hart", { exact: true })).toBeVisible();
@@ -83,6 +90,7 @@ test("creates a storyline and builds its timeline from planned segments", async 
 
 test("creates worker profiles character arcs and a relationship network", async ({ page }) => {
   await page.goto("/");
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Worker Hub" }).click();
   await expect(page.getByRole("heading", { name: "Worker Creative Profiles and Relationship Network" })).toBeVisible();
 
@@ -102,6 +110,7 @@ test("creates worker profiles character arcs and a relationship network", async 
   await expect(page.getByText("Rival · Planned")).toBeVisible();
 
   await page.reload();
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Worker Hub" }).click();
   await page.getByRole("button", { name: /Shawn Michaels/ }).click();
   await expect(page.getByLabel("Display name")).toHaveValue("Shawn Michaels");
@@ -111,11 +120,13 @@ test("creates worker profiles character arcs and a relationship network", async 
 test("creates schedules and searches a future booking idea", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "One show. One operational path. TEW remains the game." })).toBeVisible();
+  await openAdvancedTools(page);
 
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("Future Supercard");
 
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Control Center" }).click();
   await page.getByRole("button", { name: "Future Booking Board" }).click();
   await page.getByRole("button", { name: "Create Booking Idea" }).first().click();
@@ -130,6 +141,7 @@ test("creates schedules and searches a future booking idea", async ({ page }) =>
   await expect(page.getByLabel("Show name")).toHaveValue("Future Supercard");
   await expect(page.getByLabel("Segment name")).toHaveValue("World Championship Challenge");
 
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Control Center" }).click();
   await page.getByRole("button", { name: "Global Search" }).click();
   await page.getByLabel("Global creative search").fill("World Championship Challenge");
@@ -140,6 +152,7 @@ test("creates schedules and searches a future booking idea", async ({ page }) =>
   ).toBeVisible();
 
   await page.reload();
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Control Center" }).click();
   await page.getByRole("button", { name: "Future Booking Board" }).click();
   await expect(page.getByLabel("Idea title")).toHaveValue("World Championship Challenge");
@@ -147,6 +160,7 @@ test("creates schedules and searches a future booking idea", async ({ page }) =>
 
 test("creates a championship lineage and contender ranking", async ({ page }) => {
   await page.goto("/");
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Championships" }).click();
   await expect(page.getByRole("heading", { name: "Championship Hub, Rankings, and Competitive Records" })).toBeVisible();
 
@@ -167,6 +181,7 @@ test("creates a championship lineage and contender ranking", async ({ page }) =>
   await expect(page.getByLabel("Rank 1 competitors")).toHaveValue("Shawn Michaels");
 
   await page.reload();
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Championships" }).click();
   await expect(page.getByLabel("Championship name")).toHaveValue("PWL Championship");
   await page.getByRole("button", { name: "Rankings" }).click();
@@ -175,6 +190,7 @@ test("creates a championship lineage and contender ranking", async ({ page }) =>
 
 test("loads MDB browser shims before evaluating the parser", async ({ page }) => {
   await page.goto("/");
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "TEW Show History" }).click();
   await page.locator('input[accept*=".mdb"]').setInputFiles({ name: "invalid-test-snapshot.mdb", mimeType: "application/x-msaccess", buffer: Buffer.from("not a real Access database") });
   const importError = page.getByRole("alert");
