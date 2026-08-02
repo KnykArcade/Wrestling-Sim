@@ -25,7 +25,9 @@ export type PromotionShowStage =
   | "Entering in TEW"
   | "Awaiting Results"
   | "Reconciliation Needed"
-  | "Reconciled";
+  | "Reconciled"
+  | "Reconciled — Wrap-Up Pending"
+  | "Reconciled — Closed";
 
 export type BookingObligationKind =
   | "Follow-up"
