@@ -140,6 +140,7 @@ test("creates schedules and searches a future booking idea", async ({ page }) =>
   ).toBeVisible();
 
   await page.reload();
+  await page.getByRole("button", { name: "Control Center" }).click();
   await page.getByRole("button", { name: "Future Booking Board" }).click();
   await expect(page.getByLabel("Idea title")).toHaveValue("World Championship Challenge");
 });
