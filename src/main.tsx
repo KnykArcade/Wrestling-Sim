@@ -24,6 +24,7 @@ import "./show-session.css";
 import "./promotion-calendar.css";
 import "./wrap-up.css";
 import "./wrap-up-bridge.css";
+import "./companion-home.css";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
