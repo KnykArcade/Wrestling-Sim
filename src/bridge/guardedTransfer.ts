@@ -189,7 +189,12 @@ export function buildGuardedExportAudit(
   const exportEligible = requiredMappings.filter((mapping) => verificationStage(mapping) === "Export Eligible");
   const linkedEvidence = new Set(exportEligible.flatMap((mapping) => mapping.evidenceSessionIds ?? []));
   const allWorkersResolved = show.segments.every((segment) => segment.workers.every((worker) => worker.source === "tew" && Boolean(worker.id)));
-  const allRequiredValuesPresent = dryRun.proposedChanges.filter((change) => change.validation === "Blocked").length === 0;
+  const allRequiredValuesPresent = Boolean(show.name.trim() && show.date.trim()) && show.segments.length > 0 && show.segments.every((segment) =>
+    Boolean(segment.title.trim())
+    && segment.durationMinutes > 0
+    && segment.workers.length > 0
+    && (segment.type === "angle" || Boolean(segment.matchType.trim())),
+  );
   const mappingsComplete = requiredMappings.length > 0 && exportEligible.length === requiredMappings.length;
   const evidenceAvailable = exportEligible.length > 0 && [...linkedEvidence].every((sessionId) => evidenceSessions.some((session) => session.id === sessionId));
   const gates: GuardedExportGate[] = [
@@ -198,7 +203,7 @@ export function buildGuardedExportAudit(
     gate("mapping-eligibility", "Every required operation has an Export Eligible mapping", mappingsComplete, `${exportEligible.length} of ${requiredMappings.length} required mappings are Export Eligible.`),
     gate("evidence", "All exporter mappings retain linked raw evidence", evidenceAvailable, evidenceAvailable ? `${linkedEvidence.size} evidence sessions linked.` : "Exporter mappings require retained raw evidence."),
     gate("ids", "Every participant resolves to a TEW identifier", allWorkersResolved, allWorkersResolved ? "All planned workers are TEW-linked." : "One or more planned workers are manual or lack a TEW identifier."),
-    gate("values", "Required tracker values are present", allRequiredValuesPresent, allRequiredValuesPresent ? "No dry-run values are blocked as empty." : "Complete all required card values."),
+    gate("values", "Required tracker values are present", allRequiredValuesPresent, allRequiredValuesPresent ? "Show identity and essential segment values are complete." : "Complete show identity, segment title, duration, participants, and match type."),
     gate("writer", "A verified Microsoft Access write engine is available", false, "The browser dependency is read-only. No verified Access writer is installed, so database output is blocked."),
   ];
   const blockers = gates.filter((item) => !item.passed).map((item) => item.detail);
