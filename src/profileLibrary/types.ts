@@ -88,9 +88,16 @@ export type ImportConflictDecision =
   | "Merge missing fields"
   | "Preserve manual overrides"
   | "Create separate profile"
-  | "Skip row";
+  | "Skip row"
+  | (string & {});
 
-export type ImportRowStatus = "Ready" | "Conflict" | "Error" | "Skipped" | "Accepted";
+export type ImportRowStatus =
+  | "Ready"
+  | "Conflict"
+  | "Error"
+  | "Skipped"
+  | "Accepted"
+  | (string & {});
 
 export interface ProfileImportRow {
   id: string;
