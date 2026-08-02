@@ -47,9 +47,9 @@ test("runs one angle from creative output through permanent lineage and inline T
 
   await page.getByRole("button", { name: "Generate Inline TEW Entry" }).click();
   await expect(page.getByRole("heading", { name: "Opening Confrontation" }).first()).toBeVisible();
-  await expect(page.getByText("Direct TEW Field", { exact: true }).first()).toBeVisible();
+  await expect(page.locator(".session-entry-fields").getByText("Direct TEW Field", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Mark Segment Entered in TEW" }).click();
-  await expect(page.getByText("Entered", { exact: true }).first()).toBeVisible();
+  await expect(page.locator(".session-status-badge")).toHaveText("Entered");
   await expect(page.getByRole("heading", { name: "Create Entered in TEW Version checkpoint" })).toBeVisible();
   await page.getByRole("button", { name: "Create Checkpoint" }).click();
 
@@ -62,5 +62,5 @@ test("runs one angle from creative output through permanent lineage and inline T
   await page.reload();
   await expect(page.getByRole("button", { name: "4. TEW Entry" })).toHaveClass(/active/);
   await expect(page.getByRole("heading", { name: "Opening Confrontation" }).first()).toBeVisible();
-  await expect(page.getByText("Entered", { exact: true }).first()).toBeVisible();
+  await expect(page.locator(".session-status-badge")).toHaveText("Entered");
 });
