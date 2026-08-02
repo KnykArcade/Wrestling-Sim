@@ -5,7 +5,7 @@ test("builds a World Classic bracket and schedules a fixture onto a planned TEW 
   await page.goto("/");
   await openAdvancedTools(page);
 
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Classic Night");
 
