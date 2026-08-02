@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import BridgeWorkspace from "./bridge/BridgeWorkspace";
 import ChampionshipHub from "./championships/ChampionshipHub";
 import CompetitionHub from "./competitions/CompetitionHub";
@@ -13,6 +13,15 @@ import ProfileLibraryWorkspace from "./profileLibrary/ProfileLibraryWorkspace";
 import PromotionCalendarWorkspace from "./schedule/PromotionCalendarWorkspace";
 import ShowSessionCalendarBridge from "./schedule/ShowSessionCalendarBridge";
 import ShowSessionWorkspace from "./showSession/ShowSessionWorkspace";
+import CompanionHomeWorkspace from "./snapshotVault/CompanionHomeWorkspace";
+import {
+  activateStoredSnapshot,
+  importTewSnapshotToVault,
+  loadSnapshotVaultUniverse,
+  saveSnapshotVaultUniverse,
+  storedSnapshotRecord,
+} from "./snapshotVault/storage";
+import type { SnapshotVaultUniverse } from "./snapshotVault/types";
 import StorylineHub from "./storylines/StorylineHub";
 import { readTewSnapshot } from "./tew/reader";
 import type { MatchRecord, ShowRecord, StorylineRecord, TewSnapshot } from "./tew/types";
@@ -21,6 +30,7 @@ import ResultsCoreWorkspace from "./workbench/ResultsCoreWorkspace";
 import SegmentWorkbench from "./workbench/SegmentWorkbench";
 import { loadWorkbenchUniverse, updateWorkbenchSettings } from "./workbench/storage";
 import WorkerHub from "./workers/WorkerHub";
+import ShowSessionWrapUpBridge from "./wrapUp/ShowSessionWrapUpBridge";
 
 type ViewName = "session" | "calendar" | "operations" | "workbench" | "outputs" | "profiles" | "transfer" | "results" | "bridge" | "control" | "planner" | "handoff" | "competitions" | "match-engine" | "storyline-hub" | "worker-hub" | "championship-hub" | "shows" | "tew-storylines" | "schema";
 
@@ -74,18 +84,20 @@ function ImportPanel({ onFile }: { onFile: (file: File) => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
   return <section className={`import-panel ${dragActive ? "is-dragging" : ""}`} onDragEnter={(event) => { event.preventDefault(); setDragActive(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={(event) => { event.preventDefault(); if (event.currentTarget === event.target) setDragActive(false); }} onDrop={(event) => { event.preventDefault(); setDragActive(false); const file = event.dataTransfer.files.item(0); if (file) onFile(file); }}>
-    <div><p className="eyebrow">READ-ONLY IMPORT</p><h2>Open a TEW IX MDB snapshot</h2><p>The file is parsed inside this browser session. The tracker does not upload, change, or write back to the TEW database.</p></div>
+    <div><p className="eyebrow">READ-ONLY IMPORT</p><h2>Open a TEW IX MDB snapshot</h2><p>The file is parsed inside this browser session, preserved in the Snapshot Vault, and never uploaded or written back to TEW.</p></div>
     <input ref={inputRef} className="visually-hidden" type="file" accept=".mdb,.accdb,application/x-msaccess" onChange={(event) => { const file = event.target.files?.item(0); if (file) onFile(file); event.currentTarget.value = ""; }} />
     <button className="primary-button" type="button" onClick={() => inputRef.current?.click()}>Select MDB File</button><span className="drop-hint">or drop the file anywhere in this panel</span>
   </section>;
 }
 
 function SnapshotHeader({ snapshot, onClose }: { snapshot: TewSnapshot; onClose: () => void }) {
-  return <><section className="database-header"><div><p className="eyebrow">CURRENT TEW SNAPSHOT</p><h2>{snapshot.fileName}</h2><p>{formatBytes(snapshot.fileSize)} · Imported {formatDate(snapshot.importedAt)}</p></div><button className="secondary-button" type="button" onClick={onClose}>Close Snapshot</button></section><section className="summary-grid" aria-label="Import summary"><div><span>Tables</span><strong>{snapshot.tables.length}</strong></div><div><span>Workers</span><strong>{snapshot.workers.length}</strong></div><div><span>Shows</span><strong>{snapshot.shows.length}</strong></div><div><span>Matches</span><strong>{snapshot.shows.reduce((sum, show) => sum + show.matches.length, 0)}</strong></div><div><span>Storylines</span><strong>{snapshot.storylines.length}</strong></div></section></>;
+  return <><section className="database-header"><div><p className="eyebrow">ACTIVE STORED TEW SNAPSHOT</p><h2>{snapshot.fileName}</h2><p>{formatBytes(snapshot.fileSize)} · Imported {formatDate(snapshot.importedAt)}</p></div><button className="secondary-button" type="button" onClick={onClose}>Close Current View</button></section><section className="summary-grid" aria-label="Import summary"><div><span>Tables</span><strong>{snapshot.tables.length}</strong></div><div><span>Workers</span><strong>{snapshot.workers.length}</strong></div><div><span>Shows</span><strong>{snapshot.shows.length}</strong></div><div><span>Matches</span><strong>{snapshot.shows.reduce((sum, show) => sum + show.matches.length, 0)}</strong></div><div><span>Storylines</span><strong>{snapshot.storylines.length}</strong></div></section></>;
 }
 
 export default function App() {
   const [snapshot, setSnapshot] = useState<TewSnapshot | null>(null);
+  const [vault, setVault] = useState<SnapshotVaultUniverse>(() => loadSnapshotVaultUniverse(window.localStorage));
+  const [vaultReady, setVaultReady] = useState(false);
   const [selectedShowId, setSelectedShowId] = useState("");
   const [view, setView] = useState<ViewName>("session");
   const [loading, setLoading] = useState(false);
@@ -95,6 +107,23 @@ export default function App() {
   const [sessionKey, setSessionKey] = useState(0);
 
   const selectedShow = useMemo(() => snapshot ? snapshot.shows.find((show) => show.id === selectedShowId) ?? snapshot.shows[0] ?? null : null, [selectedShowId, snapshot]);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const record = await storedSnapshotRecord(vault.activeSnapshotId);
+        if (!alive) return;
+        setSnapshot(record?.snapshot ?? null);
+        setSelectedShowId(record?.snapshot.shows.find((show) => show.id === vault.home.lastSelectedHistoricalShowId)?.id ?? record?.snapshot.shows[0]?.id ?? "");
+      } finally {
+        if (alive) setVaultReady(true);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => saveSnapshotVaultUniverse(window.localStorage, vault), [vault]);
 
   function closeSnapshot(): void {
     setSnapshot(null);
@@ -107,13 +136,34 @@ export default function App() {
     setError("");
     try {
       const imported = await readTewSnapshot(file);
-      setSnapshot(imported);
+      const role = vault.manifest.length === 0 ? "Current TEW Save" as const : "After Show" as const;
+      const result = await importTewSnapshotToVault(imported, vault, role);
+      setVault(result.universe);
+      setSnapshot(result.record.snapshot);
       setSelectedShowId(imported.shows[0]?.id ?? "");
       setView(destination);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The database could not be imported.");
     } finally {
       setLoading(false);
+      setVaultReady(true);
+    }
+  }
+
+  async function activateSnapshot(snapshotId: string): Promise<void> {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await activateStoredSnapshot(snapshotId, vault);
+      if (!result.record) throw new Error("The parsed snapshot is missing from IndexedDB. Restore the Snapshot Vault package that contains it.");
+      setVault(result.universe);
+      setSnapshot(result.record.snapshot);
+      setSelectedShowId(result.record.snapshot.shows[0]?.id ?? "");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The stored snapshot could not be activated.");
+    } finally {
+      setLoading(false);
+      setVaultReady(true);
     }
   }
 
@@ -127,6 +177,17 @@ export default function App() {
     setView("session");
   }
 
+  function scrollToShowSession(): void {
+    document.querySelector(".show-session-workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function openWrapUp(): void {
+    const bridge = document.querySelector(".show-session-wrap-up-bridge");
+    const button = bridge?.querySelector("button.primary-button") as HTMLButtonElement | null;
+    if (button && !button.disabled) button.click();
+    bridge?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function toggleAdvancedTools(): void {
     const next = !advancedToolsVisible;
     setAdvancedToolsVisible(next);
@@ -137,7 +198,7 @@ export default function App() {
   const standaloneViews: ViewName[] = ["session", "calendar", "operations", "workbench", "outputs", "profiles", "transfer", "results", "bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
 
   return <div className="app-shell">
-    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>TEW IX Story Tracker</h1></div><div className="phase-badge">PHASE 5H · PROMOTION CALENDAR</div></header>
+    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>TEW IX Story Tracker</h1></div><div className="phase-badge">PHASE 5J · COMPANION HOME &amp; SNAPSHOT VAULT</div></header>
     <nav className="global-tabbar" aria-label="TEW Companion Core sections">
       <button className={view === "session" ? "active" : ""} onClick={() => setView("session")} type="button">Show Session</button>
       <button className={view === "calendar" ? "active" : ""} onClick={() => setView("calendar")} type="button">Promotion Calendar</button>
@@ -167,7 +228,12 @@ export default function App() {
       </details>}
     </nav>
     <main>
-      {view === "session" && <><ShowSessionCalendarBridge onOpenCalendar={() => setView("calendar")} onOpenShow={() => openShowSession()} /><ShowSessionWorkspace key={sessionKey} snapshot={snapshot} snapshotLoading={loading} snapshotError={error} onSnapshotFile={(file) => void handleFile(file, "session")} onOpenWorkbench={() => setView("workbench")} onOpenOutputLibrary={() => setView("outputs")} onOpenPlanner={() => setView("planner")} onOpenTransfer={() => setView("transfer")} /></>}
+      {view === "session" && <>
+        <CompanionHomeWorkspace activeSnapshot={snapshot} vault={vault} vaultReady={vaultReady} snapshotLoading={loading} snapshotError={error} onImportSnapshot={(file) => void handleFile(file, "session")} onActivateSnapshot={activateSnapshot} onVaultChange={setVault} onContinueShow={scrollToShowSession} onOpenCalendar={() => setView("calendar")} onOpenResults={() => setView("results")} onOpenProfiles={() => setView("profiles")} onOpenStorylines={() => setView("storyline-hub")} onOpenWrapUp={openWrapUp} />
+        <ShowSessionCalendarBridge onOpenCalendar={() => setView("calendar")} onOpenShow={() => openShowSession()} />
+        <ShowSessionWrapUpBridge onOpenCalendar={() => setView("calendar")} onRefreshShowSession={() => openShowSession()} />
+        <ShowSessionWorkspace key={sessionKey} snapshot={snapshot} snapshotLoading={loading} snapshotError={error} onSnapshotFile={(file) => void handleFile(file, "session")} onOpenWorkbench={() => setView("workbench")} onOpenOutputLibrary={() => setView("outputs")} onOpenPlanner={() => setView("planner")} onOpenTransfer={() => setView("transfer")} />
+      </>}
       {view === "calendar" && <PromotionCalendarWorkspace onOpenShowSession={() => openShowSession()} onOpenPlannedShow={openPlannedSegment} onOpenControl={() => setView("control")} onOpenStorylines={() => setView("storyline-hub")} onOpenWorkers={() => setView("worker-hub")} onOpenChampionships={() => setView("championship-hub")} onOpenCompetitions={() => setView("competitions")} />}
       {view === "operations" && <ShowOperationsWorkspace key="operations-overview" snapshot={snapshot} onOpenShow={openPlannedSegment} onOpenHandoff={() => setView("handoff")} onOpenTransfer={() => setView("transfer")} />}
       {view === "workbench" && <><WorkbenchOutputLibraryBridge onOpenOutputLibrary={() => setView("outputs")} /><SegmentWorkbench snapshot={snapshot} onOpenPlannedSegment={openPlannedSegment} /></>}
@@ -188,11 +254,11 @@ export default function App() {
       {loading && !standaloneViews.includes(view) && <div className="status-banner" role="status">Reading the database and matching TEW history tables…</div>}
       {error && !standaloneViews.includes(view) && <div className="status-banner error" role="alert"><strong>Import failed</strong><span>{error}</span></div>}
       {snapshot && (view === "shows" || view === "tew-storylines" || view === "schema") && <><SnapshotHeader snapshot={snapshot} onClose={closeSnapshot} />
-        {view === "shows" && <div className="history-layout"><aside className="show-list" aria-label="Previous shows"><div className="panel-heading"><span>Previous Shows</span><strong>{snapshot.shows.length}</strong></div>{snapshot.shows.length > 0 ? snapshot.shows.map((show) => <button type="button" className={selectedShow?.id === show.id ? "selected" : ""} key={show.id} onClick={() => setSelectedShowId(show.id)}><strong>{show.name}</strong><span>{formatDate(show.date)}</span><small>{show.matches.length} match{show.matches.length === 1 ? "" : "es"}</small></button>) : <div className="empty-state compact">No previous shows were mapped.</div>}</aside>{selectedShow ? <ShowDetails show={selectedShow} /> : <section className="details-panel empty-state">No show record is available to display. Open Import Diagnostics to review the detected tables.</section>}</div>}
-        {view === "tew-storylines" && <section className="content-panel"><div className="panel-heading large"><div><span>Stored TEW Storylines</span><p>These imported records remain read-only. Link them to tracker storylines inside the Storyline Hub.</p></div><strong>{snapshot.storylines.length}</strong></div>{snapshot.storylines.length > 0 ? <div className="storyline-grid">{snapshot.storylines.map((storyline) => <StorylineCard key={`${storyline.sourceTable}-${storyline.id}`} storyline={storyline} />)}</div> : <div className="empty-state">No supported storyline records were mapped from this snapshot.</div>}</section>}
-        {view === "schema" && <section className="diagnostics-layout"><div className="content-panel"><div className="panel-heading large"><div><span>Matched TEW Tables</span><p>These mappings drive the read-only show, match, worker, and storyline views.</p></div></div><dl className="mapping-list">{Object.entries(snapshot.diagnostics.matchedTables).map(([purpose, table]) => <div key={purpose}><dt>{purpose}</dt><dd className={table ? "matched" : "missing"}>{table ?? "Not found"}</dd></div>)}</dl><div className="warning-list"><h3>Warnings</h3>{snapshot.diagnostics.warnings.length > 0 ? snapshot.diagnostics.warnings.map((warning, index) => <p key={`${warning}-${index}`}>{warning}</p>) : <p>No mapping warnings were generated.</p>}</div></div><div className="content-panel table-inventory"><div className="panel-heading large"><div><span>Database Table Inventory</span><p>Only recognized history tables are loaded into memory.</p></div><strong>{snapshot.tables.length}</strong></div><div className="inventory-list">{snapshot.tables.map((table) => <details key={table.name}><summary><span>{table.name}</span><small>{table.rowCount.toLocaleString()} rows · {table.columnCount} columns</small><b>{table.loaded ? "Mapped" : "Metadata only"}</b></summary><p>{table.columns.join(", ") || "No column names were returned."}</p>{table.truncated && <p className="truncate-warning">This table exceeded the Phase 1 row limit.</p>}</details>)}</div></div></section>}
+        {view === "shows" && <div className="history-layout"><aside className="show-list" aria-label="Previous shows"><div className="panel-heading"><span>Previous Shows</span><strong>{snapshot.shows.length}</strong></div>{snapshot.shows.length > 0 ? snapshot.shows.map((show) => <button type="button" className={selectedShow?.id === show.id ? "selected" : ""} key={show.id} onClick={() => { setSelectedShowId(show.id); setVault((current) => ({ ...current, home: { ...current.home, lastSelectedHistoricalShowId: show.id, updatedAt: new Date().toISOString() } })); }}><strong>{show.name}</strong><span>{formatDate(show.date)}</span><small>{show.matches.length} match{show.matches.length === 1 ? "" : "es"}</small></button>) : <div className="empty-state compact">No previous shows were mapped.</div>}</aside>{selectedShow ? <ShowDetails show={selectedShow} /> : <section className="details-panel empty-state">No show record is available to display. Open Import Diagnostics to review the detected tables.</section>}</div>}
+        {view === "tew-storylines" && <section className="content-panel"><div className="panel-heading large"><div><span>Stored TEW Storylines</span><p>These imported records remain read-only. Link them to tracker storylines through Promotion Onboarding or the Storyline Hub.</p></div><strong>{snapshot.storylines.length}</strong></div>{snapshot.storylines.length > 0 ? <div className="storyline-grid">{snapshot.storylines.map((storyline) => <StorylineCard key={`${storyline.sourceTable}-${storyline.id}`} storyline={storyline} />)}</div> : <div className="empty-state">No supported storyline records were mapped from this snapshot.</div>}</section>}
+        {view === "schema" && <section className="diagnostics-layout"><div className="content-panel"><div className="panel-heading large"><div><span>Matched TEW Tables</span><p>These mappings drive the read-only show, match, worker, and storyline views.</p></div></div><dl className="mapping-list">{Object.entries(snapshot.diagnostics.matchedTables).map(([purpose, table]) => <div key={purpose}><dt>{purpose}</dt><dd className={table ? "matched" : "missing"}>{table ?? "Not found"}</dd></div>)}</dl><div className="warning-list"><h3>Warnings</h3>{snapshot.diagnostics.warnings.length > 0 ? snapshot.diagnostics.warnings.map((warning, index) => <p key={`${warning}-${index}`}>{warning}</p>) : <p>No mapping warnings were generated.</p>}</div></div><div className="content-panel table-inventory"><div className="panel-heading large"><div><span>Database Table Inventory</span><p>Only recognized history tables are loaded into memory.</p></div><strong>{snapshot.tables.length}</strong></div><div className="inventory-list">{snapshot.tables.map((table) => <details key={table.name}><summary><span>{table.name}</span><small>{table.rowCount.toLocaleString()} rows · {table.columnCount} columns</small><b>{table.loaded ? "Mapped" : "Metadata only"}</b></summary><p>{table.columns.join(", ") || "No column names were returned."}</p>{table.truncated && <p className="truncate-warning">This table exceeded the read-only row limit.</p>}</details>)}</div></div></section>}
       </>}
     </main>
-    <footer>TEW remains the game. Promotion Calendar organizes recurring shows and grounded continuity obligations around Show Session without modifying TEW or replacing its simulation.</footer>
+    <footer>TEW remains the game. Companion Home restores read-only TEW history, guides the current show, and keeps complete creative backups without modifying TEW or replacing its simulation.</footer>
   </div>;
 }
