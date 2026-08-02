@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { openAdvancedTools } from "./helpers";
 
+const showSessionHeading = "Open one show, finish every segment, enter it in TEW, and reconcile the actual result";
+
 test("creates and persists match and angle narratives without browser errors", async ({ page }) => {
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
@@ -9,9 +11,9 @@ test("creates and persists match and angle narratives without browser errors", a
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "TEW IX Story Tracker" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "One show. One operational path. TEW remains the game." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: showSessionHeading })).toBeVisible();
   await openAdvancedTools(page);
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Plan the show for TEW, add match approaches, then preserve what actually happened" })).toBeVisible();
 
   await page.getByRole("button", { name: "Create Show" }).first().click();
@@ -40,7 +42,7 @@ test("creates and persists match and angle narratives without browser errors", a
 
   await page.reload();
   await openAdvancedTools(page);
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await expect(page.getByLabel("Show name")).toHaveValue("Monday Night Test");
   await expect(page.locator('[data-segment-type="match"]').getByLabel("Full match story")).toContainText("Bret controls the knee");
   await expect(page.locator('[data-segment-type="angle"]').getByLabel("Full Segment Output")).toContainText("The champion opens the show");
@@ -52,7 +54,7 @@ test("creates and persists match and angle narratives without browser errors", a
 test("creates a storyline and builds its timeline from planned segments", async ({ page }) => {
   await page.goto("/");
   await openAdvancedTools(page);
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("Timeline Test Show");
   await page.getByRole("button", { name: "Add Angle" }).click();
@@ -119,10 +121,10 @@ test("creates worker profiles character arcs and a relationship network", async 
 
 test("creates schedules and searches a future booking idea", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "One show. One operational path. TEW remains the game." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: showSessionHeading })).toBeVisible();
   await openAdvancedTools(page);
 
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("Future Supercard");
 
