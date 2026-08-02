@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { openAdvancedTools } from "./helpers";
 
 test("finalizes a card and persists TEW entry progress", async ({ page }) => {
   await page.goto("/");
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Saturday Night");
@@ -16,6 +18,7 @@ test("finalizes a card and persists TEW entry progress", async ({ page }) => {
   await match.getByLabel("Manual worker name").fill("Bret Hart");
   await match.getByRole("button", { name: "Add Manual Worker" }).click();
 
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "TEW Handoff" }).click();
   await expect(page.getByRole("heading", { name: "Finalize the card here, then enter it into TEW without losing the creative plan" })).toBeVisible();
   await page.getByRole("button", { name: "Finalize for TEW" }).first().click();
@@ -30,6 +33,7 @@ test("finalizes a card and persists TEW entry progress", async ({ page }) => {
   await page.getByText("Running order confirmed").click();
 
   await page.reload();
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "TEW Handoff" }).click();
   await page.getByRole("button", { name: "Entry Assistant" }).click();
   await expect(page.getByRole("heading", { name: "1 of 1 segments entered into TEW" })).toBeVisible();
