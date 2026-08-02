@@ -26,13 +26,13 @@ export interface BridgeFieldMapping {
   tewTable: string;
   tewField: string;
   status: BridgeMappingStatus;
-  verificationStage: BridgeMappingVerificationStage;
+  verificationStage?: BridgeMappingVerificationStage;
   confidence: BridgeConfidence;
-  identityField: string;
-  requiredDefaults: string;
-  formatNotes: string;
-  evidenceSessionIds: string[];
-  history: BridgeMappingHistoryEntry[];
+  identityField?: string;
+  requiredDefaults?: string;
+  formatNotes?: string;
+  evidenceSessionIds?: string[];
+  history?: BridgeMappingHistoryEntry[];
   evidence: string;
   notes: string;
   updatedAt: string;
@@ -196,6 +196,6 @@ export interface BridgeUniverse {
   settings: CompanionModeSettings;
   mappings: BridgeFieldMapping[];
   comparisonReports: TewComparisonReport[];
-  rawEvidenceSessions: RawEvidenceSession[];
-  exportAudits: GuardedExportAudit[];
+  rawEvidenceSessions?: RawEvidenceSession[];
+  exportAudits?: GuardedExportAudit[];
 }
