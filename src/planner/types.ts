@@ -7,6 +7,7 @@ import type { MatchApproachSetup, MatchEngineUniverse } from "../matchEngine/typ
 import type { ShowOperationsUniverse } from "../operations/types";
 import type { TrackerStoryline } from "../storylines/types";
 import type { TransferUniverse } from "../transfer/types";
+import type { WorkbenchUniverse } from "../workbench/types";
 import type { WorkerUniverse } from "../workers/types";
 
 export type PlannedSegmentType = "match" | "angle";
@@ -135,7 +136,7 @@ export interface PlannedShow {
 
 export interface PlannerBackup {
   product: "TEW IX Story Tracker";
-  version: 14;
+  version: 15;
   exportedAt: string;
   shows: PlannedShow[];
   storylines: TrackerStoryline[];
@@ -148,6 +149,7 @@ export interface PlannerBackup {
   bridge: BridgeUniverse;
   transfer: TransferUniverse;
   operations: ShowOperationsUniverse;
+  workbench: WorkbenchUniverse;
 }
 
 export interface PlannerBackupBundle {
@@ -162,4 +164,5 @@ export interface PlannerBackupBundle {
   bridge: BridgeUniverse;
   transfer: TransferUniverse;
   operations: ShowOperationsUniverse;
+  workbench: WorkbenchUniverse;
 }
