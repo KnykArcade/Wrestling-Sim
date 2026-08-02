@@ -146,8 +146,8 @@ describe("Phase 5F Output Library and Road-Agent Workflow", () => {
     expect(packet.text).toContain("ROAD-AGENT MATCH PACKAGE");
     expect(packet.text).toContain("ANGLE PRODUCTION PACKAGE");
     expect(packet.warnings).toEqual(expect.arrayContaining([
-      expect.stringContaining("Post-Match Confrontation has not been saved"),
-      expect.stringContaining("no Angle Segment Output"),
+      expect.stringContaining("Post-Match Confrontation) has not been saved"),
+      expect.stringContaining("has no Angle Segment Output"),
     ]));
     expect(JSON.parse(packet.json).segments).toHaveLength(2);
   });
