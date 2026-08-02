@@ -32,6 +32,7 @@ export interface WrapUpChampionshipDecision {
   championEntering: string;
   challenger: string;
   actualWinner: string;
+  resolvedChampionNames: string;
   suggestedDecision: "Retained" | "Changed Hands" | "Vacated" | "Unresolved";
   decision: "Retained" | "Changed Hands" | "Vacated" | "Unresolved" | "Deferred";
   status: WrapUpDecisionStatus;
