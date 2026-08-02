@@ -22,7 +22,7 @@ function strings(value: unknown): string[] {
 }
 
 function step(value: unknown): ShowSessionStep {
-  return value === "setup" || value === "creative" || value === "package" || value === "entry" || value === "result" ? value : "overview";
+  return value === "setup" || value === "creative" || value === "package" || value === "entry" || value === "result" || value === "wrap-up" ? value : "overview";
 }
 
 function lineageStage(value: unknown): OutputLineageStage {

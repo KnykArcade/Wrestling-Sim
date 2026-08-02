@@ -28,6 +28,7 @@ export function createEmptySegmentReconciliation(): SegmentReconciliation {
     linkedMatchId: "",
     actualMatch: null,
     happenedAsPlanned: null,
+    happenedAsPlannedDetail: "Unresolved",
     actualRating: null,
     finalNarrative: "",
     changes: "",

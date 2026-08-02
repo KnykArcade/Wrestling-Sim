@@ -13,12 +13,14 @@ import type { TrackerStoryline } from "../storylines/types";
 import type { TransferUniverse } from "../transfer/types";
 import type { WorkbenchUniverse } from "../workbench/types";
 import type { WorkerUniverse } from "../workers/types";
+import type { WrapUpUniverse } from "../wrapUp/types";
 
 export type PlannedSegmentType = "match" | "angle";
 export type PlannedSegmentSection = "Pre-Show" | "Main Show" | "Post-Show";
 export type PlannedShowStatus = "Draft" | "Ready" | "Completed" | "Reconciled";
 export type PlannedReferenceSource = "tew" | "manual";
 export type SegmentWorkflowStatus = "Planned" | "Entered in TEW" | "Completed" | "Reconciled";
+export type ReconciliationPlanOutcome = "Unresolved" | "Yes" | "Partially" | "No";
 
 export interface PlannedWorkerReference {
   id: string;
@@ -49,6 +51,7 @@ export interface SegmentReconciliation {
   linkedMatchId: string;
   actualMatch: ActualMatchSnapshot | null;
   happenedAsPlanned: boolean | null;
+  happenedAsPlannedDetail: ReconciliationPlanOutcome;
   actualRating: number | null;
   finalNarrative: string;
   changes: string;
@@ -140,7 +143,7 @@ export interface PlannedShow {
 
 export interface PlannerBackup {
   product: "TEW IX Story Tracker";
-  version: 19;
+  version: 20;
   exportedAt: string;
   shows: PlannedShow[];
   storylines: TrackerStoryline[];
@@ -158,6 +161,7 @@ export interface PlannerBackup {
   outputLibrary: OutputLibraryUniverse;
   showSession: ShowSessionUniverse;
   promotionSchedule: PromotionScheduleUniverse;
+  wrapUp: WrapUpUniverse;
 }
 
 export interface PlannerBackupBundle {
@@ -177,4 +181,5 @@ export interface PlannerBackupBundle {
   outputLibrary: OutputLibraryUniverse;
   showSession: ShowSessionUniverse;
   promotionSchedule: PromotionScheduleUniverse;
+  wrapUp: WrapUpUniverse;
 }

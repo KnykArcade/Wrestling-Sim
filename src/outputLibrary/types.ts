@@ -1,5 +1,5 @@
 import type { MatchAimId, MatchApproachId } from "../matchEngine/types";
-import type { PlannedReferenceSource, PlannedSegmentSection, PlannedSegmentType, SegmentWorkflowStatus } from "../planner/types";
+import type { PlannedReferenceSource, PlannedSegmentSection, PlannedSegmentType, ReconciliationPlanOutcome, SegmentWorkflowStatus } from "../planner/types";
 
 export type OutputLineageStage =
   | "Plan"
@@ -42,6 +42,7 @@ export interface OutputActualSnapshot {
   rating: number | null;
   notes: string;
   happenedAsPlanned: boolean | null;
+  reviewOutcome?: ReconciliationPlanOutcome;
   finalNarrative: string;
   changes: string;
   actualConsequences: string;
