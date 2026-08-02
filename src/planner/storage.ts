@@ -27,6 +27,9 @@ import type { OutputLibraryUniverse } from "../outputLibrary/types";
 import { emptyProfileLibraryUniverse } from "../profileLibrary/model";
 import { loadProfileLibraryUniverse, parseProfileLibraryUniverse, saveProfileLibraryUniverse } from "../profileLibrary/storage";
 import type { ProfileLibraryUniverse } from "../profileLibrary/types";
+import { emptyPromotionScheduleUniverse, migrateShowsToPromotionSchedule } from "../schedule/model";
+import { loadPromotionScheduleUniverse, parsePromotionScheduleUniverse, savePromotionScheduleUniverse } from "../schedule/storage";
+import type { PromotionScheduleUniverse } from "../schedule/types";
 import { emptyShowSessionUniverse } from "../showSession/model";
 import { loadShowSessionUniverse, parseShowSessionUniverse, saveShowSessionUniverse } from "../showSession/storage";
 import type { ShowSessionUniverse } from "../showSession/types";
@@ -314,6 +317,10 @@ function browserShowSession(): ShowSessionUniverse {
   return typeof window === "undefined" ? emptyShowSessionUniverse() : loadShowSessionUniverse(window.localStorage);
 }
 
+function browserPromotionSchedule(): PromotionScheduleUniverse {
+  return typeof window === "undefined" ? emptyPromotionScheduleUniverse() : loadPromotionScheduleUniverse(window.localStorage);
+}
+
 export function createPlannerBackup(
   shows: PlannedShow[],
   storylines: TrackerStoryline[] = browserStorylines(),
@@ -330,10 +337,11 @@ export function createPlannerBackup(
   profileLibrary: ProfileLibraryUniverse = browserProfileLibrary(),
   outputLibrary: OutputLibraryUniverse = browserOutputLibrary(),
   showSession: ShowSessionUniverse = browserShowSession(),
+  promotionSchedule: PromotionScheduleUniverse = browserPromotionSchedule(),
 ): PlannerBackup {
   return {
     product: "TEW IX Story Tracker",
-    version: 18,
+    version: 19,
     exportedAt: new Date().toISOString(),
     shows,
     storylines,
@@ -350,6 +358,7 @@ export function createPlannerBackup(
     profileLibrary,
     outputLibrary,
     showSession,
+    promotionSchedule,
   };
 }
 
@@ -359,11 +368,12 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
   if (
     !isRecord(value) ||
     value.product !== "TEW IX Story Tracker" ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].includes(typeof value.version === "number" ? value.version : -1)
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].includes(typeof value.version === "number" ? value.version : -1)
   ) throw new Error("The selected file is not a supported TEW Story Tracker backup.");
   const version = value.version as number;
+  const shows = parsePlannerShows(value.shows);
   return {
-    shows: parsePlannerShows(value.shows),
+    shows,
     storylines: version >= 4 ? parseTrackerStorylines(value.storylines ?? []) : [],
     workers: version >= 5 ? parseWorkerUniverse(value.workers ?? emptyWorkerUniverse()) : emptyWorkerUniverse(),
     control: version >= 6 ? parseCreativeControlData(value.control ?? emptyCreativeControlData()) : emptyCreativeControlData(),
@@ -378,6 +388,9 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
     profileLibrary: version >= 16 ? parseProfileLibraryUniverse(value.profileLibrary ?? emptyProfileLibraryUniverse()) : emptyProfileLibraryUniverse(),
     outputLibrary: version >= 17 ? parseOutputLibraryUniverse(value.outputLibrary ?? emptyOutputLibraryUniverse()) : emptyOutputLibraryUniverse(),
     showSession: version >= 18 ? parseShowSessionUniverse(value.showSession ?? emptyShowSessionUniverse()) : emptyShowSessionUniverse(),
+    promotionSchedule: version >= 19
+      ? parsePromotionScheduleUniverse(value.promotionSchedule ?? emptyPromotionScheduleUniverse())
+      : migrateShowsToPromotionSchedule(shows),
   };
 }
 
@@ -398,6 +411,7 @@ export function parsePlannerBackup(textValue: string): PlannedShow[] {
     saveProfileLibraryUniverse(window.localStorage, bundle.profileLibrary);
     saveOutputLibraryUniverse(window.localStorage, bundle.outputLibrary);
     saveShowSessionUniverse(window.localStorage, bundle.showSession);
+    savePromotionScheduleUniverse(window.localStorage, bundle.promotionSchedule);
   }
   return bundle.shows;
 }
