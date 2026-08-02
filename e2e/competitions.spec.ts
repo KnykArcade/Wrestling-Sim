@@ -22,7 +22,7 @@ test("builds a World Classic bracket and schedules a fixture onto a planned TEW 
   await expect(page.locator(".competition-fixture")).toHaveCount(3);
 
   const firstSemifinal = page.locator(".competition-fixture").first();
-  await firstSemifinal.getByLabel(/target show/).selectOption({ label: /PWL Classic Night/ });
+  await firstSemifinal.getByLabel(/target show/).selectOption({ index: 1 });
   await firstSemifinal.getByRole("button", { name: "Add to Planned Show" }).click();
   await expect(firstSemifinal.getByRole("button", { name: "Open Planned Match" })).toBeVisible();
   await firstSemifinal.getByRole("button", { name: "Open Planned Match" }).click();
