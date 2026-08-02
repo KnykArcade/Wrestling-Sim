@@ -27,7 +27,7 @@ test("builds a World Classic bracket and schedules a fixture onto a planned TEW 
   await expect(firstSemifinal.getByRole("button", { name: "Open Planned Match" })).toBeVisible();
   await firstSemifinal.getByRole("button", { name: "Open Planned Match" }).click();
   await expect(page.getByLabel("Show name")).toHaveValue("PWL Classic Night");
-  await expect(page.locator('[data-segment-type="match"]').getByLabel("Segment name")).toContainText("Semifinal");
+  await expect(page.locator('[data-segment-type="match"]').getByLabel("Segment name")).toHaveValue(/Semifinal/);
 
   await page.reload();
   await page.getByRole("button", { name: "Competitions" }).click();
