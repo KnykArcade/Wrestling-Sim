@@ -88,6 +88,9 @@ export function createPlannedSegment(type: PlannedSegmentType): PlannedSegment {
     interference: "",
     postMatch: "",
     matchApproachSetup: createEmptyMatchApproachSetup(),
+    competitionId: "",
+    competitionFixtureId: "",
+    competitionRoundLabel: "",
 
     angleLocation: type === "angle" ? "In The Ring" : "",
     angleContentType: type === "angle" ? "Serious" : "",
@@ -118,6 +121,9 @@ export function duplicatePlannedShow(show: PlannedShow): PlannedShow {
       ...segment,
       id: createPlannerId(),
       bookingIdeaId: "",
+      competitionId: "",
+      competitionFixtureId: "",
+      competitionRoundLabel: "",
       titleResultDecision: "",
       titleResultConfirmedAt: "",
       workflowStatus: "Planned",
@@ -183,6 +189,7 @@ export function buildTewEntrySummary(segment: PlannedSegment): string {
     const preview = segment.matchApproachSetup.performancePreview;
     const previewWinner = preview?.projectedWinnerName ? ` · Preview winner: ${preview.projectedWinnerName}` : "";
     lines.push(
+      segment.competitionId ? `Competition fixture: ${segment.competitionRoundLabel || "Linked competition round"}` : "",
       segment.matchType ? `Match type: ${segment.matchType}` : "",
       segment.championship ? `Championship: ${segment.championship}` : "",
       segment.championshipMatchPurpose ? `Title match purpose: ${segment.championshipMatchPurpose}` : "",
