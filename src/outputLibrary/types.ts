@@ -42,7 +42,7 @@ export interface OutputActualSnapshot {
   rating: number | null;
   notes: string;
   happenedAsPlanned: boolean | null;
-  reviewOutcome: ReconciliationPlanOutcome;
+  reviewOutcome?: ReconciliationPlanOutcome;
   finalNarrative: string;
   changes: string;
   actualConsequences: string;
