@@ -5,7 +5,6 @@ test("generates and persists an assisted TEW transfer package", async ({ page })
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Transfer Test");
-  await page.getByLabel("Show date").fill("2026-08-15");
   await page.getByRole("button", { name: "Add Match" }).click();
   await page.getByRole("button", { name: "Add Angle" }).click();
 
@@ -29,7 +28,8 @@ test("generates and persists an assisted TEW transfer package", async ({ page })
   await expect(page.getByText("Database writing").first()).toBeVisible();
 
   await page.getByRole("button", { name: "Mark Segment Entered" }).click();
-  await expect(page.getByText("1", { exact: true }).nth(1)).toBeVisible();
+  const enteredSummary = page.locator(".transfer-score-strip > div").filter({ hasText: "Entered" });
+  await expect(enteredSummary.getByText("1", { exact: true })).toBeVisible();
 
   await page.reload();
   await page.getByRole("button", { name: "TEW Transfer" }).click();
