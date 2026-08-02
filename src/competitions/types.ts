@@ -26,8 +26,8 @@ export interface CompetitionFixture {
   participantBId: string;
   sourceFixtureAId: string;
   sourceFixtureBId: string;
-  status: CompetitionFixtureStatus;
-  resultType: CompetitionResultType | "";
+  status: CompetitionFixtureStatus | (string & {});
+  resultType: CompetitionResultType | "" | (string & {});
   winnerId: string;
   loserId: string;
   scoreText: string;
