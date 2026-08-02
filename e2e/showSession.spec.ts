@@ -33,10 +33,12 @@ test("runs one angle from creative output through permanent lineage and inline T
   await page.getByRole("button", { name: "Mark Current Output Applied" }).click();
   await expect(page.getByRole("heading", { name: "Create Applied Output checkpoint" })).toBeVisible();
   await page.getByRole("button", { name: "Create Checkpoint" }).click();
+  await expect(page.getByText("Output Library checkpoint is current for the Applied Output stage.", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "3. Production Package" }).click();
   await expect(page.getByRole("heading", { name: "Angle Production Package" })).toBeVisible();
   await page.getByRole("button", { name: "Mark Ready for TEW" }).click();
+  await expect(page.getByRole("status")).toContainText("Segment marked Ready for TEW");
   await expect(page.getByRole("heading", { name: "Create Ready for TEW checkpoint" })).toBeVisible();
   await page.getByRole("button", { name: "Create Checkpoint" }).click();
 
