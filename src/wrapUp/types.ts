@@ -9,6 +9,7 @@ export interface WrapUpSegmentReview {
   segmentId: string;
   segmentType: "match" | "angle";
   status: WrapUpSegmentReviewStatus;
+  deliberatelyUnresolved: boolean;
   happenedAsPlanned: WrapUpPlanOutcome;
   actualAngleRating: number | null;
   finalNarrative: string;
