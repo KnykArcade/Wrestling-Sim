@@ -18,6 +18,9 @@ import {
   saveMatchEngineUniverse,
 } from "../matchEngine/storage";
 import type { MatchEngineUniverse } from "../matchEngine/types";
+import { emptyShowOperationsUniverse } from "../operations/model";
+import { loadShowOperationsUniverse, parseShowOperationsUniverse, saveShowOperationsUniverse } from "../operations/storage";
+import type { ShowOperationsUniverse } from "../operations/types";
 import { loadTrackerStorylines, parseTrackerStorylines, saveTrackerStorylines } from "../storylines/storage";
 import type { TrackerStoryline } from "../storylines/types";
 import { emptyTransferUniverse } from "../transfer/model";
@@ -279,6 +282,10 @@ function browserTransfer(): TransferUniverse {
   return typeof window === "undefined" ? emptyTransferUniverse() : loadTransferUniverse(window.localStorage);
 }
 
+function browserOperations(): ShowOperationsUniverse {
+  return typeof window === "undefined" ? emptyShowOperationsUniverse() : loadShowOperationsUniverse(window.localStorage);
+}
+
 export function createPlannerBackup(
   shows: PlannedShow[],
   storylines: TrackerStoryline[] = browserStorylines(),
@@ -290,10 +297,11 @@ export function createPlannerBackup(
   competitions: CompetitionUniverse = browserCompetitions(),
   bridge: BridgeUniverse = browserBridge(),
   transfer: TransferUniverse = browserTransfer(),
+  operations: ShowOperationsUniverse = browserOperations(),
 ): PlannerBackup {
   return {
     product: "TEW IX Story Tracker",
-    version: 13,
+    version: 14,
     exportedAt: new Date().toISOString(),
     shows,
     storylines,
@@ -305,6 +313,7 @@ export function createPlannerBackup(
     competitions,
     bridge,
     transfer,
+    operations,
   };
 }
 
@@ -314,7 +323,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
   if (
     !isRecord(value) ||
     value.product !== "TEW IX Story Tracker" ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].includes(typeof value.version === "number" ? value.version : -1)
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].includes(typeof value.version === "number" ? value.version : -1)
   ) throw new Error("The selected file is not a supported TEW Story Tracker backup.");
   const version = value.version as number;
   return {
@@ -328,6 +337,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
     competitions: version >= 11 ? parseCompetitionUniverse(value.competitions ?? emptyCompetitionUniverse()) : emptyCompetitionUniverse(),
     bridge: version >= 12 ? parseBridgeUniverse(value.bridge ?? emptyBridgeUniverse()) : emptyBridgeUniverse(),
     transfer: version >= 13 ? parseTransferUniverse(value.transfer ?? emptyTransferUniverse()) : emptyTransferUniverse(),
+    operations: version >= 14 ? parseShowOperationsUniverse(value.operations ?? emptyShowOperationsUniverse()) : emptyShowOperationsUniverse(),
   };
 }
 
@@ -343,6 +353,7 @@ export function parsePlannerBackup(textValue: string): PlannedShow[] {
     saveCompetitionUniverse(window.localStorage, bundle.competitions);
     saveBridgeUniverse(window.localStorage, bundle.bridge);
     saveTransferUniverse(window.localStorage, bundle.transfer);
+    saveShowOperationsUniverse(window.localStorage, bundle.operations);
   }
   return bundle.shows;
 }
