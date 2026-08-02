@@ -1,12 +1,15 @@
 import { expect, test } from "@playwright/test";
+import { openAdvancedTools } from "./helpers";
 
 test("builds a World Classic bracket and schedules a fixture onto a planned TEW show", async ({ page }) => {
   await page.goto("/");
+  await openAdvancedTools(page);
 
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Classic Night");
 
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Competitions" }).click();
   await expect(page.getByRole("heading", { name: "Tournaments, Cups, Leagues, and Classics" })).toBeVisible();
   await page.getByRole("button", { name: "PWL World Classic" }).click();
@@ -30,6 +33,7 @@ test("builds a World Classic bracket and schedules a fixture onto a planned TEW 
   await expect(page.locator('[data-segment-type="match"]').getByLabel("Segment name")).toHaveValue(/Semifinal/);
 
   await page.reload();
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Competitions" }).click();
   await expect(page.getByRole("heading", { name: "PWL World Classic" })).toBeVisible();
   await page.getByRole("button", { name: "Bracket and Schedule" }).click();
