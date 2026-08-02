@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { openAdvancedTools } from "./helpers";
 
 test("guides a planned show through preflight and preserves entry changes", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /One show\. One operational path/ })).toBeVisible();
 
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").first().fill("PWL Operations Test");

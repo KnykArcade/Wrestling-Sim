@@ -1,0 +1,15 @@
+.advanced-tools-menu {
+  flex: 1 1 100%;
+}
+
+.advanced-tools-menu[open] {
+  width: 100%;
+}
+
+.advanced-tools-popover {
+  position: static;
+  width: 100%;
+  margin-top: 6px;
+  box-sizing: border-box;
+  box-shadow: none;
+}

@@ -17,6 +17,7 @@ import "./narrative-generator.css";
 import "./bridge.css";
 import "./transfer.css";
 import "./operations.css";
+import "./workbench.css";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
