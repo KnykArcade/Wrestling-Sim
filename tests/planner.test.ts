@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { emptyChampionshipUniverse } from "../src/championships/storage";
+import { emptyCompetitionUniverse } from "../src/competitions/model";
 import { emptyCreativeControlData } from "../src/control/storage";
 import { emptyHandoffUniverse } from "../src/handoff/storage";
 import { emptyMatchEngineUniverse } from "../src/matchEngine/storage";
@@ -83,6 +84,9 @@ describe("planned show workspace", () => {
       championshipId: "",
       championshipMatchPurpose: "",
       titleResultDecision: "",
+      competitionId: "",
+      competitionFixtureId: "",
+      competitionRoundLabel: "",
       matchApproachSetup: {
         matchAimId: "call-it-in-the-ring",
         workerPlans: [],
@@ -96,9 +100,12 @@ describe("planned show workspace", () => {
     expect(totalPlannedMinutes(show)).toBe(17);
   });
 
-  test("builds a copy-ready TEW summary with title approach and advisory preview details", () => {
+  test("builds a copy-ready TEW summary with competition title approach and advisory preview details", () => {
     const match = createPlannedSegment("match");
     match.title = "World Title Match";
+    match.competitionId = "classic-1";
+    match.competitionFixtureId = "fixture-1";
+    match.competitionRoundLabel = "Semifinal";
     match.championship = "PWL Championship";
     match.championshipMatchPurpose = "Defense";
     match.championEntering = "Bret Hart";
@@ -122,6 +129,7 @@ describe("planned show workspace", () => {
     addAdvisoryPreview(match);
     const summary = buildTewEntrySummary(match);
     expect(summary).toContain("World Title Match");
+    expect(summary).toContain("Competition fixture: Semifinal");
     expect(summary).toContain("Championship: PWL Championship");
     expect(summary).toContain("Champion entering: Bret Hart");
     expect(summary).toContain("Expected title change: No");
@@ -141,12 +149,15 @@ describe("planned show workspace", () => {
     expect(movePlannedSegment(original, first.id, -1)).toBe(original);
   });
 
-  test("duplicates shows retaining strategy but clearing result links and rolled previews", () => {
+  test("duplicates shows retaining strategy but clearing result and competition links", () => {
     const show = createPlannedShow(1);
     const match = createPlannedSegment("match");
     match.workers = [{ id: "worker-1", name: "Worker One", role: "Competitor", side: "Side 1", source: "tew" }];
     match.workflowStatus = "Reconciled";
     match.bookingIdeaId = "idea-1";
+    match.competitionId = "competition-1";
+    match.competitionFixtureId = "fixture-1";
+    match.competitionRoundLabel = "Final";
     match.titleResultDecision = "Retained";
     match.titleResultConfirmedAt = "2026-08-01T00:00:00.000Z";
     match.reconciliation.linkedMatchId = "actual-1";
@@ -168,6 +179,9 @@ describe("planned show workspace", () => {
     expect(duplicate.segments[0].workers[0].id).not.toBe(match.workers[0].id);
     expect(duplicate.segments[0].workflowStatus).toBe("Planned");
     expect(duplicate.segments[0].bookingIdeaId).toBe("");
+    expect(duplicate.segments[0].competitionId).toBe("");
+    expect(duplicate.segments[0].competitionFixtureId).toBe("");
+    expect(duplicate.segments[0].competitionRoundLabel).toBe("");
     expect(duplicate.segments[0].titleResultDecision).toBe("");
     expect(duplicate.segments[0].titleResultConfirmedAt).toBe("");
     expect(duplicate.segments[0].reconciliation.actualMatch).toBeNull();
@@ -175,7 +189,7 @@ describe("planned show workspace", () => {
     expect(duplicate.segments[0].matchApproachSetup.performancePreview).toBeNull();
   });
 
-  test("saves loads exports and imports Phase 4C3 data", () => {
+  test("saves loads exports and imports Phase 4D data", () => {
     const storage = new MemoryStorage();
     const show = createPlannedShow(1);
     const match = createPlannedSegment("match");
@@ -189,16 +203,18 @@ describe("planned show workspace", () => {
     const championships = emptyChampionshipUniverse();
     const handoff = emptyHandoffUniverse();
     const matchEngine = emptyMatchEngineUniverse();
-    const backup = createPlannerBackup([show], [], workers, control, championships, handoff, matchEngine);
-    expect(backup.version).toBe(10);
+    const competitions = emptyCompetitionUniverse();
+    const backup = createPlannerBackup([show], [], workers, control, championships, handoff, matchEngine, competitions);
+    expect(backup.version).toBe(11);
     expect(backup.storylines).toEqual([]);
     expect(backup.workers).toEqual(workers);
     expect(backup.control).toEqual(control);
     expect(backup.championships).toEqual(championships);
     expect(backup.handoff).toEqual(handoff);
     expect(backup.matchEngine).toEqual(matchEngine);
+    expect(backup.competitions).toEqual(competitions);
     expect(parsePlannerBackup(JSON.stringify(backup))).toEqual([show]);
-    expect(parsePlannerBackupBundle(JSON.stringify(backup))).toEqual({ shows: [show], storylines: [], workers, control, championships, handoff, matchEngine });
+    expect(parsePlannerBackupBundle(JSON.stringify(backup))).toEqual({ shows: [show], storylines: [], workers, control, championships, handoff, matchEngine, competitions });
   });
 
   test("migrates Phase 2A planned shows without losing the card", () => {
@@ -215,6 +231,8 @@ describe("planned show workspace", () => {
       workflowStatus: "Planned",
       bookingIdeaId: "",
       championshipId: "",
+      competitionId: "",
+      competitionFixtureId: "",
       matchApproachSetup: {
         matchAimId: "call-it-in-the-ring",
         workerPlans: [],
@@ -236,6 +254,7 @@ describe("planned show workspace", () => {
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":8,"shows":[],"storylines":[],"workers":{"profiles":[],"relationships":[]},"control":{"ideas":[],"settings":{"dashboardWindowDays":45,"calendarFilter":"All","searchQuery":""}},"championships":{"championships":[]},"handoff":{"shows":[],"mappings":[]}}')).toEqual([]);
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":9,"shows":[],"storylines":[],"workers":{"profiles":[],"relationships":[]},"control":{"ideas":[],"settings":{"dashboardWindowDays":45,"calendarFilter":"All","searchQuery":""}},"championships":{"championships":[]},"handoff":{"shows":[],"mappings":[]},"matchEngine":{"profiles":[]}}')).toEqual([]);
     expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":10,"shows":[],"storylines":[],"workers":{"profiles":[],"relationships":[]},"control":{"ideas":[],"settings":{"dashboardWindowDays":45,"calendarFilter":"All","searchQuery":""}},"championships":{"championships":[]},"handoff":{"shows":[],"mappings":[]},"matchEngine":{"profiles":[]}}')).toEqual([]);
-    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":11,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
+    expect(parsePlannerBackup('{"product":"TEW IX Story Tracker","version":11,"shows":[],"storylines":[],"workers":{"profiles":[],"relationships":[]},"control":{"ideas":[],"settings":{"dashboardWindowDays":45,"calendarFilter":"All","searchQuery":""}},"championships":{"championships":[]},"handoff":{"shows":[],"mappings":[]},"matchEngine":{"profiles":[]},"competitions":{"competitions":[]}}')).toEqual([]);
+    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":12,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
   });
 });
