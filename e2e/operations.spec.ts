@@ -9,8 +9,14 @@ test("guides a planned show through preflight and preserves entry changes", asyn
   await page.getByLabel("Show name").first().fill("PWL Operations Test");
   await page.getByRole("button", { name: "Add Match" }).click();
   await page.locator('[data-segment-type="match"]').getByLabel("Segment name").fill("Jay White vs PAC");
+  await expect(page.locator(".save-state")).toHaveText("Saved");
+  await expect.poll(async () => page.evaluate(() => {
+    const raw = window.localStorage.getItem("tew-story-tracker:planned-shows:v1");
+    const shows = raw ? JSON.parse(raw) as Array<{ name?: string }> : [];
+    return shows[0]?.name ?? "";
+  })).toBe("PWL Operations Test");
 
-  await page.getByRole("button", { name: "Show Operations" }).click();
+  await page.getByRole("button", { name: "Show Operations", exact: true }).click();
   await expect(page.getByText("PWL Operations Test", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Draft", { exact: true }).first()).toBeVisible();
 
