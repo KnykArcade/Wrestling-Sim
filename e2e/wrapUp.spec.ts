@@ -1,170 +1,189 @@
 import { expect, test } from "@playwright/test";
+import { createChampionship, createChampionshipReign } from "../src/championships/model";
+import { createBookingIdea } from "../src/control/model";
+import {
+  createCompetitionParticipant,
+  createCompetitionTemplate,
+  generateCompetitionStructure,
+} from "../src/competitions/model";
+import { emptyOutputLibraryUniverse } from "../src/outputLibrary/model";
+import { createPlannedSegment, createPlannedShow } from "../src/planner/model";
+import { migrateShowsToPromotionSchedule } from "../src/schedule/model";
+import {
+  createShowSessionRecord,
+  emptyShowSessionUniverse,
+  upsertShowSessionRecord,
+} from "../src/showSession/model";
+import { createStorylineMilestone, createTrackerStoryline } from "../src/storylines/model";
+import { createWorkerArc, createWorkerProfile } from "../src/workers/model";
+import { openAdvancedTools } from "./helpers";
+
+function buildWrapUpSeed(): Record<string, string> {
+  const show1 = createPlannedShow(1);
+  show1.id = "wrap-show-1";
+  show1.name = "PWL Power Hour #1";
+  show1.date = "2026-08-03";
+  show1.company = "PWL";
+  show1.venue = "PWL Arena";
+  show1.status = "Reconciled";
+  show1.reconciliation = {
+    linkedShowId: "actual-show-1",
+    actualShow: {
+      id: "actual-show-1",
+      name: "PWL Power Hour #1",
+      date: "2026-08-03",
+      rating: 82,
+      attendance: 1400,
+      venue: "PWL Arena",
+      company: "PWL",
+      broadcast: "Television",
+      sourceFile: "TEW-post-show.mdb",
+    },
+    linkedAt: "2026-08-03T20:00:00.000Z",
+    completedAt: "2026-08-03T22:00:00.000Z",
+    notes: "Confirmed TEW show",
+  };
+
+  const title = createChampionship(1);
+  title.id = "pwl-title";
+  title.name = "PWL Championship";
+  title.status = "Active";
+  title.currentChampions = [{ id: "jay", name: "Jay White" }];
+  title.dateWon = "2026-07-01";
+  title.reigns = [createChampionshipReign(title.currentChampions, [], title.dateWon)];
+
+  const titleMatch = createPlannedSegment("match");
+  titleMatch.id = "title-match";
+  titleMatch.title = "PWL Championship: Jay White vs PAC";
+  titleMatch.matchStory = "PAC survives White's control and wins after a decisive counter.";
+  titleMatch.workers = [
+    { id: "jay", name: "Jay White", role: "Competitor", side: "Side 1", source: "manual" },
+    { id: "pac", name: "PAC", role: "Competitor", side: "Side 2", source: "manual" },
+  ];
+  titleMatch.championshipId = title.id;
+  titleMatch.championship = title.name;
+  titleMatch.championEntering = "Jay White";
+  titleMatch.challenger = "PAC";
+  titleMatch.workflowStatus = "Reconciled";
+  titleMatch.reconciliation.actualMatch = {
+    id: "actual-title-match",
+    description: "PAC defeated Jay White",
+    rating: 88,
+    winner: "PAC",
+    matchTime: "22:14",
+    notes: "PAC won cleanly.",
+    placement: "Main Show",
+    workers: ["Jay White", "PAC"],
+  };
+  titleMatch.reconciliation.actualRating = 88;
+  titleMatch.reconciliation.finalNarrative = titleMatch.matchStory;
+  titleMatch.reconciliation.reconciledAt = "2026-08-03T22:00:00.000Z";
+
+  let competition = createCompetitionTemplate("world-classic");
+  competition.participants = ["Bandido", "Brody King", "Ricochet", "Roderick Strong"].map((name, index) => createCompetitionParticipant(
+    name,
+    competition.participantType,
+    { seed: index + 1, memberNames: [name] },
+  ));
+  competition = generateCompetitionStructure(competition);
+  const fixture = competition.fixtures.find((item) => item.participantAId && item.participantBId);
+  if (!fixture) throw new Error("The test competition did not create a playable fixture.");
+  const fixtureWinner = competition.participants.find((item) => item.id === fixture.participantAId);
+  if (!fixtureWinner) throw new Error("The test fixture winner could not be resolved.");
+
+  const competitionMatch = createPlannedSegment("match");
+  competitionMatch.id = "competition-match";
+  competitionMatch.title = `${competition.name} ${fixture.roundLabel}`;
+  competitionMatch.matchStory = `${fixtureWinner.name} wins a competitive tournament match.`;
+  competitionMatch.competitionId = competition.id;
+  competitionMatch.competitionFixtureId = fixture.id;
+  competitionMatch.competitionRoundLabel = fixture.roundLabel;
+  competitionMatch.workflowStatus = "Reconciled";
+  competitionMatch.reconciliation.actualMatch = {
+    id: "actual-competition-match",
+    description: `${fixtureWinner.name} won the tournament match`,
+    rating: 80,
+    winner: fixtureWinner.name,
+    matchTime: "15:32",
+    notes: "Tournament result",
+    placement: "Main Show",
+    workers: [fixtureWinner.name],
+  };
+  competitionMatch.reconciliation.actualRating = 80;
+  competitionMatch.reconciliation.finalNarrative = competitionMatch.matchStory;
+  competitionMatch.reconciliation.reconciledAt = "2026-08-03T22:00:00.000Z";
+
+  const angle = createPlannedSegment("angle");
+  angle.id = "closing-angle";
+  angle.title = "Closing Contract Challenge";
+  angle.segmentOutput = "The new champion is challenged to sign a contract next week.";
+  angle.followUp = "The new champion signs the championship contract on the next episode.";
+  angle.workflowStatus = "Reconciled";
+
+  show1.segments = [titleMatch, competitionMatch, angle];
+
+  const show2 = createPlannedShow(2);
+  show2.id = "wrap-show-2";
+  show2.name = "PWL Power Hour #2";
+  show2.date = "2026-08-10";
+  show2.company = "PWL";
+  show2.venue = "PWL Arena";
+
+  const storyline = createTrackerStoryline(1);
+  storyline.id = "world-title-story";
+  storyline.name = "World Title Rivalry";
+  storyline.status = "Active";
+  const milestone = createStorylineMilestone(1);
+  milestone.id = "contract-milestone";
+  milestone.title = "Contract Challenge";
+  milestone.assignedShowId = show1.id;
+  milestone.status = "Assigned";
+  storyline.milestones = [milestone];
+
+  const idea = createBookingIdea(1);
+  idea.id = "closing-idea";
+  idea.title = "Closing Contract Challenge";
+  idea.status = "Scheduled";
+  idea.targetShowId = show1.id;
+  idea.scheduledSegmentId = angle.id;
+
+  const worker = createWorkerProfile(1);
+  worker.id = "pac-worker";
+  worker.displayName = "PAC";
+  const arc = createWorkerArc(1);
+  arc.id = "pac-arc";
+  arc.name = "PAC Becomes Champion";
+  arc.status = "Active";
+  arc.targetShowId = show1.id;
+  worker.arcs = [arc];
+
+  const shows = [show1, show2];
+  const schedule = migrateShowsToPromotionSchedule(shows);
+  const sessionUniverse = upsertShowSessionRecord(emptyShowSessionUniverse(), {
+    ...createShowSessionRecord(show1.id, titleMatch.id),
+    activeStep: "overview",
+  });
+
+  return {
+    "tew-story-tracker:planned-shows:v1": JSON.stringify(shows),
+    "tew-story-tracker:championships:v1": JSON.stringify({ championships: [title] }),
+    "tew-story-tracker:competitions:v1": JSON.stringify({ competitions: [competition] }),
+    "tew-story-tracker:storylines:v1": JSON.stringify([storyline]),
+    "tew-story-tracker:creative-control:v1": JSON.stringify({ ideas: [idea], settings: { dashboardWindowDays: 45, calendarFilter: "All", searchQuery: "" } }),
+    "tew-story-tracker:workers:v1": JSON.stringify({ profiles: [worker], relationships: [] }),
+    "tew-story-tracker:promotion-schedule:v1": JSON.stringify(schedule),
+    "tew-story-tracker:show-session:v1": JSON.stringify(sessionUniverse),
+    "tew-story-tracker:output-library:v1": JSON.stringify(emptyOutputLibraryUniverse()),
+  };
+}
 
 test("closes a reconciled show, confirms consequences, rolls continuity forward, and restores backup version 20", async ({ page }) => {
+  const seed = buildWrapUpSeed();
   await page.goto("/");
-
-  await page.evaluate(async () => {
-    const load = (path: string): Promise<any> => Function("p", "return import(p)")(path) as Promise<any>;
-    const planner = await load("/src/planner/model.ts");
-    const championshipModel = await load("/src/championships/model.ts");
-    const competitionModel = await load("/src/competitions/model.ts");
-    const storylineModel = await load("/src/storylines/model.ts");
-    const controlModel = await load("/src/control/model.ts");
-    const workerModel = await load("/src/workers/model.ts");
-    const scheduleModel = await load("/src/schedule/model.ts");
-    const showSessionModel = await load("/src/showSession/model.ts");
-    const outputModel = await load("/src/outputLibrary/model.ts");
-
-    const show1 = planner.createPlannedShow(1);
-    show1.id = "wrap-show-1";
-    show1.name = "PWL Power Hour #1";
-    show1.date = "2026-08-03";
-    show1.company = "PWL";
-    show1.venue = "PWL Arena";
-    show1.status = "Reconciled";
-    show1.reconciliation = {
-      linkedShowId: "actual-show-1",
-      actualShow: {
-        id: "actual-show-1",
-        name: "PWL Power Hour #1",
-        date: "2026-08-03",
-        rating: 82,
-        attendance: 1400,
-        venue: "PWL Arena",
-        company: "PWL",
-        broadcast: "Television",
-        sourceFile: "TEW-post-show.mdb",
-      },
-      linkedAt: "2026-08-03T20:00:00.000Z",
-      completedAt: "2026-08-03T22:00:00.000Z",
-      notes: "Confirmed TEW show",
-    };
-
-    const title = championshipModel.createChampionship(1);
-    title.id = "pwl-title";
-    title.name = "PWL Championship";
-    title.status = "Active";
-    title.currentChampions = [{ id: "jay", name: "Jay White" }];
-    title.dateWon = "2026-07-01";
-    title.reigns = [championshipModel.createChampionshipReign(title.currentChampions, [], title.dateWon)];
-
-    const titleMatch = planner.createPlannedSegment("match");
-    titleMatch.id = "title-match";
-    titleMatch.title = "PWL Championship: Jay White vs PAC";
-    titleMatch.matchStory = "PAC survives White's control and wins after a decisive counter.";
-    titleMatch.workers = [
-      { id: "jay", name: "Jay White", role: "Competitor", side: "Side 1", source: "manual" },
-      { id: "pac", name: "PAC", role: "Competitor", side: "Side 2", source: "manual" },
-    ];
-    titleMatch.championshipId = title.id;
-    titleMatch.championship = title.name;
-    titleMatch.championEntering = "Jay White";
-    titleMatch.challenger = "PAC";
-    titleMatch.workflowStatus = "Reconciled";
-    titleMatch.reconciliation.actualMatch = {
-      id: "actual-title-match",
-      description: "PAC defeated Jay White",
-      rating: 88,
-      winner: "PAC",
-      matchTime: "22:14",
-      notes: "PAC won cleanly.",
-      placement: "Main Show",
-      workers: ["Jay White", "PAC"],
-    };
-    titleMatch.reconciliation.actualRating = 88;
-    titleMatch.reconciliation.finalNarrative = titleMatch.matchStory;
-    titleMatch.reconciliation.reconciledAt = "2026-08-03T22:00:00.000Z";
-
-    let competition = competitionModel.createCompetitionTemplate("world-classic");
-    competition.participants = ["Bandido", "Brody King", "Ricochet", "Roderick Strong"].map((name: string, index: number) => competitionModel.createCompetitionParticipant(name, competition.participantType, { seed: index + 1, memberNames: [name] }));
-    competition = competitionModel.generateCompetitionStructure(competition);
-    const fixture = competition.fixtures.find((item: any) => item.participantAId && item.participantBId);
-    const fixtureWinner = competition.participants.find((item: any) => item.id === fixture.participantAId);
-
-    const competitionMatch = planner.createPlannedSegment("match");
-    competitionMatch.id = "competition-match";
-    competitionMatch.title = `${competition.name} ${fixture.roundLabel}`;
-    competitionMatch.matchStory = `${fixtureWinner.name} wins a competitive tournament match.`;
-    competitionMatch.competitionId = competition.id;
-    competitionMatch.competitionFixtureId = fixture.id;
-    competitionMatch.competitionRoundLabel = fixture.roundLabel;
-    competitionMatch.workflowStatus = "Reconciled";
-    competitionMatch.reconciliation.actualMatch = {
-      id: "actual-competition-match",
-      description: `${fixtureWinner.name} won the tournament match`,
-      rating: 80,
-      winner: fixtureWinner.name,
-      matchTime: "15:32",
-      notes: "Tournament result",
-      placement: "Main Show",
-      workers: [fixtureWinner.name],
-    };
-    competitionMatch.reconciliation.actualRating = 80;
-    competitionMatch.reconciliation.finalNarrative = competitionMatch.matchStory;
-    competitionMatch.reconciliation.reconciledAt = "2026-08-03T22:00:00.000Z";
-
-    const angle = planner.createPlannedSegment("angle");
-    angle.id = "closing-angle";
-    angle.title = "Closing Contract Challenge";
-    angle.segmentOutput = "The new champion is challenged to sign a contract next week.";
-    angle.followUp = "The new champion signs the championship contract on the next episode.";
-    angle.workflowStatus = "Reconciled";
-
-    show1.segments = [titleMatch, competitionMatch, angle];
-
-    const show2 = planner.createPlannedShow(2);
-    show2.id = "wrap-show-2";
-    show2.name = "PWL Power Hour #2";
-    show2.date = "2026-08-10";
-    show2.company = "PWL";
-    show2.venue = "PWL Arena";
-
-    const storyline = storylineModel.createTrackerStoryline(1);
-    storyline.id = "world-title-story";
-    storyline.name = "World Title Rivalry";
-    storyline.status = "Active";
-    const milestone = storylineModel.createStorylineMilestone(1);
-    milestone.id = "contract-milestone";
-    milestone.title = "Contract Challenge";
-    milestone.assignedShowId = show1.id;
-    milestone.status = "Assigned";
-    storyline.milestones = [milestone];
-
-    const idea = controlModel.createBookingIdea(1);
-    idea.id = "closing-idea";
-    idea.title = "Closing Contract Challenge";
-    idea.status = "Scheduled";
-    idea.targetShowId = show1.id;
-    idea.scheduledSegmentId = angle.id;
-
-    const worker = workerModel.createWorkerProfile(1);
-    worker.id = "pac-worker";
-    worker.displayName = "PAC";
-    const arc = workerModel.createWorkerArc(1);
-    arc.id = "pac-arc";
-    arc.name = "PAC Becomes Champion";
-    arc.status = "Active";
-    arc.targetShowId = show1.id;
-    worker.arcs = [arc];
-
-    const shows = [show1, show2];
-    const schedule = scheduleModel.migrateShowsToPromotionSchedule(shows);
-    const sessionUniverse = showSessionModel.upsertShowSessionRecord(showSessionModel.emptyShowSessionUniverse(), {
-      ...showSessionModel.createShowSessionRecord(show1.id, titleMatch.id),
-      activeStep: "wrap-up",
-    });
-
-    window.localStorage.setItem("tew-story-tracker:planned-shows:v1", JSON.stringify(shows));
-    window.localStorage.setItem("tew-story-tracker:championships:v1", JSON.stringify({ championships: [title] }));
-    window.localStorage.setItem("tew-story-tracker:competitions:v1", JSON.stringify({ competitions: [competition] }));
-    window.localStorage.setItem("tew-story-tracker:storylines:v1", JSON.stringify([storyline]));
-    window.localStorage.setItem("tew-story-tracker:creative-control:v1", JSON.stringify({ ideas: [idea], settings: { dashboardWindowDays: 45, calendarFilter: "All", searchQuery: "" } }));
-    window.localStorage.setItem("tew-story-tracker:workers:v1", JSON.stringify({ profiles: [worker], relationships: [] }));
-    window.localStorage.setItem("tew-story-tracker:promotion-schedule:v1", JSON.stringify(schedule));
-    window.localStorage.setItem("tew-story-tracker:show-session:v1", JSON.stringify(sessionUniverse));
-    window.localStorage.setItem("tew-story-tracker:output-library:v1", JSON.stringify(outputModel.emptyOutputLibraryUniverse()));
-    window.localStorage.removeItem("tew-story-tracker:wrap-up:v1");
-  });
+  await page.evaluate((values) => {
+    window.localStorage.clear();
+    Object.entries(values).forEach(([key, value]) => window.localStorage.setItem(key, value));
+  }, seed);
 
   await page.reload();
   await expect(page.getByRole("button", { name: /Open Step 6: Wrap-Up/ })).toBeVisible();
@@ -227,19 +246,46 @@ test("closes a reconciled show, confirms consequences, rolls continuity forward,
     return shows.find((show) => show.id === "wrap-show-2")?.segments.some((segment) => segment.title === "Follow up: Closing Contract Challenge") ?? false;
   })).toBe(true);
 
-  await page.evaluate(async () => {
-    const load = (path: string): Promise<any> => Function("p", "return import(p)")(path) as Promise<any>;
-    const plannerStorage = await load("/src/planner/storage.ts");
-    const shows = plannerStorage.loadPlannedShows(window.localStorage);
-    const backup = plannerStorage.createPlannerBackup(shows);
-    if (backup.version !== 20) throw new Error("Expected a version 20 backup.");
-    const serialized = JSON.stringify(backup);
-    window.localStorage.clear();
-    const restoredShows = plannerStorage.parsePlannerBackup(serialized);
-    plannerStorage.savePlannedShows(window.localStorage, restoredShows);
+  const serializedBackup = await page.evaluate(() => {
+    const read = (key: string, fallback: unknown): unknown => {
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) as unknown : fallback;
+    };
+    return JSON.stringify({
+      product: "TEW IX Story Tracker",
+      version: 20,
+      exportedAt: new Date().toISOString(),
+      shows: read("tew-story-tracker:planned-shows:v1", []),
+      storylines: read("tew-story-tracker:storylines:v1", []),
+      workers: read("tew-story-tracker:workers:v1", {}),
+      control: read("tew-story-tracker:creative-control:v1", {}),
+      championships: read("tew-story-tracker:championships:v1", {}),
+      handoff: read("tew-story-tracker:handoff:v1", {}),
+      matchEngine: read("tew-story-tracker:match-engine:v1", {}),
+      competitions: read("tew-story-tracker:competitions:v1", {}),
+      bridge: read("tew-story-tracker:bridge:v1", {}),
+      transfer: read("tew-story-tracker:transfer:v1", {}),
+      operations: read("tew-story-tracker:show-operations:v1", {}),
+      workbench: read("tew-story-tracker:workbench:v1", {}),
+      profileLibrary: read("tew-story-tracker:profile-library:v1", {}),
+      outputLibrary: read("tew-story-tracker:output-library:v1", {}),
+      showSession: read("tew-story-tracker:show-session:v1", {}),
+      promotionSchedule: read("tew-story-tracker:promotion-schedule:v1", {}),
+      wrapUp: read("tew-story-tracker:wrap-up:v1", {}),
+    });
   });
 
+  await page.evaluate(() => window.localStorage.clear());
   await page.reload();
+  await openAdvancedTools(page);
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
+  await page.locator('input[type="file"][accept*="application/json"]').setInputFiles({
+    name: "tew-story-tracker-version-20.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(serializedBackup),
+  });
+  await expect(page.getByRole("status")).toContainText("Imported 2 planned shows");
+
   await expect.poll(async () => page.evaluate(() => {
     const raw = window.localStorage.getItem("tew-story-tracker:wrap-up:v1");
     const data = raw ? JSON.parse(raw) as { sessions?: Array<{ showId?: string; status?: string; closureReports?: unknown[] }> } : {};
