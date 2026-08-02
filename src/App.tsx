@@ -11,6 +11,7 @@ import StorylineHub from "./storylines/StorylineHub";
 import { readTewSnapshot } from "./tew/reader";
 import type { MatchRecord, ShowRecord, StorylineRecord, TewSnapshot } from "./tew/types";
 import TransferWorkspace from "./transfer/TransferWorkspace";
+import ResultsCoreWorkspace from "./workbench/ResultsCoreWorkspace";
 import SegmentWorkbench from "./workbench/SegmentWorkbench";
 import { loadWorkbenchUniverse, updateWorkbenchSettings } from "./workbench/storage";
 import WorkerHub from "./workers/WorkerHub";
@@ -150,10 +151,10 @@ export default function App() {
       </details>}
     </nav>
     <main>
-      {view === "operations" && <ShowOperationsWorkspace key="operations-overview" initialTab="overview" snapshot={snapshot} onOpenShow={openPlannedSegment} onOpenHandoff={() => setView("handoff")} onOpenTransfer={() => setView("transfer")} />}
+      {view === "operations" && <ShowOperationsWorkspace key="operations-overview" snapshot={snapshot} onOpenShow={openPlannedSegment} onOpenHandoff={() => setView("handoff")} onOpenTransfer={() => setView("transfer")} />}
       {view === "workbench" && <SegmentWorkbench snapshot={snapshot} onOpenPlannedSegment={openPlannedSegment} />}
       {view === "transfer" && <TransferWorkspace onOpenShow={openPlannedSegment} />}
-      {view === "results" && <ShowOperationsWorkspace key="operations-results" initialTab="results" snapshot={snapshot} onOpenShow={openPlannedSegment} onOpenHandoff={() => setView("handoff")} onOpenTransfer={() => setView("transfer")} />}
+      {view === "results" && <ResultsCoreWorkspace key="operations-results" snapshot={snapshot} onOpenShow={openPlannedSegment} onOpenHandoff={() => setView("handoff")} onOpenTransfer={() => setView("transfer")} />}
       {view === "bridge" && <BridgeWorkspace onOpenShow={openPlannedSegment} />}
       {view === "control" && <CreativeControlCenter snapshot={snapshot} onOpenShow={openPlannedSegment} onOpenStoryline={() => setView("storyline-hub")} onOpenWorker={() => setView("worker-hub")} />}
       {view === "planner" && <PlannedShowWorkspace key={plannerTarget?.key ?? 0} snapshot={snapshot} snapshotLoading={loading} snapshotError={error} onSnapshotFile={(file) => void handleFile(file, "planner")} onCloseSnapshot={closeSnapshot} initialShowId={plannerTarget?.showId ?? ""} initialSegmentId={plannerTarget?.segmentId ?? ""} />}
