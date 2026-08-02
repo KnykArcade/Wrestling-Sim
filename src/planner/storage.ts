@@ -43,6 +43,9 @@ import { loadWorkbenchUniverse, parseWorkbenchUniverse, saveWorkbenchUniverse } 
 import type { WorkbenchUniverse } from "../workbench/types";
 import { emptyWorkerUniverse, loadWorkerUniverse, parseWorkerUniverse, saveWorkerUniverse } from "../workers/storage";
 import type { WorkerUniverse } from "../workers/types";
+import { emptyWrapUpUniverse } from "../wrapUp/model";
+import { loadWrapUpUniverse, migrateShowsToWrapUp, parseWrapUpUniverse, saveWrapUpUniverse } from "../wrapUp/storage";
+import type { WrapUpUniverse } from "../wrapUp/types";
 import { createEmptySegmentReconciliation, createPlannedSegment } from "./model";
 import type {
   ActualMatchSnapshot,
@@ -53,6 +56,7 @@ import type {
   PlannedShow,
   PlannedStorylineReference,
   PlannedWorkerReference,
+  ReconciliationPlanOutcome,
   SegmentReconciliation,
   ShowReconciliation,
 } from "./types";
@@ -114,13 +118,21 @@ function normalizeActualMatch(value: unknown): ActualMatchSnapshot | null {
   };
 }
 
+function normalizePlanOutcome(value: unknown, legacy: boolean | null): ReconciliationPlanOutcome {
+  const allowed: ReconciliationPlanOutcome[] = ["Unresolved", "Yes", "Partially", "No"];
+  if (typeof value === "string" && allowed.includes(value as ReconciliationPlanOutcome)) return value as ReconciliationPlanOutcome;
+  return legacy === true ? "Yes" : legacy === false ? "No" : "Unresolved";
+}
+
 function normalizeSegmentReconciliation(value: unknown): SegmentReconciliation {
   const defaults = createEmptySegmentReconciliation();
   if (!isRecord(value)) return defaults;
+  const happenedAsPlanned = nullableBoolean(value.happenedAsPlanned);
   return {
     linkedMatchId: text(value.linkedMatchId),
     actualMatch: normalizeActualMatch(value.actualMatch),
-    happenedAsPlanned: nullableBoolean(value.happenedAsPlanned),
+    happenedAsPlanned,
+    happenedAsPlannedDetail: normalizePlanOutcome(value.happenedAsPlannedDetail, happenedAsPlanned),
     actualRating: nullableNumber(value.actualRating),
     finalNarrative: text(value.finalNarrative),
     changes: text(value.changes),
@@ -321,6 +333,10 @@ function browserPromotionSchedule(): PromotionScheduleUniverse {
   return typeof window === "undefined" ? emptyPromotionScheduleUniverse() : loadPromotionScheduleUniverse(window.localStorage);
 }
 
+function browserWrapUp(): WrapUpUniverse {
+  return typeof window === "undefined" ? emptyWrapUpUniverse() : loadWrapUpUniverse(window.localStorage);
+}
+
 export function createPlannerBackup(
   shows: PlannedShow[],
   storylines: TrackerStoryline[] = browserStorylines(),
@@ -338,10 +354,11 @@ export function createPlannerBackup(
   outputLibrary: OutputLibraryUniverse = browserOutputLibrary(),
   showSession: ShowSessionUniverse = browserShowSession(),
   promotionSchedule: PromotionScheduleUniverse = browserPromotionSchedule(),
+  wrapUp: WrapUpUniverse = browserWrapUp(),
 ): PlannerBackup {
   return {
     product: "TEW IX Story Tracker",
-    version: 19,
+    version: 20,
     exportedAt: new Date().toISOString(),
     shows,
     storylines,
@@ -359,6 +376,7 @@ export function createPlannerBackup(
     outputLibrary,
     showSession,
     promotionSchedule,
+    wrapUp,
   };
 }
 
@@ -368,7 +386,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
   if (
     !isRecord(value) ||
     value.product !== "TEW IX Story Tracker" ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].includes(typeof value.version === "number" ? value.version : -1)
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].includes(typeof value.version === "number" ? value.version : -1)
   ) throw new Error("The selected file is not a supported TEW Story Tracker backup.");
   const version = value.version as number;
   const shows = parsePlannerShows(value.shows);
@@ -391,6 +409,9 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
     promotionSchedule: version >= 19
       ? parsePromotionScheduleUniverse(value.promotionSchedule ?? emptyPromotionScheduleUniverse())
       : migrateShowsToPromotionSchedule(shows),
+    wrapUp: version >= 20
+      ? parseWrapUpUniverse(value.wrapUp ?? emptyWrapUpUniverse())
+      : migrateShowsToWrapUp(shows),
   };
 }
 
@@ -412,6 +433,7 @@ export function parsePlannerBackup(textValue: string): PlannedShow[] {
     saveOutputLibraryUniverse(window.localStorage, bundle.outputLibrary);
     saveShowSessionUniverse(window.localStorage, bundle.showSession);
     savePromotionScheduleUniverse(window.localStorage, bundle.promotionSchedule);
+    saveWrapUpUniverse(window.localStorage, bundle.wrapUp);
   }
   return bundle.shows;
 }
