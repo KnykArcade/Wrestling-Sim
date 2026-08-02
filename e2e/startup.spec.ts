@@ -8,7 +8,7 @@ test("creates and persists match and angle narratives without browser errors", a
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "TEW IX Story Tracker" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Run the whole booking universe from one workspace" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Plan here. Run the show in TEW. Reconcile the real result." })).toBeVisible();
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await expect(page.getByRole("heading", { name: "Plan the show for TEW, add match approaches, then preserve what actually happened" })).toBeVisible();
 
@@ -110,7 +110,7 @@ test("creates worker profiles character arcs and a relationship network", async 
 
 test("creates schedules and searches a future booking idea", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Run the whole booking universe from one workspace" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Plan here. Run the show in TEW. Reconcile the real result." })).toBeVisible();
 
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
