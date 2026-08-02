@@ -43,9 +43,8 @@ export default function ShowSessionCalendarBridge({ onOpenCalendar, onOpenShow }
   const previous = show ? nextScheduledShow(show.id, current.shows, -1) : null;
   const next = show ? nextScheduledShow(show.id, current.shows, 1) : null;
   const wrapUp = loadWrapUpUniverse(window.localStorage);
-  const closedShowIds = new Set(wrapUp.sessions.filter((session) => session.status === "Closed").map((session) => session.showId));
   const currentWrapUp = show ? wrapUp.sessions.find((session) => session.showId === show.id) : null;
-  const nextUnfinished = show ? nextScheduledShow(show.id, current.shows, 1, true, closedShowIds) : null;
+  const nextUnfinished = show ? nextScheduledShow(show.id, current.shows, 1, true) : null;
 
   function selectShow(target: PlannedShow | null): void {
     if (!target) return;
