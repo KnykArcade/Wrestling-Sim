@@ -206,7 +206,8 @@ export function buildGuardedExportAudit(
     gate("values", "Required tracker values are present", allRequiredValuesPresent, allRequiredValuesPresent ? "Show identity and essential segment values are complete." : "Complete show identity, segment title, duration, participants, and match type."),
     gate("writer", "A verified Microsoft Access write engine is available", false, "The browser dependency is read-only. No verified Access writer is installed, so database output is blocked."),
   ];
-  const blockers = gates.filter((item) => !item.passed).map((item) => item.detail);
+  const failedGates = gates.filter((item) => !item.passed);
+  const blockers = failedGates.map((item) => item.detail);
   const proposedOutputFileName = sourceFileName ? sourceFileName.replace(/\.(mdb|accdb)$/i, "-tracker-output.$1") : `${show.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-tracker-output.mdb`;
   return {
     id: id("export-audit"),
@@ -218,7 +219,7 @@ export function buildGuardedExportAudit(
     sourceCopyConfirmed,
     writerAvailable: false,
     writingEnabled: false,
-    status: blockers.length === 1 && blockers[0].includes("write engine") ? "Eligible Pending Writer" : "Blocked",
+    status: failedGates.length === 1 && failedGates[0].id === "writer" ? "Eligible Pending Writer" : "Blocked",
     gates,
     dryRun,
     blockers,
