@@ -83,7 +83,7 @@ describe("Phase 5D Match and Angle Workbench", () => {
     const [source] = synchronizeWorkerRatingSources(snapshot, emptyMatchEngineUniverse(), []);
     expect(source.identitySource).toBe("TEW snapshot");
     expect(source.overall.source).toBe("Missing");
-    expect(source.overall.note).toContain("does not yet expose");
+    expect(source.overall.note).toContain("not a verified value");
   });
 
   test("normalizes saved workbench data and keeps built-in templates", () => {
