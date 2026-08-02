@@ -103,7 +103,8 @@ function zipEntries(buffer: ArrayBuffer): ZipEntry[] {
 
 async function decompressDeflateRaw(bytes: Uint8Array): Promise<Uint8Array> {
   if (typeof DecompressionStream === "undefined") throw new Error("This browser does not support read-only Excel decompression.");
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  const copy = Uint8Array.from(bytes);
+  const stream = new Blob([copy.buffer]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
