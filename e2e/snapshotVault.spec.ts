@@ -186,7 +186,12 @@ test("restores parsed TEW history, compares snapshots, onboards PWL, and round-t
   });
   await expect(page.getByRole("status")).toContainText("Restored 2 parsed snapshots");
   await expect(page.getByText("PWL-baseline.mdb", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Active", { exact: true }).first()).toBeVisible();
+  await expect.poll(async () => page.evaluate(() => {
+    const raw = window.localStorage.getItem("tew-story-tracker:snapshot-vault-manifest:v1");
+    const data = raw ? JSON.parse(raw) as { activeSnapshotId?: string } : {};
+    return data.activeSnapshotId ?? "";
+  })).toBe("snapshot-baseline");
+  await expect(page.locator(".snapshot-vault-list > article.active").filter({ hasText: "PWL-baseline.mdb" })).toBeVisible();
 
   await page.getByRole("button", { name: "Compare Supported TEW History" }).click();
   await expect(page.getByText("New Show: PWL Power Hour #2", { exact: false })).toBeVisible();
