@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { openAdvancedTools } from "./helpers";
 
 test("uses TEW Companion Mode and persists a verified field mapping", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "TEW Companion", exact: true }).click();
+  await openAdvancedTools(page);
+  await page.getByRole("button", { name: "TEW Companion Research", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Plan here. Run the show in TEW. Reconcile the real result." })).toBeVisible();
   await expect(page.getByText("Direct TEW writing").first()).toBeVisible();
   await expect(page.getByText("Disabled", { exact: true }).first()).toBeVisible();
@@ -16,7 +18,8 @@ test("uses TEW Companion Mode and persists a verified field mapping", async ({ p
   await showNameMapping.getByLabel("Show name confidence").selectOption("High");
 
   await page.reload();
-  await page.getByRole("button", { name: "TEW Companion", exact: true }).click();
+  await openAdvancedTools(page);
+  await page.getByRole("button", { name: "TEW Companion Research", exact: true }).click();
   await expect(page.getByLabel("Show advanced preview tools")).toBeChecked();
   await page.getByRole("button", { name: "Field Mappings" }).click();
   const persisted = page.locator(".bridge-mapping-row").filter({ hasText: "Show name" }).first();
@@ -27,6 +30,7 @@ test("uses TEW Companion Mode and persists a verified field mapping", async ({ p
 
 test("shows the guided TEW workflow and non-writing dry-run for a planned card", async ({ page }) => {
   await page.goto("/");
+  await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows" }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Companion Night");
@@ -37,7 +41,8 @@ test("shows the guided TEW workflow and non-writing dry-run for a planned card",
   await match.getByLabel("Segment name").fill("Jay White vs PAC");
   await expect(page.locator(".save-state")).toHaveText("Saved");
 
-  await page.getByRole("button", { name: "TEW Companion", exact: true }).click();
+  await openAdvancedTools(page);
+  await page.getByRole("button", { name: "TEW Companion Research", exact: true }).click();
   await expect(page.getByRole("heading", { name: "PWL Companion Night" })).toBeVisible();
   await expect(page.getByText("Plan the card", { exact: true })).toBeVisible();
   await expect(page.getByText("TEW remains authoritative for actual results and ratings.")).toBeVisible();
