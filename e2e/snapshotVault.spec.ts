@@ -238,8 +238,10 @@ test("restores parsed TEW history, compares snapshots, onboards PWL, and round-t
 
   await page.reload();
   await page.getByRole("button", { name: "Promotion Onboarding" }).click();
-  await expect(page.getByText("Created Identity-Only Profile", { exact: true })).toBeVisible();
-  await expect(page.getByText("Created Tracker Storyline", { exact: true })).toBeVisible();
+  const persistedBandido = page.locator(".onboarding-workers .onboarding-identity-list > article").filter({ hasText: "Bandido" });
+  await expect(persistedBandido.getByText("Created Identity-Only Profile", { exact: true })).toBeVisible();
+  const persistedStoryline = page.locator(".onboarding-storylines .onboarding-identity-list > article").filter({ hasText: "World Title Rivalry" });
+  await expect(persistedStoryline.getByText("Created Tracker Storyline", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Data & Backup Center" }).click();
   const backupDownloadPromise = page.waitForEvent("download");
