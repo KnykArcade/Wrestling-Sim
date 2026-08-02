@@ -7,6 +7,7 @@ import type { MatchApproachSetup, MatchEngineUniverse } from "../matchEngine/typ
 import type { ShowOperationsUniverse } from "../operations/types";
 import type { OutputLibraryUniverse } from "../outputLibrary/types";
 import type { ProfileLibraryUniverse } from "../profileLibrary/types";
+import type { ShowSessionUniverse } from "../showSession/types";
 import type { TrackerStoryline } from "../storylines/types";
 import type { TransferUniverse } from "../transfer/types";
 import type { WorkbenchUniverse } from "../workbench/types";
@@ -138,7 +139,7 @@ export interface PlannedShow {
 
 export interface PlannerBackup {
   product: "TEW IX Story Tracker";
-  version: 17;
+  version: 18;
   exportedAt: string;
   shows: PlannedShow[];
   storylines: TrackerStoryline[];
@@ -154,6 +155,7 @@ export interface PlannerBackup {
   workbench: WorkbenchUniverse;
   profileLibrary: ProfileLibraryUniverse;
   outputLibrary: OutputLibraryUniverse;
+  showSession: ShowSessionUniverse;
 }
 
 export interface PlannerBackupBundle {
@@ -171,4 +173,5 @@ export interface PlannerBackupBundle {
   workbench: WorkbenchUniverse;
   profileLibrary: ProfileLibraryUniverse;
   outputLibrary: OutputLibraryUniverse;
+  showSession: ShowSessionUniverse;
 }
