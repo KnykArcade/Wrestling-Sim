@@ -22,6 +22,7 @@ import {
   parsePlannerBackupBundle,
   savePlannedShows,
 } from "../src/planner/storage";
+import { emptyProfileLibraryUniverse } from "../src/profileLibrary/model";
 import { emptyTransferUniverse } from "../src/transfer/model";
 import { emptyWorkbenchUniverse } from "../src/workbench/model";
 
@@ -191,7 +192,7 @@ describe("planned show workspace", () => {
     expect(duplicate.segments[0].matchApproachSetup.performancePreview).toBeNull();
   });
 
-  test("saves loads exports and imports Phase 5D workbench data", () => {
+  test("saves loads exports and imports Phase 5E profile library data", () => {
     const storage = new MemoryStorage();
     const show = createPlannedShow(1);
     const match = createPlannedSegment("match");
@@ -211,6 +212,7 @@ describe("planned show workspace", () => {
     const transfer = emptyTransferUniverse();
     const operations = emptyShowOperationsUniverse();
     const workbench = emptyWorkbenchUniverse();
+    const profileLibrary = emptyProfileLibraryUniverse();
     const backup = createPlannerBackup(
       [show],
       [],
@@ -224,10 +226,12 @@ describe("planned show workspace", () => {
       transfer,
       operations,
       workbench,
+      profileLibrary,
     );
 
-    expect(backup.version).toBe(15);
+    expect(backup.version).toBe(16);
     expect(backup.workbench).toEqual(workbench);
+    expect(backup.profileLibrary).toEqual(profileLibrary);
     expect(parsePlannerBackup(JSON.stringify(backup))).toEqual([show]);
     expect(parsePlannerBackupBundle(JSON.stringify(backup))).toEqual({
       shows: [show],
@@ -242,6 +246,7 @@ describe("planned show workspace", () => {
       transfer,
       operations,
       workbench,
+      profileLibrary,
     });
   });
 
@@ -281,12 +286,12 @@ describe("planned show workspace", () => {
     });
   });
 
-  test("accepts versions 1 through 15 and rejects future unsupported versions", () => {
-    for (let version = 1; version <= 14; version += 1) {
+  test("accepts versions 1 through 16 and rejects future unsupported versions", () => {
+    for (let version = 1; version <= 15; version += 1) {
       expect(parsePlannerBackup(JSON.stringify({ product: "TEW IX Story Tracker", version, shows: [] }))).toEqual([]);
     }
-    const version15 = createPlannerBackup([], [], { profiles: [], relationships: [] }, emptyCreativeControlData(), emptyChampionshipUniverse(), emptyHandoffUniverse(), emptyMatchEngineUniverse(), emptyCompetitionUniverse(), emptyBridgeUniverse(), emptyTransferUniverse(), emptyShowOperationsUniverse(), emptyWorkbenchUniverse());
-    expect(parsePlannerBackup(JSON.stringify(version15))).toEqual([]);
-    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":16,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
+    const version16 = createPlannerBackup([], [], { profiles: [], relationships: [] }, emptyCreativeControlData(), emptyChampionshipUniverse(), emptyHandoffUniverse(), emptyMatchEngineUniverse(), emptyCompetitionUniverse(), emptyBridgeUniverse(), emptyTransferUniverse(), emptyShowOperationsUniverse(), emptyWorkbenchUniverse(), emptyProfileLibraryUniverse());
+    expect(parsePlannerBackup(JSON.stringify(version16))).toEqual([]);
+    expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":17,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
   });
 });
