@@ -25,11 +25,14 @@ test("runs one angle from creative output through permanent lineage and inline T
   await expect(page.getByRole("heading", { name: "Opening Confrontation" }).first()).toBeVisible();
   await expect(page.getByText("Creative In Progress", { exact: true }).first()).toBeVisible();
 
+  await page.getByRole("button", { name: "1. Setup" }).click();
+  await page.getByLabel("Jay White session role").fill("Speaker");
+  await page.getByRole("button", { name: "2. Approaches & Output" }).click();
+
   await expect(page.getByRole("heading", { name: "Create Generated Draft checkpoint" })).toBeVisible();
   await page.getByRole("button", { name: "Create Checkpoint" }).click();
   await expect(page.getByText("checkpoint created", { exact: false })).toBeVisible();
 
-  await page.getByRole("button", { name: "2. Approaches & Output" }).click();
   await page.getByRole("button", { name: "Mark Current Output Applied" }).click();
   await expect(page.getByRole("heading", { name: "Create Applied Output checkpoint" })).toBeVisible();
   await page.getByRole("button", { name: "Create Checkpoint" }).click();
