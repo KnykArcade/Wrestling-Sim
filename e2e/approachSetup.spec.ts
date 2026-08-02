@@ -4,7 +4,7 @@ import { openAdvancedTools } from "./helpers";
 test("selects and persists wrestler approaches inside a planned TEW match", async ({ page }) => {
   await page.goto("/");
   await openAdvancedTools(page);
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Approach Test");
   await page.getByRole("button", { name: "Add Match" }).click();
@@ -39,7 +39,7 @@ test("selects and persists wrestler approaches inside a planned TEW match", asyn
 
   await page.reload();
   await openAdvancedTools(page);
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   const persistedMatch = page.locator('[data-segment-type="match"]');
   await expect(page.getByLabel("Show name")).toHaveValue("PWL Approach Test");
   await expect(persistedMatch.getByLabel("Match aim")).toHaveValue("technical-showcase");

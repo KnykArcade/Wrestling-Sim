@@ -4,7 +4,7 @@ import { openAdvancedTools } from "./helpers";
 test("finalizes a card and persists TEW entry progress", async ({ page }) => {
   await page.goto("/");
   await openAdvancedTools(page);
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Saturday Night");
   await page.getByLabel("Company").fill("PWL");

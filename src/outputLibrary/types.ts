@@ -5,6 +5,7 @@ export type OutputLineageStage =
   | "Plan"
   | "Generated Draft"
   | "Applied Output"
+  | "Ready for TEW"
   | "Entered in TEW Version"
   | "Reconciled Actual Version";
 

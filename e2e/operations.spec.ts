@@ -3,10 +3,10 @@ import { openAdvancedTools } from "./helpers";
 
 test("guides a planned show through preflight and preserves entry changes", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /One show\. One operational path/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Open one show, finish every segment/ })).toBeVisible();
 
   await openAdvancedTools(page);
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").first().fill("PWL Operations Test");
   await page.getByRole("button", { name: "Add Match" }).click();
@@ -18,7 +18,8 @@ test("guides a planned show through preflight and preserves entry changes", asyn
     return shows[0]?.name ?? "";
   })).toBe("PWL Operations Test");
 
-  await page.getByRole("button", { name: "Show Operations", exact: true }).click();
+  await openAdvancedTools(page);
+  await page.getByRole("button", { name: "Show Operations Diagnostics", exact: true }).click();
   await expect(page.getByLabel("Operations planned show").locator("option:checked")).toContainText("PWL Operations Test");
   await expect(page.getByText("Draft", { exact: true }).first()).toBeVisible();
 
@@ -35,6 +36,8 @@ test("guides a planned show through preflight and preserves entry changes", asyn
   await expect(page.getByText("TEW broadcast timing changed on show day.", { exact: true })).toBeVisible();
 
   await page.reload();
+  await openAdvancedTools(page);
+  await page.getByRole("button", { name: "Show Operations Diagnostics", exact: true }).click();
   await expect(page.getByRole("button", { name: "Entry Changes" })).toHaveClass(/active/);
   await expect(page.getByText("TEW broadcast timing changed on show day.", { exact: true })).toBeVisible();
 });

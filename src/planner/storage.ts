@@ -27,6 +27,9 @@ import type { OutputLibraryUniverse } from "../outputLibrary/types";
 import { emptyProfileLibraryUniverse } from "../profileLibrary/model";
 import { loadProfileLibraryUniverse, parseProfileLibraryUniverse, saveProfileLibraryUniverse } from "../profileLibrary/storage";
 import type { ProfileLibraryUniverse } from "../profileLibrary/types";
+import { emptyShowSessionUniverse } from "../showSession/model";
+import { loadShowSessionUniverse, parseShowSessionUniverse, saveShowSessionUniverse } from "../showSession/storage";
+import type { ShowSessionUniverse } from "../showSession/types";
 import { loadTrackerStorylines, parseTrackerStorylines, saveTrackerStorylines } from "../storylines/storage";
 import type { TrackerStoryline } from "../storylines/types";
 import { emptyTransferUniverse } from "../transfer/model";
@@ -307,6 +310,10 @@ function browserOutputLibrary(): OutputLibraryUniverse {
   return typeof window === "undefined" ? emptyOutputLibraryUniverse() : loadOutputLibraryUniverse(window.localStorage);
 }
 
+function browserShowSession(): ShowSessionUniverse {
+  return typeof window === "undefined" ? emptyShowSessionUniverse() : loadShowSessionUniverse(window.localStorage);
+}
+
 export function createPlannerBackup(
   shows: PlannedShow[],
   storylines: TrackerStoryline[] = browserStorylines(),
@@ -322,10 +329,11 @@ export function createPlannerBackup(
   workbench: WorkbenchUniverse = browserWorkbench(),
   profileLibrary: ProfileLibraryUniverse = browserProfileLibrary(),
   outputLibrary: OutputLibraryUniverse = browserOutputLibrary(),
+  showSession: ShowSessionUniverse = browserShowSession(),
 ): PlannerBackup {
   return {
     product: "TEW IX Story Tracker",
-    version: 17,
+    version: 18,
     exportedAt: new Date().toISOString(),
     shows,
     storylines,
@@ -341,6 +349,7 @@ export function createPlannerBackup(
     workbench,
     profileLibrary,
     outputLibrary,
+    showSession,
   };
 }
 
@@ -350,7 +359,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
   if (
     !isRecord(value) ||
     value.product !== "TEW IX Story Tracker" ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17].includes(typeof value.version === "number" ? value.version : -1)
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].includes(typeof value.version === "number" ? value.version : -1)
   ) throw new Error("The selected file is not a supported TEW Story Tracker backup.");
   const version = value.version as number;
   return {
@@ -368,6 +377,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
     workbench: version >= 15 ? parseWorkbenchUniverse(value.workbench ?? emptyWorkbenchUniverse()) : emptyWorkbenchUniverse(),
     profileLibrary: version >= 16 ? parseProfileLibraryUniverse(value.profileLibrary ?? emptyProfileLibraryUniverse()) : emptyProfileLibraryUniverse(),
     outputLibrary: version >= 17 ? parseOutputLibraryUniverse(value.outputLibrary ?? emptyOutputLibraryUniverse()) : emptyOutputLibraryUniverse(),
+    showSession: version >= 18 ? parseShowSessionUniverse(value.showSession ?? emptyShowSessionUniverse()) : emptyShowSessionUniverse(),
   };
 }
 
@@ -387,6 +397,7 @@ export function parsePlannerBackup(textValue: string): PlannedShow[] {
     saveWorkbenchUniverse(window.localStorage, bundle.workbench);
     saveProfileLibraryUniverse(window.localStorage, bundle.profileLibrary);
     saveOutputLibraryUniverse(window.localStorage, bundle.outputLibrary);
+    saveShowSessionUniverse(window.localStorage, bundle.showSession);
   }
   return bundle.shows;
 }

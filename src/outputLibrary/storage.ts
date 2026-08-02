@@ -154,7 +154,7 @@ function normalizeVersion(value: unknown): OutputVersion | null {
   if (!isRecord(value) || !stringValue(value.id)) return null;
   const snapshot = normalizeSnapshot(value.snapshot);
   if (!snapshot) return null;
-  const stages: OutputLineageStage[] = ["Plan", "Generated Draft", "Applied Output", "Entered in TEW Version", "Reconciled Actual Version"];
+  const stages: OutputLineageStage[] = ["Plan", "Generated Draft", "Applied Output", "Ready for TEW", "Entered in TEW Version", "Reconciled Actual Version"];
   return {
     id: stringValue(value.id),
     stage: stages.includes(value.stage as OutputLineageStage) ? value.stage as OutputLineageStage : "Applied Output",

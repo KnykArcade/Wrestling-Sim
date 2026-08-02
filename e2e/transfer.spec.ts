@@ -4,7 +4,7 @@ import { openAdvancedTools } from "./helpers";
 test("generates and persists an assisted TEW transfer package", async ({ page }) => {
   await page.goto("/");
   await openAdvancedTools(page);
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Transfer Test");
   await page.getByRole("button", { name: "Add Match" }).click();

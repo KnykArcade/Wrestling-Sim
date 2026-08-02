@@ -1,7 +1,7 @@
 import type { BridgeMappingVerificationStage } from "../bridge/types";
 
 export type TransferDestination = "Direct TEW Field" | "TEW Notes" | "Companion Only";
-export type TransferFieldStatus = "Pending" | "Copied" | "Entered" | "Not Applicable";
+export type TransferFieldStatus = "Pending" | "Copied" | "Entered" | "Changed in TEW" | "Not Applicable";
 
 export interface TransferField {
   key: string;
@@ -65,7 +65,7 @@ export interface TransferAuditLog {
   id: string;
   showId: string;
   createdAt: string;
-  action: "Package Generated" | "Field Copied" | "Field Entered" | "Segment Completed" | "Export Plan Downloaded";
+  action: "Package Generated" | "Field Copied" | "Field Entered" | "Field Changed in TEW" | "Segment Completed" | "Export Plan Downloaded";
   detail: string;
 }
 
