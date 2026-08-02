@@ -4,7 +4,7 @@ import { openAdvancedTools } from "./helpers";
 test("generates and persists a TEW-authoritative match performance preview", async ({ page }) => {
   await page.goto("/");
   await openAdvancedTools(page);
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Performance Preview");
   await page.getByRole("button", { name: "Add Match" }).click();
@@ -30,7 +30,7 @@ test("generates and persists a TEW-authoritative match performance preview", asy
 
   await page.reload();
   await openAdvancedTools(page);
-  await page.getByRole("button", { name: "Planned Shows" }).click();
+  await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   const persistedMatch = page.locator('[data-segment-type="match"]');
   await expect(page.getByLabel("Show name")).toHaveValue("PWL Performance Preview");
   await expect(persistedMatch.getByText("Determined in TEW", { exact: true })).toBeVisible();
