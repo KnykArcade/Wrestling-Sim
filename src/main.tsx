@@ -14,6 +14,7 @@ import "./match-engine.css";
 import "./match-setup.css";
 import "./match-performance.css";
 import "./narrative-generator.css";
+import "./bridge.css";
 
 type ErrorBoundaryProps = {
   children: ReactNode;

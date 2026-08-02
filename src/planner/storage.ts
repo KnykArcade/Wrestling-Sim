@@ -1,3 +1,6 @@
+import { emptyBridgeUniverse } from "../bridge/model";
+import { loadBridgeUniverse, parseBridgeUniverse, saveBridgeUniverse } from "../bridge/storage";
+import type { BridgeUniverse } from "../bridge/types";
 import { emptyChampionshipUniverse, loadChampionshipUniverse, parseChampionshipUniverse, saveChampionshipUniverse } from "../championships/storage";
 import type { ChampionshipUniverse } from "../championships/types";
 import { emptyCompetitionUniverse } from "../competitions/model";
@@ -265,6 +268,10 @@ function browserCompetitions(): CompetitionUniverse {
   return typeof window === "undefined" ? emptyCompetitionUniverse() : loadCompetitionUniverse(window.localStorage);
 }
 
+function browserBridge(): BridgeUniverse {
+  return typeof window === "undefined" ? emptyBridgeUniverse() : loadBridgeUniverse(window.localStorage);
+}
+
 export function createPlannerBackup(
   shows: PlannedShow[],
   storylines: TrackerStoryline[] = browserStorylines(),
@@ -274,10 +281,11 @@ export function createPlannerBackup(
   handoff: HandoffUniverse = browserHandoff(),
   matchEngine: MatchEngineUniverse = browserMatchEngine(),
   competitions: CompetitionUniverse = browserCompetitions(),
+  bridge: BridgeUniverse = browserBridge(),
 ): PlannerBackup {
   return {
     product: "TEW IX Story Tracker",
-    version: 11,
+    version: 12,
     exportedAt: new Date().toISOString(),
     shows,
     storylines,
@@ -287,6 +295,7 @@ export function createPlannerBackup(
     handoff,
     matchEngine,
     competitions,
+    bridge,
   };
 }
 
@@ -296,7 +305,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
   if (
     !isRecord(value) ||
     value.product !== "TEW IX Story Tracker" ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(typeof value.version === "number" ? value.version : -1)
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(typeof value.version === "number" ? value.version : -1)
   ) throw new Error("The selected file is not a supported TEW Story Tracker backup.");
   const version = value.version as number;
   return {
@@ -308,6 +317,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
     handoff: version >= 8 ? parseHandoffUniverse(value.handoff ?? emptyHandoffUniverse()) : emptyHandoffUniverse(),
     matchEngine: version >= 9 ? parseMatchEngineUniverse(value.matchEngine ?? emptyMatchEngineUniverse()) : emptyMatchEngineUniverse(),
     competitions: version >= 11 ? parseCompetitionUniverse(value.competitions ?? emptyCompetitionUniverse()) : emptyCompetitionUniverse(),
+    bridge: version >= 12 ? parseBridgeUniverse(value.bridge ?? emptyBridgeUniverse()) : emptyBridgeUniverse(),
   };
 }
 
@@ -321,6 +331,7 @@ export function parsePlannerBackup(textValue: string): PlannedShow[] {
     saveHandoffUniverse(window.localStorage, bundle.handoff);
     saveMatchEngineUniverse(window.localStorage, bundle.matchEngine);
     saveCompetitionUniverse(window.localStorage, bundle.competitions);
+    saveBridgeUniverse(window.localStorage, bundle.bridge);
   }
   return bundle.shows;
 }
