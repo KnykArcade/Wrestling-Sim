@@ -7,7 +7,7 @@ test("applies one official result to records and forces a future booking review"
   await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Consequence Test");
-  await page.getByLabel("Show date").fill("2019-01-08");
+  await page.getByLabel("Date", { exact: true }).fill("2019-01-08");
   await page.getByRole("button", { name: "Add Match" }).click();
 
   const match = page.locator('[data-segment-type="match"]').first();
