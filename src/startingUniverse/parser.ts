@@ -44,7 +44,26 @@ function extension(fileName: string): string {
 }
 
 function normalizeTableName(value: string): string {
-  return value.replace(/\.csv$/i, "").trim();
+  return value.split(/[\\/]/).at(-1)!.replace(/\.csv$/i, "").trim();
+}
+
+function normalized(value: RawTewValue | undefined): string {
+  return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function text(value: RawTewValue | undefined): string {
+  return value === null || value === undefined ? "" : String(value).trim();
+}
+
+function parseDurationMinutes(value: RawTewValue | undefined): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const raw = text(value);
+  if (!raw) return 0;
+  const direct = Number(raw);
+  if (Number.isFinite(direct)) return direct;
+  const hours = Number(raw.match(/(\d+(?:\.\d+)?)\s*(?:hr|hour)/i)?.[1] ?? 0);
+  const minutes = Number(raw.match(/(\d+(?:\.\d+)?)\s*(?:min|minute)/i)?.[1] ?? 0);
+  return Math.round(hours * 60 + minutes);
 }
 
 function decodeCsv(bytes: Uint8Array): string {
@@ -52,17 +71,17 @@ function decodeCsv(bytes: Uint8Array): string {
   return decoded.charCodeAt(0) === 0xfeff ? decoded.slice(1) : decoded;
 }
 
-export function parseCsvRows(text: string): RawTewRow[] {
+export function parseCsvRows(value: string): RawTewRow[] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
   let quoted = false;
 
-  for (let index = 0; index < text.length; index += 1) {
-    const character = text[index];
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
     if (quoted) {
       if (character === '"') {
-        if (text[index + 1] === '"') {
+        if (value[index + 1] === '"') {
           field += '"';
           index += 1;
         } else quoted = false;
@@ -79,10 +98,10 @@ export function parseCsvRows(text: string): RawTewRow[] {
       continue;
     }
     if (character === "\n" || character === "\r") {
-      if (character === "\r" && text[index + 1] === "\n") index += 1;
+      if (character === "\r" && value[index + 1] === "\n") index += 1;
       row.push(field);
       field = "";
-      if (row.some((value) => value.length > 0)) rows.push(row);
+      if (row.some((item) => item.length > 0)) rows.push(row);
       row = [];
       continue;
     }
@@ -90,10 +109,10 @@ export function parseCsvRows(text: string): RawTewRow[] {
   }
   if (field.length || row.length) {
     row.push(field);
-    if (row.some((value) => value.length > 0)) rows.push(row);
+    if (row.some((item) => item.length > 0)) rows.push(row);
   }
   if (rows.length === 0) return [];
-  const headers = rows[0].map((value) => value.trim());
+  const headers = rows[0].map((item) => item.trim());
   return rows.slice(1).map((values) => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""])) as RawTewRow);
 }
 
@@ -134,6 +153,30 @@ function queryRows(database: Database, tableName: string): RawTewRow[] {
   return rows;
 }
 
+function prepareTables(source: RawTewTables): RawTewTables {
+  const tables = structuredClone(source);
+  const companies = new Map((tables.Companies ?? []).map((row) => [text(row.UID), text(row.Name) || text(row.Initials) || `Company ${text(row.UID)}`]));
+  const workersByName = new Map((tables.Workers ?? []).map((row) => [normalized(row.Name), text(row.UID)]));
+
+  for (const row of tables.Contracts ?? []) row.CompanyName = companies.get(text(row.CompanyUID)) || text(row.CompanyName);
+  for (const row of tables.Title_Belts ?? []) row.CompanyName = companies.get(text(row.CompanyUID)) || text(row.CompanyName);
+  for (const row of tables.Tag_Teams ?? []) row.CompanyName = companies.get(text(row.CompanyUID)) || text(row.CompanyName);
+  for (const row of tables.TV_Shows ?? []) {
+    row.Company_Name = companies.get(text(row.CompanyUID)) || text(row.Company_Name);
+    row.Length = parseDurationMinutes(row.Length);
+  }
+  for (const row of tables.Stables ?? []) {
+    row.CompanyName = companies.get(text(row.CompanyUID)) || text(row.CompanyName);
+    for (let index = 1; index <= 20; index += 1) {
+      const original = text(row[`Member${index}`]);
+      if (!original || normalized(original) === "none" || normalized(original) === "nobody") continue;
+      row[`MemberName${index}`] = original;
+      row[`Member${index}`] = workersByName.get(normalized(original)) || original;
+    }
+  }
+  return tables;
+}
+
 async function parseSqlite(bytes: Uint8Array): Promise<{ tables: RawTewTables; tableNames: string[]; warnings: string[] }> {
   const SQL = await sqlRuntime();
   const database = new SQL.Database(bytes);
@@ -153,7 +196,7 @@ async function parseSqlite(bytes: Uint8Array): Promise<{ tables: RawTewTables; t
       tables[requested] = queryRows(database, actual);
     }
     if (!available.has("companies") || !available.has("workers") || !available.has("contracts")) throw new Error("The SQLite file does not contain the Companies, Workers, and Contracts tables required for a TEW starting universe.");
-    return { tables, tableNames, warnings };
+    return { tables: prepareTables(tables), tableNames, warnings };
   } finally {
     database.close();
   }
@@ -176,7 +219,7 @@ function parseZip(bytes: Uint8Array): { tables: RawTewTables; tableNames: string
     tables[requested] = parseCsvRows(decodeCsv(files[fileName]));
   }
   if (!byNormalized.has("companies") || !byNormalized.has("workers") || !byNormalized.has("contracts")) throw new Error("The ZIP file does not contain Companies.csv, Workers.csv, and Contracts.csv required for a TEW starting universe.");
-  return { tables, tableNames, warnings };
+  return { tables: prepareTables(tables), tableNames, warnings };
 }
 
 export async function readTewStartingUniverseBytes(
