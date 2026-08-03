@@ -118,7 +118,9 @@ export function parseCsvRows(value: string): RawTewRow[] {
 
 async function sha256(bytes: Uint8Array): Promise<string> {
   if (typeof crypto !== "undefined" && crypto.subtle) {
-    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    const copy = new Uint8Array(bytes.byteLength);
+    copy.set(bytes);
+    const digest = await crypto.subtle.digest("SHA-256", copy.buffer);
     return Array.from(new Uint8Array(digest)).map((value) => value.toString(16).padStart(2, "0")).join("");
   }
   let hash = 0x811c9dc5;

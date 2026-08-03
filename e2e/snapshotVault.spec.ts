@@ -173,7 +173,7 @@ function vaultPackage() {
   };
 }
 
-test("restores parsed TEW history, compares snapshots, onboards PWL, and round-trips version 21 data", async ({ page }) => {
+test("restores parsed TEW history, compares snapshots, onboards PWL, and round-trips version 22 data", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Your current TEW snapshot, current show, next action/ })).toBeVisible();
   await page.getByRole("button", { name: "TEW Snapshot Vault" }).click();
@@ -247,11 +247,11 @@ test("restores parsed TEW history, compares snapshots, onboards PWL, and round-t
   const backupDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Complete Companion Backup" }).click();
   const backupDownload = await backupDownloadPromise;
-  expect(backupDownload.suggestedFilename()).toContain("backup-v21");
+  expect(backupDownload.suggestedFilename()).toMatch(/^tew-story-tracker-backup-v\d+-/);
   const backupPath = await backupDownload.path();
   expect(backupPath).not.toBeNull();
   const backup = JSON.parse(await readFile(backupPath!, "utf8")) as { version?: number; snapshotVault?: { promotion?: { promotionName?: string } } };
-  expect(backup.version).toBe(21);
+  expect(backup.version).toBe(22);
   expect(backup.snapshotVault?.promotion?.promotionName).toBe("PWL");
 
   const vaultDownloadPromise = page.waitForEvent("download");
@@ -272,7 +272,7 @@ test("restores parsed TEW history, compares snapshots, onboards PWL, and round-t
   await expect(page.locator(".companion-home-active")).toContainText("PWL-after-show.mdb");
 
   await page.locator('input[accept="application/json,.json"]').nth(1).setInputFiles(backupPath!);
-  await expect(page.locator(".backup-preview").getByText("Version 21", { exact: true })).toBeVisible();
+  await expect(page.locator(".backup-preview").getByText("Version 22", { exact: true })).toBeVisible();
   page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Confirm Restore" }).click();
   await expect(page.getByRole("heading", { name: /Your current TEW snapshot, current show, next action/ })).toBeVisible();

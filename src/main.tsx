@@ -13,6 +13,7 @@ import "./handoff.css";
 import "./match-engine.css";
 import "./match-setup.css";
 import "./match-performance.css";
+import "./match-resolution.css";
 import "./narrative-generator.css";
 import "./bridge.css";
 import "./transfer.css";

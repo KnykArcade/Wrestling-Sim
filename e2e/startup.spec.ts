@@ -10,7 +10,7 @@ test("creates and persists match and angle narratives without browser errors", a
   page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "TEW IX Story Tracker" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Wrestling Sim" })).toBeVisible();
   await expect(page.getByRole("heading", { name: showSessionHeading })).toBeVisible();
   await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
