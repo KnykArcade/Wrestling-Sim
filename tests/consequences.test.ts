@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { createChampionship } from "../src/championships/model";
 import { emptyChampionshipUniverse } from "../src/championships/storage";
-import { createCompetition, createCompetitionParticipant, generateCompetitionSchedule } from "../src/competitions/model";
+import { createCompetition, createCompetitionParticipant, generateCompetitionStructure } from "../src/competitions/model";
 import { emptyCompetitionUniverse } from "../src/competitions/model";
 import {
   applyCoreResultConsequences,
@@ -101,15 +101,15 @@ function resolution(showId: string, segmentId: string, winnerName = "PAC", accep
           performanceScore: 89,
           competitiveScore: 86,
           winProbability: winnerName === "Jay White" ? 0.58 : 0.42,
-          mentalStateId: "normal",
-          mentalStateName: "NORMAL",
+          mentalStateId: "neutral",
+          mentalStateName: "NEUTRAL",
           mentalStateScore: 60,
           mentalModifier: 0,
           luck: 0,
           swing: 0,
           consistencyVariance: 0,
           actualPace: 2,
-          paceStatus: "ACCEPTABLE PACE",
+          paceStatus: "OPEN PACE",
           paceModifier: 5,
           staminaUsed: 4,
           staminaAvailable: 8,
@@ -244,7 +244,7 @@ describe("Phase 6B3 standalone result consequences", () => {
     championship.id = "title-1";
     championship.name = "PWL World Championship";
     championship.status = "Active";
-    championship.currentChampions = [{ id: "white", name: "Jay White", source: "manual" }];
+    championship.currentChampions = [{ id: "white", name: "Jay White" }];
     championship.defenses = 2;
     segment.championshipId = championship.id;
     segment.championship = championship.name;
@@ -270,13 +270,15 @@ describe("Phase 6B3 standalone result consequences", () => {
 
   test("creates and explicitly confirms competition advancement", () => {
     const { show, segment } = showWithMatch();
-    let competition = createCompetition("PWL Cup", "Single Elimination");
+    let competition = createCompetition(1);
     competition.id = "cup-1";
-    const white = createCompetitionParticipant("Jay White", "manual");
+    competition.name = "PWL Cup";
+    competition.format = "Single Elimination";
+    const white = createCompetitionParticipant("Jay White", "Singles", { source: "manual" });
     white.id = "participant-white";
-    const pac = createCompetitionParticipant("PAC", "manual");
+    const pac = createCompetitionParticipant("PAC", "Singles", { source: "manual" });
     pac.id = "participant-pac";
-    competition = generateCompetitionSchedule({ ...competition, participants: [white, pac] });
+    competition = generateCompetitionStructure({ ...competition, participants: [white, pac] });
     const fixture = competition.fixtures[0];
     segment.competitionId = competition.id;
     segment.competitionFixtureId = fixture.id;
