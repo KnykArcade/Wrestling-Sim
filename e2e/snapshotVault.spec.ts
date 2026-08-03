@@ -272,7 +272,7 @@ test("restores parsed TEW history, compares snapshots, onboards PWL, and round-t
   await expect(page.locator(".companion-home-active")).toContainText("PWL-after-show.mdb");
 
   await page.locator('input[accept="application/json,.json"]').nth(1).setInputFiles(backupPath!);
-  await expect(page.getByText("Version 21", { exact: true })).toBeVisible();
+  await expect(page.locator(".backup-preview").getByText("Version 21", { exact: true })).toBeVisible();
   page.once("dialog", (dialog) => void dialog.accept());
   await page.getByRole("button", { name: "Confirm Restore" }).click();
   await expect(page.getByRole("heading", { name: /Your current TEW snapshot, current show, next action/ })).toBeVisible();
