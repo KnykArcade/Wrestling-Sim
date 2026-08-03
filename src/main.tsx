@@ -14,6 +14,7 @@ import "./match-engine.css";
 import "./match-setup.css";
 import "./match-performance.css";
 import "./match-resolution.css";
+import "./live-card.css";
 import "./narrative-generator.css";
 import "./bridge.css";
 import "./transfer.css";
