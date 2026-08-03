@@ -40,7 +40,7 @@ test("runs a show one result at a time and inserts a grounded reaction angle", a
   await expect(page.getByRole("heading", { name: /You book the opportunity. The wrestlers create the outcome/ })).toBeVisible();
   await expect(page.getByLabel("Resolution planned match").locator("option:checked")).toContainText("Jay White vs PAC");
   await page.getByRole("button", { name: "Run Official Match Calculation" }).click();
-  await expect(page.getByRole("heading", { name: "OFFICIAL ENGINE RESULT" })).toBeVisible();
+  await expect(page.locator(".match-resolution-result").getByText("OFFICIAL ENGINE RESULT", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Accept Engine Result" }).click();
   const acceptedWinner = await page.locator(".match-resolution-final--accepted h3").textContent();
   expect(acceptedWinner).toMatch(/defeated/);
