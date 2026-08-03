@@ -1,0 +1,442 @@
+.consequence-workspace {
+  display: grid;
+  gap: 16px;
+}
+
+.consequence-hero,
+.consequence-tabs,
+.consequence-metrics article,
+.consequence-pending,
+.consequence-applications,
+.consequence-detail,
+.consequence-records > aside,
+.consequence-records > main,
+.consequence-decisions > section,
+.consequence-future > section,
+.consequence-audit > section {
+  border: 1px solid #7f94bb;
+  background: rgba(8, 20, 39, 0.97);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
+}
+
+.consequence-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px;
+  background:
+    linear-gradient(116deg, rgba(37, 96, 176, 0.5), transparent 58%),
+    rgba(8, 20, 39, 0.97);
+}
+
+.consequence-hero h2 {
+  max-width: 980px;
+  margin: 6px 0 10px;
+  font-size: clamp(1.45rem, 2.7vw, 2.05rem);
+}
+
+.consequence-hero p,
+.consequence-detail p,
+.consequence-decisions p,
+.consequence-future p,
+.consequence-audit p {
+  margin: 0;
+  color: #c8d4e8;
+  line-height: 1.55;
+}
+
+.consequence-principle {
+  min-width: 275px;
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  padding: 17px;
+  border: 1px solid #6d89ba;
+  background: #07152e;
+}
+
+.consequence-principle span,
+.consequence-metrics span,
+.record-scorecard span {
+  color: #aebed8;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.consequence-principle strong {
+  color: #fff200;
+}
+
+.consequence-principle small {
+  color: #c1cde0;
+  line-height: 1.45;
+}
+
+.consequence-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.consequence-tabs button {
+  min-height: 48px;
+  border: 0;
+  border-right: 1px solid #405477;
+  background: #0a1933;
+  color: #c8d3e6;
+  font-weight: 800;
+}
+
+.consequence-tabs button:last-child { border-right: 0; }
+.consequence-tabs button:hover,
+.consequence-tabs button.active { background: #1d3d72; color: #fff200; }
+
+.consequence-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.consequence-metrics article,
+.record-scorecard article {
+  min-height: 88px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 13px;
+}
+
+.consequence-metrics strong,
+.record-scorecard strong {
+  color: #fff200;
+  font-size: 1.3rem;
+}
+
+.consequence-overview {
+  display: grid;
+  grid-template-columns: minmax(280px, .8fr) minmax(280px, .8fr) minmax(0, 1.4fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.consequence-pending,
+.consequence-applications,
+.consequence-detail,
+.consequence-records > aside,
+.consequence-records > main,
+.consequence-decisions > section,
+.consequence-future > section,
+.consequence-audit > section {
+  padding: 16px;
+}
+
+.consequence-pending > header,
+.consequence-applications > header,
+.consequence-detail > header,
+.consequence-records > main > header,
+.consequence-decisions > section > header,
+.consequence-future > section > header,
+.consequence-audit > section > header,
+.consequence-change-grid article > header,
+.consequence-decisions article > header,
+.consequence-future article > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.consequence-pending h3,
+.consequence-applications h3,
+.consequence-detail h3,
+.consequence-records h3,
+.consequence-decisions h3,
+.consequence-future h3,
+.consequence-audit h3 {
+  margin: 4px 0 7px;
+}
+
+.consequence-pending > header > span,
+.consequence-applications > header > span,
+.consequence-detail > header > span,
+.consequence-records > main > header > span,
+.consequence-decisions > section > header > span,
+.consequence-future > section > header > span,
+.consequence-audit > section > header > span,
+.consequence-decisions article > header > b,
+.consequence-future article > header > b {
+  padding: 6px 9px;
+  border: 1px solid #6e88b7;
+  color: #fff200;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.consequence-pending > article,
+.consequence-applications > button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid #344b70;
+  background: #07162e;
+  color: #eef3fb;
+  text-align: left;
+}
+
+.consequence-pending > article > div,
+.consequence-applications > button {
+  min-width: 0;
+}
+
+.consequence-pending > article > div,
+.consequence-applications > button {
+  display: grid;
+  gap: 3px;
+}
+
+.consequence-applications > button:hover,
+.consequence-applications > button.active {
+  border-color: #fff200;
+  background: #183867;
+}
+
+.consequence-pending span,
+.consequence-pending small,
+.consequence-applications span,
+.consequence-applications small {
+  color: #b8c5da;
+}
+
+.consequence-change-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.consequence-change-grid article {
+  padding: 12px;
+  border: 1px solid #405477;
+  background: #07162e;
+}
+
+.consequence-change-grid article > header span {
+  color: #f2c867;
+}
+
+.consequence-change-grid dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 10px 0;
+}
+
+.consequence-change-grid dl > div,
+.record-scorecard article {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid #304668;
+}
+
+.consequence-change-grid dt {
+  color: #aebed8;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.consequence-change-grid dd {
+  margin: 0;
+  font-weight: 800;
+}
+
+.consequence-records {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.consequence-records > aside {
+  display: grid;
+  gap: 7px;
+}
+
+.consequence-records > aside button {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid #344b70;
+  background: #07162e;
+  color: #eef3fb;
+  text-align: left;
+}
+
+.consequence-records > aside button:hover,
+.consequence-records > aside button.active {
+  border-color: #fff200;
+  background: #183867;
+}
+
+.consequence-records > aside button > b {
+  display: grid;
+  place-items: center;
+  color: #fff200;
+}
+
+.consequence-records > aside button > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.consequence-records > aside small {
+  color: #aebed8;
+}
+
+.record-scorecard {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  margin: 13px 0;
+}
+
+.record-history {
+  display: grid;
+  gap: 8px;
+}
+
+.record-history h4 { margin: 0; }
+
+.record-history article {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #344b70;
+  background: #07162e;
+}
+
+.record-history article > b {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #6e88b7;
+  color: #fff200;
+}
+
+.record-history article > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.record-history span,
+.record-history small { color: #b8c5da; }
+.record-history em { font-style: normal; color: #fff200; }
+
+.consequence-decisions,
+.consequence-future,
+.consequence-audit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.consequence-decisions > section,
+.consequence-future > section,
+.consequence-audit > section {
+  display: grid;
+  gap: 10px;
+}
+
+.consequence-decisions article,
+.consequence-future article,
+.consequence-audit article {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #344b70;
+  background: #07162e;
+}
+
+.consequence-decisions article small,
+.consequence-future article small,
+.consequence-audit article span,
+.consequence-audit article small {
+  color: #b8c5da;
+}
+
+.decision-status--confirmed { border-color: #65c98c !important; }
+.decision-status--deferred { border-color: #cd9b43 !important; }
+.decision-status--blocked { border-color: #b94b4b !important; }
+
+.consequence-future article.resolved { opacity: .72; border-color: #52785f; }
+.consequence-future article > div,
+.prompt-target {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prompt-target .field {
+  flex: 1;
+  min-width: 180px;
+  margin: 0;
+}
+
+.consequence-audit article {
+  grid-template-columns: 190px minmax(0, 1fr) auto;
+}
+
+.consequence-status--rolled-back { border-color: #9a6666 !important; }
+
+@media (max-width: 1250px) {
+  .consequence-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .consequence-detail { grid-column: 1 / -1; }
+  .record-scorecard { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 850px) {
+  .consequence-hero,
+  .consequence-pending > header,
+  .consequence-applications > header,
+  .consequence-detail > header,
+  .consequence-records > main > header,
+  .consequence-decisions > section > header,
+  .consequence-future > section > header,
+  .consequence-audit > section > header {
+    flex-direction: column;
+  }
+  .consequence-principle { min-width: 0; }
+  .consequence-tabs,
+  .consequence-metrics,
+  .consequence-overview,
+  .consequence-records,
+  .consequence-decisions,
+  .consequence-future,
+  .consequence-audit {
+    grid-template-columns: 1fr;
+  }
+  .consequence-detail { grid-column: auto; }
+  .consequence-change-grid,
+  .record-scorecard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .consequence-audit article { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 520px) {
+  .consequence-change-grid,
+  .record-scorecard { grid-template-columns: 1fr; }
+}
