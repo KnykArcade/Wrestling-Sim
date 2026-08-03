@@ -37,7 +37,7 @@ test("books wrestlers without a winner, runs one official result, and preserves 
   await jay.getByText("Dirty Rulebreaker", { exact: true }).click();
   await pac.getByText("Counter Specialist", { exact: true }).click();
   await page.getByRole("button", { name: "Run Official Match Calculation" }).click();
-  await expect(page.getByRole("heading", { name: "OFFICIAL ENGINE RESULT" })).toBeVisible();
+  await expect(page.locator(".match-resolution-result").getByText("OFFICIAL ENGINE RESULT", { exact: true })).toBeVisible();
   await expect(page.getByText("Result roll", { exact: true })).toBeVisible();
   await expect(page.getByText("Performance MVP", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Create New Calculation After Material Change" })).toBeDisabled();
