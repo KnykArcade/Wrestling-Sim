@@ -247,7 +247,7 @@ export interface StartingUniverseTagTeamVariant {
 export interface StartingUniverseTagTeamDecision {
   id: string;
   workerIds: [string, string];
-  workerNames: [string, string];
+  workerNames: string[];
   selectedVariantId: string;
   included: boolean;
   gameName: string;
