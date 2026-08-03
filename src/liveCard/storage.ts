@@ -1,4 +1,4 @@
-import { emptyLiveCardUniverse } from "./model";
+import { emptyLiveCardUniverse, upsertLiveCardSession as upsertSession } from "./model";
 import type {
   LiveCardAuditEntry,
   LiveCardCorrectionEntry,
@@ -101,4 +101,8 @@ export function loadLiveCardUniverse(storage: Pick<Storage, "getItem">): LiveCar
 
 export function saveLiveCardUniverse(storage: Pick<Storage, "setItem">, universe: LiveCardUniverse): void {
   storage.setItem(LIVE_CARD_STORAGE_KEY, JSON.stringify(universe));
+}
+
+export function upsertLiveCardSession(universe: LiveCardUniverse, sessionValue: LiveCardSession): LiveCardUniverse {
+  return upsertSession(universe, sessionValue);
 }
