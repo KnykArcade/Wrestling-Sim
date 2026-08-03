@@ -247,7 +247,7 @@ test("restores parsed TEW history, compares snapshots, onboards PWL, and round-t
   const backupDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export Complete Companion Backup" }).click();
   const backupDownload = await backupDownloadPromise;
-  expect(backupDownload.suggestedFilename()).toContain("backup-v22");
+  expect(backupDownload.suggestedFilename()).toMatch(/^tew-story-tracker-backup-v\d+-/);
   const backupPath = await backupDownload.path();
   expect(backupPath).not.toBeNull();
   const backup = JSON.parse(await readFile(backupPath!, "utf8")) as { version?: number; snapshotVault?: { promotion?: { promotionName?: string } } };
