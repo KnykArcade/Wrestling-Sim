@@ -16,7 +16,7 @@ import {
   matchResolutionSetupFingerprint,
   overrideEngineResult,
   resolutionApproachRating,
-  resolveSinglesMatch,
+  resolveMatch,
 } from "./engine";
 import {
   loadMatchResolutionUniverse,
@@ -63,8 +63,17 @@ function workbookMetricsForWorker(worker: PlannedWorkerReference, universe: Star
   return universe?.review.roster.find((decision) => decision.workerId === worker.id)?.workbookMetrics ?? null;
 }
 
-function eligibleSinglesSegments(show: PlannedShow | null): PlannedSegment[] {
-  return show?.segments.filter((segment) => segment.type === "match" && segment.workers.length === 2) ?? [];
+function eligibleMatchSegments(show: PlannedShow | null): PlannedSegment[] {
+  return show?.segments.filter((segment) => segment.type === "match" && segment.workers.length >= 2) ?? [];
+}
+
+function formatForSegment(segment: PlannedSegment): NonNullable<MatchResolutionSetup["format"]> {
+  const matchType = normalizeApproachName(segment.matchType);
+  if (matchType.includes("battle royal") || matchType.includes("royal rumble")) return "Battle Royal";
+  if (matchType.includes("elimination") || matchType.includes("survivor series")) return "Elimination";
+  const sides = segment.workers.map((worker) => normalizeApproachName(worker.side)).filter(Boolean);
+  if (new Set(sides).size >= 2 && new Set(sides).size < segment.workers.length) return "Team";
+  return segment.workers.length === 2 ? "Singles" : "Multi Person";
 }
 
 function defaultImportance(show: PlannedShow, segment: PlannedSegment): MatchResolutionImportance {
@@ -75,7 +84,9 @@ function defaultImportance(show: PlannedShow, segment: PlannedSegment): MatchRes
   return "Television";
 }
 
-function createWorkerSettings(worker: PlannedWorkerReference): MatchResolutionWorkerSettings {
+function createWorkerSettings(worker: PlannedWorkerReference, segment: PlannedSegment): MatchResolutionWorkerSettings {
+  const side = normalizeApproachName(worker.side);
+  const teammates = side ? segment.workers.filter((candidate) => normalizeApproachName(candidate.side) === side) : [worker];
   return {
     workerKey: workerProfileKey({ id: worker.id, name: worker.name, source: worker.source }),
     workerId: worker.id,
@@ -86,6 +97,8 @@ function createWorkerSettings(worker: PlannedWorkerReference): MatchResolutionWo
     storyNeed: 0,
     momentum: 0,
     bookingBias: 0,
+    teamId: side || workerProfileKey({ id: worker.id, name: worker.name, source: worker.source }),
+    teamName: teammates.map((candidate) => candidate.name).join(" & ") || worker.name,
   };
 }
 
@@ -101,7 +114,13 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, existing?: Match
       aimId: segment.matchApproachSetup.matchAimId,
       championship: segment.championship,
       competitionRound: segment.competitionRoundLabel,
-      workers: segment.workers.map((worker) => existing.setup.workers.find((item) => item.workerId === worker.id || normalizeApproachName(item.workerName) === normalizeApproachName(worker.name)) ?? createWorkerSettings(worker)),
+      format: formatForSegment(segment),
+      eliminationRules: formatForSegment(segment) === "Elimination" || formatForSegment(segment) === "Battle Royal",
+      workers: segment.workers.map((worker) => {
+        const derived = createWorkerSettings(worker, segment);
+        const saved = existing.setup.workers.find((item) => item.workerId === worker.id || normalizeApproachName(item.workerName) === normalizeApproachName(worker.name));
+        return saved ? { ...derived, ...saved, teamId: saved.teamId || derived.teamId, teamName: saved.teamName || derived.teamName } : derived;
+      }),
     };
   }
   return {
@@ -118,7 +137,9 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, existing?: Match
     competitionRound: segment.competitionRoundLabel,
     chemistry: 0,
     volatility: 8,
-    workers: segment.workers.map(createWorkerSettings),
+    format: formatForSegment(segment),
+    eliminationRules: formatForSegment(segment) === "Elimination" || formatForSegment(segment) === "Battle Royal",
+    workers: segment.workers.map((worker) => createWorkerSettings(worker, segment)),
   };
 }
 
@@ -134,7 +155,7 @@ export default function MatchResolutionWorkspace() {
   const initialShowId = universe.settings.selectedShowId && shows.some((show) => show.id === universe.settings.selectedShowId) ? universe.settings.selectedShowId : shows[0]?.id ?? "";
   const [selectedShowId, setSelectedShowId] = useState(initialShowId);
   const selectedShow = shows.find((show) => show.id === selectedShowId) ?? shows[0] ?? null;
-  const eligibleSegments = eligibleSinglesSegments(selectedShow);
+  const eligibleSegments = eligibleMatchSegments(selectedShow);
   const initialSegmentId = universe.settings.selectedSegmentId && eligibleSegments.some((segment) => segment.id === universe.settings.selectedSegmentId) ? universe.settings.selectedSegmentId : eligibleSegments[0]?.id ?? "";
   const [selectedSegmentId, setSelectedSegmentId] = useState(initialSegmentId);
   const selectedSegment = eligibleSegments.find((segment) => segment.id === selectedSegmentId) ?? eligibleSegments[0] ?? null;
@@ -158,7 +179,7 @@ export default function MatchResolutionWorkspace() {
 
   useEffect(() => {
     if (!selectedShow) return;
-    const segments = eligibleSinglesSegments(selectedShow);
+    const segments = eligibleMatchSegments(selectedShow);
     const nextSegmentId = segments.some((segment) => segment.id === selectedSegmentId) ? selectedSegmentId : segments[0]?.id ?? "";
     if (nextSegmentId !== selectedSegmentId) setSelectedSegmentId(nextSegmentId);
   }, [selectedShowId]);
@@ -188,14 +209,14 @@ export default function MatchResolutionWorkspace() {
 
   const missingProfiles = selectedSegment?.workers.filter((worker) => !profileForWorker(worker, matchEngine.profiles)) ?? [];
   const activeAttempt = activeResolutionAttempt(existingRecord);
-  const currentFingerprint = setup && sources.length === 2 ? matchResolutionSetupFingerprint(setup, sources) : "";
+  const currentFingerprint = setup && sources.length >= 2 ? matchResolutionSetupFingerprint(setup, sources) : "";
   const setupChanged = Boolean(activeAttempt && currentFingerprint && activeAttempt.setupFingerprint !== currentFingerprint);
   const slots = setup ? approachSlotsForDuration(setup.durationMinutes) : 0;
 
   function selectShow(showId: string): void {
     setSelectedShowId(showId);
     const show = shows.find((item) => item.id === showId);
-    const segmentId = eligibleSinglesSegments(show ?? null)[0]?.id ?? "";
+    const segmentId = eligibleMatchSegments(show ?? null)[0]?.id ?? "";
     setSelectedSegmentId(segmentId);
     setUniverse((current) => ({ ...current, settings: { ...current.settings, selectedShowId: showId, selectedSegmentId: segmentId } }));
   }
@@ -219,8 +240,8 @@ export default function MatchResolutionWorkspace() {
 
   function runOfficialCalculation(): void {
     if (!setup || !selectedShow || !selectedSegment) return;
-    if (sources.length !== 2 || missingProfiles.length) {
-      setNotice("Both wrestlers need Match Engine profiles before the official singles result can be calculated.");
+    if (sources.length !== selectedSegment.workers.length || missingProfiles.length) {
+      setNotice("Every booked participant needs a Match Engine profile before the official result can be calculated.");
       return;
     }
     if (existingRecord && !setupChanged) {
@@ -232,7 +253,7 @@ export default function MatchResolutionWorkspace() {
       return;
     }
     try {
-      const attempt = resolveSinglesMatch({ setup, workers: sources as [MatchResolutionWorkerSource, MatchResolutionWorkerSource], setupChangeReason: existingRecord ? changeReason : "" });
+      const attempt = resolveMatch({ setup, workers: sources, setupChangeReason: existingRecord ? changeReason : "" });
       const record = existingRecord
         ? { ...appendResolutionAttempt({ ...existingRecord, setup }, attempt), setup }
         : createMatchResolutionRecord(setup, attempt);
@@ -275,7 +296,7 @@ export default function MatchResolutionWorkspace() {
 
   return <section className="match-resolution-workspace">
     <header className="match-resolution-hero">
-      <div><p className="eyebrow">PHASE 6B1 · OFFICIAL SINGLES MATCH RESOLUTION</p><h2>You book the opportunity. The wrestlers create the outcome. You book the consequences.</h2><p>Select a planned singles match without deciding the winner. The engine uses the sixteen workbook-derived approach formulas, pace, stamina, current condition, mental state, consistency, opponent interaction, story pressure, and one visible result roll.</p></div>
+      <div><p className="eyebrow">PHASE 6B4 · TEAM AND MULTI-PERSON MATCH RESOLUTION</p><h2>You book the opportunity. The wrestlers create the outcome. You book the consequences.</h2><p>Resolve singles, tag, trios, multi-person, elimination, and battle-royal matches through the same permanent calculation and explicit override process.</p></div>
       <div className="match-resolution-principle"><span>Outcome authority</span><strong>Wrestling Sim</strong><small>One official calculation per material setup. Accept or explicitly override.</small></div>
     </header>
 
@@ -283,11 +304,11 @@ export default function MatchResolutionWorkspace() {
 
     <section className="match-resolution-selector">
       <label className="field"><span>Planned show</span><select aria-label="Resolution planned show" value={selectedShow?.id ?? ""} onChange={(event) => selectShow(event.target.value)}><option value="">No planned show</option>{shows.map((show) => <option key={show.id} value={show.id}>{show.name} · {show.date || "Unscheduled"}</option>)}</select></label>
-      <label className="field"><span>Unresolved singles match</span><select aria-label="Resolution planned match" value={selectedSegment?.id ?? ""} onChange={(event) => selectSegment(event.target.value)}><option value="">No eligible singles match</option>{eligibleSegments.map((segment) => { const record = universe.records.find((item) => item.showId === selectedShow?.id && item.segmentId === segment.id); return <option key={segment.id} value={segment.id}>{segment.title} · {record?.status ?? "Unresolved"}</option>; })}</select></label>
-      <div className="match-resolution-selector-summary"><span>Eligible matches</span><strong>{eligibleSegments.length}</strong><small>Exactly two booked wrestlers; winner may be blank.</small></div>
+      <label className="field"><span>Unresolved match</span><select aria-label="Resolution planned match" value={selectedSegment?.id ?? ""} onChange={(event) => selectSegment(event.target.value)}><option value="">No eligible match</option>{eligibleSegments.map((segment) => { const record = universe.records.find((item) => item.showId === selectedShow?.id && item.segmentId === segment.id); return <option key={segment.id} value={segment.id}>{segment.title} · {record?.status ?? "Unresolved"}</option>; })}</select></label>
+      <div className="match-resolution-selector-summary"><span>Eligible matches</span><strong>{eligibleSegments.length}</strong><small>Two or more booked wrestlers; teams follow the booked side assignments.</small></div>
     </section>
 
-    {!selectedShow || !selectedSegment || !setup ? <div className="empty-state match-resolution-empty"><h3>No planned singles match is ready</h3><p>Create a planned match with exactly two wrestlers. Do not enter a winner unless you want it recorded only as optional booking context elsewhere.</p></div> : <>
+    {!selectedShow || !selectedSegment || !setup ? <div className="empty-state match-resolution-empty"><h3>No planned match is ready</h3><p>Create a planned match with at least two wrestlers. Assign matching sides to teammates in tag and trios matches.</p></div> : <>
       <section className="match-resolution-context">
         <header><div><p className="eyebrow">MATCH CONTEXT</p><h3>{selectedSegment.title}</h3><p>{selectedShow.name} · {selectedSegment.matchType} · {selectedSegment.durationMinutes} minutes</p></div><span className={`resolution-status resolution-status--${statusClass(displayedRecord?.status ?? "Unresolved")}`}>{displayedRecord?.status ?? "Unresolved"}</span></header>
         <div className="match-resolution-context-grid">
@@ -295,7 +316,7 @@ export default function MatchResolutionWorkspace() {
           <label className="field"><span>Importance</span><select aria-label="Resolution match importance" value={setup.importance} onChange={(event) => setSetup({ ...setup, importance: event.target.value as MatchResolutionImportance })}>{importanceOptions.map((importance) => <option key={importance}>{importance}</option>)}</select></label>
           <label className="field"><span>Chemistry</span><input aria-label="Resolution chemistry" type="number" min={-10} max={10} value={setup.chemistry} onChange={(event) => setSetup({ ...setup, chemistry: clamp(Number(event.target.value) || 0, -10, 10) })} /></label>
           <label className="field"><span>Volatility</span><input aria-label="Resolution volatility" type="number" min={0} max={20} value={setup.volatility} onChange={(event) => setSetup({ ...setup, volatility: clamp(Number(event.target.value) || 0, 0, 20) })} /></label>
-          <div><span>Championship</span><strong>{setup.championship || "None"}</strong></div><div><span>Competition</span><strong>{setup.competitionRound || "None"}</strong></div>
+          <div><span>Format</span><strong>{setup.format || "Singles"}</strong></div><div><span>Championship</span><strong>{setup.championship || "None"}</strong></div><div><span>Competition</span><strong>{setup.competitionRound || "None"}</strong></div>
         </div>
       </section>
 

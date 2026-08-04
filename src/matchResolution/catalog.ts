@@ -30,7 +30,7 @@ export const RESOLUTION_APPROACHES: ResolutionApproachDefinition[] = IMPORTED_AP
   ...META[formula.id],
 }));
 
-export const RESOLUTION_CALCULATION_VERSION = "wrestling-sim-singles-v1";
+export const RESOLUTION_CALCULATION_VERSION = "wrestling-sim-match-resolution-v2";
 
 export const IMPORTANCE_MODIFIERS = {
   Television: { performance: 0, pressure: 0, durationVariance: 0.08 },

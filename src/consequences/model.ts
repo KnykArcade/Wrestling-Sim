@@ -19,6 +19,7 @@ import type {
   ResultConsequenceUniverse,
   StandaloneMatchHistoryEntry,
   StandaloneWorkerRecord,
+  StandaloneTeamRecord,
 } from "./types";
 
 function now(): string {
@@ -51,6 +52,7 @@ function audit(applicationId: string, action: ConsequenceAuditEntry["action"], d
 export function emptyResultConsequenceUniverse(): ResultConsequenceUniverse {
   return {
     workerRecords: [],
+    teamRecords: [],
     applications: [],
     championshipProposals: [],
     competitionProposals: [],
@@ -184,6 +186,52 @@ function applyRankingPositions(records: StandaloneWorkerRecord[]): StandaloneWor
   }));
 }
 
+function applyTeamRankingPositions(records: StandaloneTeamRecord[]): StandaloneTeamRecord[] {
+  const ordered = [...records].sort((left, right) => right.rankingPoints - left.rankingPoints || right.wins - left.wins || left.losses - right.losses || left.teamName.localeCompare(right.teamName));
+  const positions = new Map(ordered.map((record, index) => [record.teamKey, index + 1]));
+  return records.map((record) => ({ ...record, previousRankingPosition: record.rankingPosition, rankingPosition: positions.get(record.teamKey) ?? 0 }));
+}
+
+function updateTeamRecords(
+  existingRecords: StandaloneTeamRecord[],
+  resolution: MatchResolutionRecord,
+  show: PlannedShow,
+  segment: PlannedSegment,
+): StandaloneTeamRecord[] {
+  const attempt = activeResolutionAttempt(resolution);
+  if (!attempt?.finalResult || !attempt.engineResult.teamResults?.length) return existingRecords;
+  const winnerTeamId = attempt.finalResult.winnerTeamId || attempt.engineResult.winnerTeamId;
+  let records = [...existingRecords];
+  for (const team of attempt.engineResult.teamResults) {
+    const result: "W" | "L" = team.id === winnerTeamId ? "W" : "L";
+    const existing = records.find((record) => record.teamKey === team.id) ?? {
+      teamKey: team.id, teamName: team.name, memberKeys: team.memberKeys, memberNames: team.memberNames,
+      wins: 0, losses: 0, draws: 0, noContests: 0, rankingPoints: 0, rankingPosition: 0,
+      previousRankingPosition: 0, momentum: 0, matchHistory: [], updatedAt: now(),
+    };
+    const quality = Math.max(0, attempt.finalResult.matchScore - 60) / 20;
+    const rankingDelta = result === "W" ? 3 + quality + (team.winProbability < 0.5 ? 2 : 0) : -1 + quality * 0.4;
+    const history = {
+      id: createPlannerId(), resolutionRecordId: resolution.id, resolutionAttemptId: attempt.id,
+      showId: show.id, showName: show.name, showDate: show.date, segmentId: segment.id, segmentTitle: segment.title,
+      opponentTeamNames: attempt.engineResult.teamResults.filter((candidate) => candidate.id !== team.id).map((candidate) => candidate.name),
+      result, finishDescription: attempt.finalResult.finishDescription, matchScore: attempt.finalResult.matchScore,
+      occurredAt: attempt.finalResult.finalizedAt,
+    } as const;
+    const next: StandaloneTeamRecord = {
+      ...existing, teamName: team.name, memberKeys: team.memberKeys, memberNames: team.memberNames,
+      wins: existing.wins + (result === "W" ? 1 : 0), losses: existing.losses + (result === "L" ? 1 : 0),
+      rankingPoints: round(existing.rankingPoints + rankingDelta),
+      momentum: round(clamp(existing.momentum + (result === "W" ? 5 : -2), -100, 100)),
+      matchHistory: [history, ...existing.matchHistory], updatedAt: now(),
+    };
+    records = records.some((record) => record.teamKey === team.id)
+      ? records.map((record) => record.teamKey === team.id ? next : record)
+      : [...records, next];
+  }
+  return applyTeamRankingPositions(records);
+}
+
 function standaloneActualMatch(record: MatchResolutionRecord) {
   const attempt = activeResolutionAttempt(record);
   if (!attempt?.finalResult) throw new Error("The match resolution does not have a final result.");
@@ -231,7 +279,7 @@ function findChampionship(segment: PlannedSegment, universe: ChampionshipUnivers
   return universe.championships.find((championship) => segment.championshipId === championship.id || titleMatchesSegment(championship, segment)) ?? null;
 }
 
-function championshipProposal(applicationId: string, show: PlannedShow, segment: PlannedSegment, finalWinner: string, universe: ChampionshipUniverse): ChampionshipConsequenceProposal | null {
+function championshipProposal(applicationId: string, show: PlannedShow, segment: PlannedSegment, finalWinner: string, winnerMemberNames: string[], universe: ChampionshipUniverse): ChampionshipConsequenceProposal | null {
   const championship = findChampionship(segment, universe);
   if (!championship) return null;
   const championEntering = segment.championEntering || championship.currentChampions.map((champion) => champion.name).join(" & ");
@@ -241,10 +289,10 @@ function championshipProposal(applicationId: string, show: PlannedShow, segment:
   if (championship.status === "Vacant" || championship.currentChampions.length === 0) {
     suggestedDecision = "Changed Hands";
     reason = `${championship.name} is vacant, so the final winner can begin a new reign.`;
-  } else if (championEntering && matchNames(finalWinner, championEntering)) {
+  } else if (championEntering && (matchNames(finalWinner, championEntering) || winnerMemberNames.every((name) => matchNames(championEntering, name)))) {
     suggestedDecision = "Retained";
     reason = `${finalWinner} matches the champion entering the match.`;
-  } else if (challenger && matchNames(finalWinner, challenger)) {
+  } else if ((challenger && matchNames(finalWinner, challenger)) || winnerMemberNames.some((name) => matchNames(challenger, name))) {
     suggestedDecision = "Changed Hands";
     reason = `${finalWinner} matches the challenger.`;
   }
@@ -258,6 +306,7 @@ function championshipProposal(applicationId: string, show: PlannedShow, segment:
     championEntering,
     challenger,
     finalWinner,
+    finalWinnerMemberNames: winnerMemberNames,
     suggestedDecision,
     selectedDecision: suggestedDecision,
     status: suggestedDecision === "Unresolved" ? "Blocked" : "Pending",
@@ -271,16 +320,16 @@ function championshipProposal(applicationId: string, show: PlannedShow, segment:
   };
 }
 
-function participantForWinner(competition: Competition, winnerName: string): CompetitionParticipant[] {
-  return competition.participants.filter((participant) => [participant.name, ...participant.memberNames].some((name) => matchNames(name, winnerName)));
+function participantForWinner(competition: Competition, winnerNames: string[]): CompetitionParticipant[] {
+  return competition.participants.filter((participant) => winnerNames.some((winnerName) => [participant.name, ...participant.memberNames].some((name) => matchNames(name, winnerName))));
 }
 
-function competitionProposal(applicationId: string, show: PlannedShow, segment: PlannedSegment, finalWinner: string, universe: CompetitionUniverse): CompetitionConsequenceProposal | null {
+function competitionProposal(applicationId: string, show: PlannedShow, segment: PlannedSegment, finalWinner: string, winnerMemberNames: string[], universe: CompetitionUniverse): CompetitionConsequenceProposal | null {
   if (!segment.competitionId || !segment.competitionFixtureId) return null;
   const competition = universe.competitions.find((item) => item.id === segment.competitionId);
   const fixture = competition?.fixtures.find((item) => item.id === segment.competitionFixtureId);
   if (!competition || !fixture) return null;
-  const candidates = participantForWinner(competition, finalWinner).filter((participant) => [fixture.participantAId, fixture.participantBId].includes(participant.id));
+  const candidates = participantForWinner(competition, [finalWinner, ...winnerMemberNames]).filter((participant) => [fixture.participantAId, fixture.participantBId].includes(participant.id));
   const winner = candidates.length === 1 ? candidates[0] : null;
   const beforeStandings = buildCompetitionStandings(competition);
   const proposedCompetition = winner ? recordCompetitionResult(competition, fixture.id, "Decision", winner.id, `${finalWinner} won in Wrestling Sim.`) : competition;
@@ -308,16 +357,17 @@ function competitionProposal(applicationId: string, show: PlannedShow, segment: 
   };
 }
 
-function futureConflicts(show: PlannedShow, segment: PlannedSegment, winnerName: string, loserName: string, allShows: PlannedShow[]): FutureBookingConflict[] {
+function futureConflicts(show: PlannedShow, segment: PlannedSegment, winnerName: string, loserName: string, winnerNames: string[], loserNames: string[], allShows: PlannedShow[]): FutureBookingConflict[] {
+  const matchesAny = (value: string, names: string[]) => names.some((name) => matchNames(value, name));
   return allShows
     .filter((future) => future.id !== show.id && future.date && show.date && future.date > show.date)
     .flatMap((future) => future.segments.map((futureSegment) => ({ future, futureSegment })))
-    .filter(({ futureSegment }) => futureSegment.workers.some((worker) => matchNames(worker.name, winnerName) || matchNames(worker.name, loserName)))
+    .filter(({ futureSegment }) => futureSegment.workers.some((worker) => matchesAny(worker.name, winnerNames) || matchesAny(worker.name, loserNames)))
     .filter(({ futureSegment }) => {
-      if (futureSegment.plannedWinner && matchNames(futureSegment.plannedWinner, loserName)) return true;
-      if (futureSegment.championship && futureSegment.workers.some((worker) => matchNames(worker.name, loserName))) return true;
+      if (futureSegment.plannedWinner && matchesAny(futureSegment.plannedWinner, loserNames)) return true;
+      if (futureSegment.championship && futureSegment.workers.some((worker) => matchesAny(worker.name, loserNames))) return true;
       if (futureSegment.notes.toLowerCase().includes("must") || futureSegment.purpose.toLowerCase().includes("must")) return true;
-      return futureSegment.workers.some((worker) => matchNames(worker.name, winnerName)) && futureSegment.workers.some((worker) => matchNames(worker.name, loserName));
+      return futureSegment.workers.some((worker) => matchesAny(worker.name, winnerNames)) && futureSegment.workers.some((worker) => matchesAny(worker.name, loserNames));
     })
     .map(({ future, futureSegment }) => ({
       id: createPlannerId(),
@@ -329,7 +379,7 @@ function futureConflicts(show: PlannedShow, segment: PlannedSegment, winnerName:
       futureSegmentId: futureSegment.id,
       futureSegmentTitle: futureSegment.title,
       severity: futureSegment.championship || futureSegment.plannedWinner ? "Important" : "Review",
-      reason: futureSegment.plannedWinner && matchNames(futureSegment.plannedWinner, loserName)
+      reason: futureSegment.plannedWinner && matchesAny(futureSegment.plannedWinner, loserNames)
         ? `${loserName} is already planned to win this future match despite the new result and current rankings.`
         : futureSegment.championship
           ? `The new result may affect the championship logic for ${futureSegment.title}.`
@@ -382,6 +432,7 @@ export function applyCoreResultConsequences(input: {
   const applicationId = createPlannerId();
   const before: ConsequenceSnapshot = {
     workerRecords: structuredClone(input.universe.workerRecords),
+    teamRecords: structuredClone(input.universe.teamRecords),
     shows: structuredClone(input.shows),
     championships: structuredClone(input.championships),
     competitions: structuredClone(input.competitions),
@@ -393,10 +444,11 @@ export function applyCoreResultConsequences(input: {
   for (const workerResult of attempt.workerResults) {
     const profile = input.profiles.find((item) => item.workerKey === workerResult.workerKey) ?? null;
     const existing = records.find((item) => item.workerKey === workerResult.workerKey) ?? defaultWorkerRecord(workerResult.workerKey, workerResult.workerId, workerResult.workerName, profile);
-    const resultCode: "W" | "L" = workerResult.workerKey === attempt.finalResult.winnerKey ? "W" : "L";
+    const winningKeys = attempt.finalResult.winnerMemberKeys?.length ? attempt.finalResult.winnerMemberKeys : [attempt.finalResult.winnerKey];
+    const resultCode: "W" | "L" = winningKeys.includes(workerResult.workerKey) ? "W" : "L";
     const isLeader = workerResult.workerKey === attempt.engineResult.performanceLeaderKey;
     const condition = conditionForWorker({ existing, workerResult, resultCode, finalResult: attempt.finalResult, performanceLeader: isLeader, upset: attempt.engineResult.upset && resultCode === "W" });
-    const opponents = attempt.workerResults.filter((item) => item.workerKey !== workerResult.workerKey);
+    const opponents = attempt.workerResults.filter((item) => winningKeys.includes(item.workerKey) !== winningKeys.includes(workerResult.workerKey));
     const history: StandaloneMatchHistoryEntry = {
       id: createPlannerId(),
       resolutionRecordId: input.resolution.id,
@@ -428,13 +480,17 @@ export function applyCoreResultConsequences(input: {
     historyEntries.push(history);
   }
   records = applyRankingPositions(records);
+  const teamRecords = updateTeamRecords(input.universe.teamRecords, input.resolution, show, segment);
   const updatedShow = applyResultToShow(show, segment.id, input.resolution);
   const shows = input.shows.map((item) => item.id === show.id ? updatedShow : item);
   const refreshedSegment = updatedShow.segments.find((item) => item.id === segment.id)!;
-  const conflicts = futureConflicts(updatedShow, refreshedSegment, attempt.finalResult.winnerName, attempt.finalResult.loserName, shows);
+  const winningNames = attempt.finalResult.winnerMemberNames?.length ? attempt.finalResult.winnerMemberNames : [attempt.finalResult.winnerName];
+  const losingNames = attempt.finalResult.loserNames?.length ? attempt.finalResult.loserNames : [attempt.finalResult.loserName];
+  const conflicts = futureConflicts(updatedShow, refreshedSegment, attempt.finalResult.winnerName, attempt.finalResult.loserName, winningNames, losingNames, shows);
   const prompts = groundedPrompts(updatedShow, refreshedSegment, input.resolution);
-  const titleProposal = championshipProposal(applicationId, updatedShow, refreshedSegment, attempt.finalResult.winnerName, input.championships);
-  const competition = competitionProposal(applicationId, updatedShow, refreshedSegment, attempt.finalResult.winnerName, input.competitions);
+  const winnerMemberNames = attempt.finalResult.winnerMemberNames?.length ? attempt.finalResult.winnerMemberNames : [attempt.finalResult.winnerName];
+  const titleProposal = championshipProposal(applicationId, updatedShow, refreshedSegment, attempt.finalResult.winnerName, winnerMemberNames, input.championships);
+  const competition = competitionProposal(applicationId, updatedShow, refreshedSegment, attempt.finalResult.winnerName, winnerMemberNames, input.competitions);
   const application: ResultConsequenceApplication = {
     id: applicationId,
     resolutionRecordId: input.resolution.id,
@@ -461,12 +517,13 @@ export function applyCoreResultConsequences(input: {
     universe: {
       ...input.universe,
       workerRecords: records,
+      teamRecords,
       applications: [application, ...input.universe.applications],
       championshipProposals: titleProposal ? [titleProposal, ...input.universe.championshipProposals] : input.universe.championshipProposals,
       competitionProposals: competition ? [competition, ...input.universe.competitionProposals] : input.universe.competitionProposals,
       futureConflicts: [...conflicts, ...input.universe.futureConflicts],
       prompts: [...prompts, ...input.universe.prompts],
-      audit: [audit(application.id, "Core Consequences Applied", `${attempt.finalResult.winnerName} defeated ${attempt.finalResult.loserName}; records, rankings, momentum, condition, history, and future-plan review were updated.`), ...input.universe.audit],
+      audit: [audit(application.id, "Core Consequences Applied", `${attempt.finalResult.winnerName} defeated ${attempt.finalResult.loserName}; individual and team records, rankings, momentum, condition, history, and future-plan review were updated.`), ...input.universe.audit],
       settings: { ...input.universe.settings, selectedApplicationId: application.id },
     },
   };
@@ -487,6 +544,7 @@ export function rollbackCoreResultConsequences(universe: ResultConsequenceUniver
     universe: {
       ...universe,
       workerRecords: structuredClone(application.before.workerRecords),
+      teamRecords: structuredClone(application.before.teamRecords ?? []),
       applications: universe.applications.map((item) => item.id === applicationId ? { ...item, status: "Rolled Back", rolledBackAt: timestamp, rollbackReason: reason.trim() } : item),
       championshipProposals: universe.championshipProposals.filter((proposal) => proposal.applicationId !== applicationId),
       competitionProposals: universe.competitionProposals.filter((proposal) => proposal.applicationId !== applicationId),
@@ -523,7 +581,11 @@ export function confirmChampionshipConsequence(input: {
   const show = input.shows.find((item) => item.id === proposal.showId);
   const segment = show?.segments.find((item) => item.id === proposal.segmentId);
   if (!championship || !show || !segment) throw new Error("The linked championship, show, or segment could not be found.");
-  const applied = applyTitleResult(championship, show, segment, proposal.selectedDecision, input.knownWorkers ?? []);
+  const titleSegment = proposal.selectedDecision === "Changed Hands" && proposal.finalWinnerMemberNames?.length > 1 && segment.reconciliation.actualMatch
+    ? { ...segment, reconciliation: { ...segment.reconciliation, actualMatch: { ...segment.reconciliation.actualMatch, winner: proposal.finalWinnerMemberNames.join(" & ") } } }
+    : segment;
+  const titleShow = titleSegment === segment ? show : { ...show, segments: show.segments.map((item) => item.id === segment.id ? titleSegment : item) };
+  const applied = applyTitleResult(championship, titleShow, titleSegment, proposal.selectedDecision, input.knownWorkers ?? []);
   const timestamp = now();
   return {
     shows: input.shows.map((item) => item.id === show.id ? applied.show : item),

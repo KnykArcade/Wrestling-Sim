@@ -14,6 +14,7 @@ import {
   matchResolutionSetupFingerprint,
   overrideEngineResult,
   resolutionApproachRating,
+  resolveMatch,
   resolveSinglesMatch,
 } from "../src/matchResolution/engine";
 import {
@@ -220,5 +221,82 @@ describe("Phase 6B1 official singles match resolution", () => {
     const replaced = upsertMatchResolutionRecord(parsed, accepted);
     expect(replaced.records).toHaveLength(1);
     expect(replaced.records[0].status).toBe("Accepted");
+  });
+});
+
+describe("Phase 6B4 team and multi-person match resolution", () => {
+  function multiSources(names: string[]): MatchResolutionWorkerSource[] {
+    return names.map((name, index) => ({ profile: profile(`worker-${index + 1}`, name, 78 + index * 3), workbookMetrics: metrics() }));
+  }
+
+  function multiSetup(format: NonNullable<MatchResolutionSetup["format"]>, names: string[], teams: string[] = names): MatchResolutionSetup {
+    return {
+      ...setup(),
+      segmentTitle: names.join(" vs "),
+      matchType: format,
+      format,
+      eliminationRules: format === "Elimination" || format === "Battle Royal",
+      workers: names.map((name, index) => ({
+        workerKey: `tew:worker-${index + 1}`,
+        workerId: `worker-${index + 1}`,
+        workerName: name,
+        approachMode: "AI",
+        lockedApproachIds: [],
+        manualApproachIds: [],
+        storyNeed: 0,
+        momentum: 0,
+        bookingBias: 0,
+        teamId: teams[index],
+        teamName: teams[index] === "side-a" ? "Motor City Machine Guns" : teams[index] === "side-b" ? "Aussie Open" : name,
+      })),
+    };
+  }
+
+  test("resolves tag teams as units while preserving the deciding fall", () => {
+    const names = ["Alex Shelley", "Chris Sabin", "Mark Davis", "Kyle Fletcher"];
+    const attempt = resolveMatch({
+      setup: multiSetup("Team", names, ["side-a", "side-a", "side-b", "side-b"]),
+      workers: multiSources(names),
+      seed: "phase-6b4-tag",
+    });
+    expect(attempt.engineResult.teamResults).toHaveLength(2);
+    expect(attempt.engineResult.teamResults!.reduce((total, team) => total + team.winProbability, 0)).toBeCloseTo(1, 4);
+    expect(attempt.engineResult.winnerMemberKeys).toHaveLength(2);
+    expect(attempt.engineResult.loserKeys).toHaveLength(2);
+    expect(attempt.engineResult.fallWinnerName).toBeTruthy();
+    expect(attempt.engineResult.fallLoserName).toBeTruthy();
+    const accepted = activeResolutionAttempt(acceptEngineResult(createMatchResolutionRecord(multiSetup("Team", names, ["side-a", "side-a", "side-b", "side-b"]), attempt)))!;
+    expect(accepted.finalResult?.winnerMemberKeys).toEqual(attempt.engineResult.winnerMemberKeys);
+  });
+
+  test("supports triple threats without treating non-winning participants as a team", () => {
+    const names = ["PAC", "Jay White", "Brian Cage"];
+    const attempt = resolveMatch({ setup: multiSetup("Multi Person", names), workers: multiSources(names), seed: "phase-6b4-triple-threat" });
+    expect(attempt.workerResults).toHaveLength(3);
+    expect(attempt.workerResults.reduce((total, worker) => total + worker.winProbability, 0)).toBeCloseTo(1, 4);
+    expect(attempt.engineResult.winnerMemberKeys).toHaveLength(1);
+    expect(attempt.engineResult.loserKeys).toHaveLength(2);
+  });
+
+  test("records a complete elimination order for elimination matches and battle royals", () => {
+    const names = ["PAC", "Jay White", "Brian Cage", "Bobby Lashley", "Bandido"];
+    for (const format of ["Elimination", "Battle Royal"] as const) {
+      const attempt = resolveMatch({ setup: multiSetup(format, names), workers: multiSources(names), seed: `phase-6b4-${format}` });
+      expect(attempt.engineResult.eliminationOrder).toHaveLength(names.length - 1);
+      expect(attempt.engineResult.eliminationOrder!.map((item) => item.order)).toEqual([1, 2, 3, 4]);
+      expect(new Set(attempt.engineResult.eliminationOrder!.map((item) => item.eliminatedWorkerKey)).size).toBe(4);
+      expect(attempt.engineResult.eliminationOrder!.some((item) => item.eliminatedWorkerKey === attempt.engineResult.winnerKey)).toBe(false);
+    }
+  });
+
+  test("a team override changes the whole winning side and preserves the engine result", () => {
+    const names = ["Alex Shelley", "Chris Sabin", "Mark Davis", "Kyle Fletcher"];
+    const matchSetup = multiSetup("Team", names, ["side-a", "side-a", "side-b", "side-b"]);
+    const attempt = resolveMatch({ setup: matchSetup, workers: multiSources(names), seed: "phase-6b4-team-override" });
+    const alternate = attempt.workerResults.find((worker) => !attempt.engineResult.winnerMemberKeys!.includes(worker.workerKey))!;
+    const overridden = activeResolutionAttempt(overrideEngineResult(createMatchResolutionRecord(matchSetup, attempt), alternate.workerKey, "Pinfall", "", "Approved team booking change."))!;
+    expect(overridden.engineResult.winnerTeamId).toBe(attempt.engineResult.winnerTeamId);
+    expect(overridden.finalResult?.winnerTeamId).not.toBe(attempt.engineResult.winnerTeamId);
+    expect(overridden.finalResult?.winnerMemberKeys).toHaveLength(2);
   });
 });

@@ -55,6 +55,10 @@ function resultFacts(record: MatchResolutionRecord | null): string[] {
   return [
     `${attempt.finalResult.winnerName} defeated ${attempt.finalResult.loserName}.`,
     attempt.finalResult.finishDescription,
+    ...(attempt.finalResult.fallWinnerName && attempt.finalResult.fallLoserName && attempt.finalResult.winnerMemberKeys && attempt.finalResult.winnerMemberKeys.length > 1
+      ? [`Deciding fall: ${attempt.finalResult.fallWinnerName} over ${attempt.finalResult.fallLoserName}.`]
+      : []),
+    ...(attempt.finalResult.eliminationOrder?.map((elimination) => `Elimination ${elimination.order}: ${elimination.byWorkerName} eliminated ${elimination.eliminatedWorkerName}.`) ?? []),
     `Duration: ${attempt.finalResult.actualDurationMinutes.toFixed(2)} minutes.`,
     `Match score: ${attempt.finalResult.matchScore.toFixed(1)} · ${attempt.finalResult.starRating} stars.`,
     attempt.status === "Overridden" ? `Booker override: ${attempt.finalResult.overrideReason}` : "Engine result accepted.",
