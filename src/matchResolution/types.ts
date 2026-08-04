@@ -6,6 +6,7 @@ export type ResolutionApproachMode = "AI" | "Manual";
 export type MatchResolutionImportance = "Television" | "Feature" | "Main Event" | "Championship" | "Tournament";
 export type MatchResolutionStatus = "Unresolved" | "Calculated" | "Accepted" | "Overridden";
 export type MatchResolutionAttemptStatus = "Calculated" | "Accepted" | "Overridden" | "Superseded";
+export type MatchResolutionFormat = "Singles" | "Team" | "Multi Person" | "Elimination" | "Battle Royal";
 export type MatchResolutionFinishType =
   | "Pinfall"
   | "Submission"
@@ -35,6 +36,27 @@ export interface MatchResolutionWorkerSettings {
   storyNeed: number;
   momentum: number;
   bookingBias: number;
+  teamId?: string;
+  teamName?: string;
+}
+
+export interface MatchResolutionTeamResult {
+  id: string;
+  name: string;
+  memberKeys: string[];
+  memberNames: string[];
+  competitiveScore: number;
+  winProbability: number;
+}
+
+export interface MatchResolutionElimination {
+  order: number;
+  eliminatedWorkerKey: string;
+  eliminatedWorkerName: string;
+  eliminatedTeamId: string;
+  byWorkerKey: string;
+  byWorkerName: string;
+  finishType: MatchResolutionFinishType;
 }
 
 export interface MatchResolutionSetup {
@@ -52,6 +74,8 @@ export interface MatchResolutionSetup {
   chemistry: number;
   volatility: number;
   workers: MatchResolutionWorkerSettings[];
+  format?: MatchResolutionFormat;
+  eliminationRules?: boolean;
 }
 
 export interface MatchResolutionWorkerSource {
@@ -114,6 +138,18 @@ export interface MatchResolutionEngineResult {
   winnerName: string;
   loserKey: string;
   loserName: string;
+  winnerTeamId?: string;
+  winnerTeamName?: string;
+  winnerMemberKeys?: string[];
+  winnerMemberNames?: string[];
+  loserKeys?: string[];
+  loserNames?: string[];
+  fallWinnerKey?: string;
+  fallWinnerName?: string;
+  fallLoserKey?: string;
+  fallLoserName?: string;
+  teamResults?: MatchResolutionTeamResult[];
+  eliminationOrder?: MatchResolutionElimination[];
   finishType: MatchResolutionFinishType;
   finishDescription: string;
   actualDurationMinutes: number;
@@ -134,6 +170,17 @@ export interface MatchResolutionFinalResult {
   winnerName: string;
   loserKey: string;
   loserName: string;
+  winnerTeamId?: string;
+  winnerTeamName?: string;
+  winnerMemberKeys?: string[];
+  winnerMemberNames?: string[];
+  loserKeys?: string[];
+  loserNames?: string[];
+  fallWinnerKey?: string;
+  fallWinnerName?: string;
+  fallLoserKey?: string;
+  fallLoserName?: string;
+  eliminationOrder?: MatchResolutionElimination[];
   finishType: MatchResolutionFinishType;
   finishDescription: string;
   actualDurationMinutes: number;
@@ -189,6 +236,13 @@ export interface MatchResolutionUniverse {
 export interface ResolveSinglesMatchInput {
   setup: MatchResolutionSetup;
   workers: [MatchResolutionWorkerSource, MatchResolutionWorkerSource];
+  seed?: string;
+  setupChangeReason?: string;
+}
+
+export interface ResolveMatchInput {
+  setup: MatchResolutionSetup;
+  workers: MatchResolutionWorkerSource[];
   seed?: string;
   setupChangeReason?: string;
 }

@@ -31,10 +31,12 @@ import type {
   MatchResolutionFinalResult,
   MatchResolutionRecord,
   MatchResolutionSetup,
+  MatchResolutionTeamResult,
   MatchResolutionWorkerResult,
   MatchResolutionWorkerSettings,
   MatchResolutionWorkerSource,
   ResolveSinglesMatchInput,
+  ResolveMatchInput,
   ResolutionApproachId,
 } from "./types";
 
@@ -427,6 +429,89 @@ function applyProbabilities(results: MatchResolutionWorkerResult[], volatility: 
   return results.map((result, index) => ({ ...result, winProbability: round(weights[index] / total, 4) }));
 }
 
+function inferredFormat(setup: MatchResolutionSetup): NonNullable<MatchResolutionSetup["format"]> {
+  if (setup.format) return setup.format;
+  const matchType = normalize(setup.matchType);
+  if (matchType.includes("battle royal") || matchType.includes("royal rumble")) return "Battle Royal";
+  if (setup.eliminationRules || matchType.includes("elimination") || matchType.includes("survivor series")) return "Elimination";
+  const teamIds = new Set(setup.workers.map((worker) => worker.teamId).filter(Boolean));
+  if (teamIds.size >= 2 && teamIds.size < setup.workers.length) return "Team";
+  return setup.workers.length === 2 ? "Singles" : "Multi Person";
+}
+
+function workerTeamId(worker: MatchResolutionWorkerSettings): string {
+  return worker.teamId?.trim() || worker.workerKey;
+}
+
+function workerTeamName(worker: MatchResolutionWorkerSettings): string {
+  return worker.teamName?.trim() || worker.workerName;
+}
+
+function teamResultsFor(
+  setup: MatchResolutionSetup,
+  workerResults: MatchResolutionWorkerResult[],
+): MatchResolutionTeamResult[] {
+  const grouped = new Map<string, { name: string; members: MatchResolutionWorkerResult[] }>();
+  setup.workers.forEach((worker) => {
+    const result = workerResults.find((item) => item.workerKey === worker.workerKey);
+    if (!result) return;
+    const id = workerTeamId(worker);
+    const current = grouped.get(id) ?? { name: workerTeamName(worker), members: [] };
+    current.members.push(result);
+    grouped.set(id, current);
+  });
+  const teams = [...grouped.entries()].map(([id, team]) => ({
+    id,
+    name: team.name,
+    memberKeys: team.members.map((member) => member.workerKey),
+    memberNames: team.members.map((member) => member.workerName),
+    competitiveScore: round(average(team.members.map((member) => member.competitiveScore)) + Math.min(4, team.members.length - 1)),
+    winProbability: 0,
+  }));
+  const minimum = Math.min(...teams.map((team) => team.competitiveScore));
+  const temperature = 8 + setup.volatility * 0.8;
+  const weights = teams.map((team) => Math.exp((team.competitiveScore - minimum) / temperature));
+  const total = weights.reduce((sum, value) => sum + value, 0) || 1;
+  return teams.map((team, index) => ({ ...team, winProbability: round(weights[index] / total, 4) }));
+}
+
+function selectByProbability<T extends { winProbability: number }>(items: T[], roll: number): T {
+  let cumulative = 0;
+  for (const item of items) {
+    cumulative += item.winProbability;
+    if (roll <= cumulative) return item;
+  }
+  return items.at(-1)!;
+}
+
+function eliminationOrder(
+  results: MatchResolutionWorkerResult[],
+  winner: MatchResolutionWorkerResult,
+  setup: MatchResolutionSetup,
+  random: () => number,
+) {
+  const remaining = results.filter((item) => item.workerKey !== winner.workerKey);
+  const ordered = [...remaining].sort((left, right) => {
+    const leftSurvival = left.competitiveScore + random() * (10 + setup.volatility);
+    const rightSurvival = right.competitiveScore + random() * (10 + setup.volatility);
+    return leftSurvival - rightSurvival;
+  });
+  return ordered.map((eliminated, index) => {
+    const survivors = [...ordered.slice(index + 1), winner];
+    const eliminator = survivors[Math.floor(random() * survivors.length)] ?? winner;
+    const eliminatedSettings = setup.workers.find((item) => item.workerKey === eliminated.workerKey);
+    return {
+      order: index + 1,
+      eliminatedWorkerKey: eliminated.workerKey,
+      eliminatedWorkerName: eliminated.workerName,
+      eliminatedTeamId: eliminatedSettings ? workerTeamId(eliminatedSettings) : eliminated.workerKey,
+      byWorkerKey: eliminator.workerKey,
+      byWorkerName: eliminator.workerName,
+      finishType: finishTypeForWinner(eliminator, random),
+    };
+  });
+}
+
 function finishTypeForWinner(winner: MatchResolutionWorkerResult, random: () => number) {
   const primary = [...winner.approachScores].sort((left, right) => right.total - left.total)[0]?.approachId ?? winner.selectedApproachIds[0] ?? "big-match-performer";
   const choices = FINISH_TYPES_BY_APPROACH[primary] ?? ["Pinfall"];
@@ -485,9 +570,131 @@ function actualDuration(setup: MatchResolutionSetup, winner: MatchResolutionWork
 function matchScore(results: MatchResolutionWorkerResult[], setup: MatchResolutionSetup): number {
   const performanceAverage = average(results.map((result) => result.performanceScore));
   const structure = average(results.map((result) => clamp(72 + result.paceModifier * 1.2 + result.staminaModifier * 2)));
-  const closeness = clamp(100 - Math.abs(results[0].performanceScore - results[1].performanceScore) * 2);
+  const ordered = [...results].sort((left, right) => right.performanceScore - left.performanceScore);
+  const closeness = clamp(100 - Math.abs(ordered[0].performanceScore - (ordered[1]?.performanceScore ?? ordered[0].performanceScore)) * 2);
   const incidentPenalty = results.reduce((total, result) => total + (result.incident ? 3 : 0), 0);
   return round(clamp(performanceAverage * 0.8 + structure * 0.12 + closeness * 0.08 + setup.chemistry * 0.5 - incidentPenalty));
+}
+
+export function resolveMatch(input: ResolveMatchInput): MatchResolutionAttempt {
+  if (input.workers.length < 2) throw new Error("A match requires at least two wrestler profiles.");
+  if (input.setup.workers.length !== input.workers.length) throw new Error("The match setup must contain settings for every wrestler profile.");
+  const uniqueKeys = new Set(input.workers.map((source) => source.profile.workerKey));
+  if (uniqueKeys.size !== input.workers.length) throw new Error("Every match participant must have a unique wrestler profile.");
+  const format = inferredFormat(input.setup);
+  const teamIds = new Set(input.setup.workers.map(workerTeamId));
+  if (format === "Team" && teamIds.size < 2) throw new Error("A team match requires at least two distinct teams.");
+  const teamOutcome = format === "Team" || (format === "Elimination" && teamIds.size >= 2 && teamIds.size < input.workers.length);
+
+  const seed = input.seed || createMatchEngineId();
+  const random = seededRandom(seed);
+  const opponentIndexes = input.setup.workers.map((worker, index) => {
+    const ownTeam = workerTeamId(worker);
+    const opponent = input.setup.workers.findIndex((candidate, candidateIndex) => candidateIndex !== index && workerTeamId(candidate) !== ownTeam);
+    return opponent >= 0 ? opponent : (index + 1) % input.workers.length;
+  });
+  const approaches = input.workers.map((source, index) => selectedApproaches(
+    input.setup.workers[index],
+    source,
+    input.workers[opponentIndexes[index]],
+    input.setup,
+  ));
+  let workerResults = input.workers.map((source, index) => workerResult(
+    source,
+    input.workers[opponentIndexes[index]],
+    input.setup.workers[index],
+    input.setup,
+    approaches[index],
+    approaches[opponentIndexes[index]].ids,
+    random,
+  ));
+  const roll = round(random(), 6);
+  let teams: MatchResolutionTeamResult[] = [];
+  let winningTeam: MatchResolutionTeamResult;
+  if (teamOutcome) {
+    teams = teamResultsFor(input.setup, workerResults);
+    winningTeam = selectByProbability(teams, roll);
+    const teamProbability = new Map(teams.flatMap((team) => team.memberKeys.map((key) => [key, team.winProbability] as const)));
+    workerResults = workerResults.map((result) => ({ ...result, winProbability: teamProbability.get(result.workerKey) ?? 0 }));
+  } else {
+    workerResults = applyProbabilities(workerResults, input.setup.volatility);
+    const winner = selectByProbability(workerResults, roll);
+    const settings = input.setup.workers.find((item) => item.workerKey === winner.workerKey)!;
+    winningTeam = {
+      id: workerTeamId(settings),
+      name: workerTeamName(settings),
+      memberKeys: [winner.workerKey],
+      memberNames: [winner.workerName],
+      competitiveScore: winner.competitiveScore,
+      winProbability: winner.winProbability,
+    };
+  }
+  const winningMembers = workerResults.filter((item) => winningTeam.memberKeys.includes(item.workerKey));
+  const losingMembers = workerResults.filter((item) => !winningTeam.memberKeys.includes(item.workerKey));
+  const fallWinner = [...winningMembers].sort((left, right) => right.competitiveScore - left.competitiveScore)[0];
+  const fallLoser = [...losingMembers].sort((left, right) => left.competitiveScore - right.competitiveScore)[0];
+  const finishType = finishTypeForWinner(fallWinner, random);
+  const score = matchScore(workerResults, input.setup);
+  const duration = actualDuration(input.setup, fallWinner, random);
+  const performanceLeader = [...workerResults].sort((left, right) => right.performanceScore - left.performanceScore)[0];
+  const eliminations = format === "Elimination" || format === "Battle Royal"
+    ? eliminationOrder(workerResults, fallWinner, input.setup, random)
+    : [];
+  const winnerName = teamOutcome ? winningTeam.name : fallWinner.workerName;
+  const loserName = teamOutcome
+    ? teams.filter((team) => team.id !== winningTeam.id).map((team) => team.name).join(" & ")
+    : fallLoser.workerName;
+  const result: MatchResolutionEngineResult = {
+    winnerKey: fallWinner.workerKey,
+    winnerName,
+    loserKey: fallLoser.workerKey,
+    loserName,
+    winnerTeamId: winningTeam.id,
+    winnerTeamName: winnerName,
+    winnerMemberKeys: winningTeam.memberKeys,
+    winnerMemberNames: winningTeam.memberNames,
+    loserKeys: losingMembers.map((item) => item.workerKey),
+    loserNames: losingMembers.map((item) => item.workerName),
+    fallWinnerKey: fallWinner.workerKey,
+    fallWinnerName: fallWinner.workerName,
+    fallLoserKey: fallLoser.workerKey,
+    fallLoserName: fallLoser.workerName,
+    teamResults: teams,
+    eliminationOrder: eliminations,
+    finishType,
+    finishDescription: teamOutcome
+      ? `${winnerName} won when ${fallWinner.workerName} defeated ${fallLoser.workerName} by ${finishType.toLowerCase()}.`
+      : format === "Battle Royal"
+        ? `${fallWinner.workerName} won the battle royal after eliminating ${fallLoser.workerName} last.`
+        : format === "Elimination"
+          ? `${fallWinner.workerName} survived the elimination match and secured the final elimination over ${fallLoser.workerName}.`
+          : finishDescription(finishType, fallWinner, fallLoser),
+    actualDurationMinutes: duration,
+    matchScore: score,
+    starRating: advisoryStarRating(score),
+    performanceLeaderKey: performanceLeader.workerKey,
+    performanceLeaderName: performanceLeader.workerName,
+    winnerProbability: winningTeam.winProbability,
+    resultRoll: roll,
+    confidenceLabel: confidenceLabel(Math.max(...(teams.length ? teams : workerResults).map((item) => item.winProbability))),
+    upset: winningTeam.winProbability < 1 / (teams.length || workerResults.length),
+    decisiveFactors: decisiveFactors(fallWinner, fallLoser),
+    matchFacts: [
+      `${winnerName} won the ${format.toLowerCase()} match.`,
+      teamOutcome ? `${fallWinner.workerName} scored the deciding fall over ${fallLoser.workerName}.` : `${fallWinner.workerName} secured the deciding result over ${fallLoser.workerName}.`,
+      `${performanceLeader.workerName} delivered the strongest individual performance.`,
+      ...eliminations.map((item) => `${item.byWorkerName} eliminated ${item.eliminatedWorkerName} (${item.order}).`),
+      ...workerResults.flatMap((item) => item.incident ? [`${item.workerName}: ${item.incident}`] : []),
+    ],
+  };
+  return {
+    id: createMatchEngineId(), number: 1, seed,
+    setupFingerprint: matchResolutionSetupFingerprint(input.setup, input.workers),
+    setupChangeReason: input.setupChangeReason ?? "",
+    calculationVersion: RESOLUTION_CALCULATION_VERSION,
+    generatedAt: new Date().toISOString(), status: "Calculated", workerResults,
+    engineResult: result, finalResult: null,
+  };
 }
 
 export function resolveSinglesMatch(input: ResolveSinglesMatchInput): MatchResolutionAttempt {
@@ -588,6 +795,17 @@ function finalFromEngine(attempt: MatchResolutionAttempt): MatchResolutionFinalR
     winnerName: result.winnerName,
     loserKey: result.loserKey,
     loserName: result.loserName,
+    winnerTeamId: result.winnerTeamId,
+    winnerTeamName: result.winnerTeamName,
+    winnerMemberKeys: result.winnerMemberKeys,
+    winnerMemberNames: result.winnerMemberNames,
+    loserKeys: result.loserKeys,
+    loserNames: result.loserNames,
+    fallWinnerKey: result.fallWinnerKey,
+    fallWinnerName: result.fallWinnerName,
+    fallLoserKey: result.fallLoserKey,
+    fallLoserName: result.fallLoserName,
+    eliminationOrder: result.eliminationOrder,
     finishType: result.finishType,
     finishDescription: result.finishDescription,
     actualDurationMinutes: result.actualDurationMinutes,
@@ -623,16 +841,47 @@ export function overrideEngineResult(
   if (!attempt) throw new Error("The active match calculation could not be found.");
   if (attempt.status !== "Calculated") throw new Error("This official calculation has already been finalized.");
   const winner = attempt.workerResults.find((item) => item.workerKey === winnerKey);
-  const loser = attempt.workerResults.find((item) => item.workerKey !== winnerKey);
-  if (!winner || !loser) throw new Error("Choose one of the calculated match participants as the override winner.");
+  if (!winner) throw new Error("Choose one of the calculated match participants as the override winner.");
+  const setupWorker = record.setup.workers.find((item) => item.workerKey === winnerKey);
+  const format = inferredFormat(record.setup);
+  const distinctTeamIds = new Set(record.setup.workers.map(workerTeamId));
+  const teamOutcome = format === "Team" || (format === "Elimination" && distinctTeamIds.size >= 2 && distinctTeamIds.size < record.setup.workers.length);
+  const winnerTeamId = setupWorker ? workerTeamId(setupWorker) : winnerKey;
+  const winnerMembers = teamOutcome
+    ? attempt.workerResults.filter((item) => {
+      const settings = record.setup.workers.find((worker) => worker.workerKey === item.workerKey);
+      return settings ? workerTeamId(settings) === winnerTeamId : item.workerKey === winnerKey;
+    })
+    : [winner];
+  const losers = attempt.workerResults.filter((item) => !winnerMembers.some((member) => member.workerKey === item.workerKey));
+  const loser = [...losers].sort((left, right) => left.competitiveScore - right.competitiveScore)[0];
+  if (!loser) throw new Error("The override winner must leave at least one losing participant.");
+  const winnerName = teamOutcome ? workerTeamName(setupWorker!) : winner.workerName;
+  const loserName = teamOutcome
+    ? Array.from(new Set(losers.map((item) => {
+      const settings = record.setup.workers.find((worker) => worker.workerKey === item.workerKey);
+      return settings ? workerTeamName(settings) : item.workerName;
+    }))).join(" & ")
+    : loser.workerName;
   if (!reason.trim()) throw new Error("Record why the engine result was overridden.");
   const finalResult: MatchResolutionFinalResult = {
     winnerKey: winner.workerKey,
-    winnerName: winner.workerName,
+    winnerName,
     loserKey: loser.workerKey,
-    loserName: loser.workerName,
+    loserName,
+    winnerTeamId,
+    winnerTeamName: winnerName,
+    winnerMemberKeys: winnerMembers.map((item) => item.workerKey),
+    winnerMemberNames: winnerMembers.map((item) => item.workerName),
+    loserKeys: losers.map((item) => item.workerKey),
+    loserNames: losers.map((item) => item.workerName),
+    fallWinnerKey: winner.workerKey,
+    fallWinnerName: winner.workerName,
+    fallLoserKey: loser.workerKey,
+    fallLoserName: loser.workerName,
+    eliminationOrder: attempt.engineResult.eliminationOrder,
     finishType,
-    finishDescription: finishDescriptionValue.trim() || `${winner.workerName} defeated ${loser.workerName} by ${finishType.toLowerCase()}.`,
+    finishDescription: finishDescriptionValue.trim() || `${winnerName} defeated ${loserName} by ${finishType.toLowerCase()}.`,
     actualDurationMinutes: attempt.engineResult.actualDurationMinutes,
     matchScore: attempt.engineResult.matchScore,
     starRating: attempt.engineResult.starRating,

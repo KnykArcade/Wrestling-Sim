@@ -8,6 +8,7 @@ import type {
   ResultConsequenceApplication,
   ResultConsequenceUniverse,
   StandaloneWorkerRecord,
+  StandaloneTeamRecord,
 } from "./types";
 
 export const RESULT_CONSEQUENCE_STORAGE_KEY = "wrestling-sim:result-consequences:v1";
@@ -27,6 +28,11 @@ function records<T>(value: unknown): T[] {
 function workerRecord(value: unknown): StandaloneWorkerRecord | null {
   if (!isRecord(value) || !text(value.workerKey) || !text(value.workerName)) return null;
   return value as unknown as StandaloneWorkerRecord;
+}
+
+function teamRecord(value: unknown): StandaloneTeamRecord | null {
+  if (!isRecord(value) || !text(value.teamKey) || !text(value.teamName)) return null;
+  return value as unknown as StandaloneTeamRecord;
 }
 
 function application(value: unknown): ResultConsequenceApplication | null {
@@ -65,6 +71,7 @@ export function parseResultConsequenceUniverse(value: unknown): ResultConsequenc
   const tabs: ResultConsequenceUniverse["settings"]["activeTab"][] = ["overview", "records", "decisions", "future", "audit"];
   return {
     workerRecords: Array.isArray(value.workerRecords) ? value.workerRecords.map(workerRecord).filter((item): item is StandaloneWorkerRecord => item !== null) : [],
+    teamRecords: Array.isArray(value.teamRecords) ? value.teamRecords.map(teamRecord).filter((item): item is StandaloneTeamRecord => item !== null) : [],
     applications: Array.isArray(value.applications) ? value.applications.map(application).filter((item): item is ResultConsequenceApplication => item !== null) : [],
     championshipProposals: Array.isArray(value.championshipProposals) ? value.championshipProposals.map(championshipProposal).filter((item): item is ChampionshipConsequenceProposal => item !== null) : [],
     competitionProposals: Array.isArray(value.competitionProposals) ? value.competitionProposals.map(competitionProposal).filter((item): item is CompetitionConsequenceProposal => item !== null) : [],

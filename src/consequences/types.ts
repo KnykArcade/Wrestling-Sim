@@ -56,6 +56,39 @@ export interface StandaloneWorkerRecord {
   updatedAt: string;
 }
 
+export interface StandaloneTeamHistoryEntry {
+  id: string;
+  resolutionRecordId: string;
+  resolutionAttemptId: string;
+  showId: string;
+  showName: string;
+  showDate: string;
+  segmentId: string;
+  segmentTitle: string;
+  opponentTeamNames: string[];
+  result: "W" | "L" | "D" | "NC";
+  finishDescription: string;
+  matchScore: number;
+  occurredAt: string;
+}
+
+export interface StandaloneTeamRecord {
+  teamKey: string;
+  teamName: string;
+  memberKeys: string[];
+  memberNames: string[];
+  wins: number;
+  losses: number;
+  draws: number;
+  noContests: number;
+  rankingPoints: number;
+  rankingPosition: number;
+  previousRankingPosition: number;
+  momentum: number;
+  matchHistory: StandaloneTeamHistoryEntry[];
+  updatedAt: string;
+}
+
 export interface ConditionChange {
   workerKey: string;
   workerName: string;
@@ -111,6 +144,7 @@ export interface ChampionshipConsequenceProposal {
   championEntering: string;
   challenger: string;
   finalWinner: string;
+  finalWinnerMemberNames: string[];
   suggestedDecision: TitleResultDecision;
   selectedDecision: TitleResultDecision;
   status: ConsequenceDecisionStatus;
@@ -140,6 +174,7 @@ export interface CompetitionConsequenceProposal {
 
 export interface ConsequenceSnapshot {
   workerRecords: StandaloneWorkerRecord[];
+  teamRecords: StandaloneTeamRecord[];
   shows: PlannedShow[];
   championships: ChampionshipUniverse;
   competitions: CompetitionUniverse;
@@ -183,6 +218,7 @@ export interface ResultConsequenceSettings {
 
 export interface ResultConsequenceUniverse {
   workerRecords: StandaloneWorkerRecord[];
+  teamRecords: StandaloneTeamRecord[];
   applications: ResultConsequenceApplication[];
   championshipProposals: ChampionshipConsequenceProposal[];
   competitionProposals: CompetitionConsequenceProposal[];

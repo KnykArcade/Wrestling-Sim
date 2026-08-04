@@ -13,6 +13,7 @@ import {
 } from "../src/consequences/model";
 import { parseResultConsequenceUniverse } from "../src/consequences/storage";
 import { createMatchEngineProfile } from "../src/matchEngine/model";
+import { acceptEngineResult, createMatchResolutionRecord, resolveMatch } from "../src/matchResolution/engine";
 import type { MatchResolutionRecord } from "../src/matchResolution/types";
 import { createPlannedSegment, createPlannedShow } from "../src/planner/model";
 
@@ -357,5 +358,79 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(parsed.workerRecords[0].matchHistory[0].resolutionAttemptId).toBe(`attempt-${segment.id}`);
     expect(parsed.applications[0].conditionChanges).toHaveLength(2);
     expect(parsed.prompts.length).toBeGreaterThanOrEqual(3);
+  });
+
+  test("applies team wins to every teammate and maintains separate team records", () => {
+    const show = createPlannedShow(1);
+    show.id = "show-team";
+    show.name = "PWL Power Hour";
+    show.date = "2019-02-05";
+    const segment = createPlannedSegment("match");
+    segment.id = "tag-match";
+    segment.title = "MCMG vs Aussie Open";
+    segment.matchType = "Tag Team";
+    const names = ["Alex Shelley", "Chris Sabin", "Mark Davis", "Kyle Fletcher"];
+    const ids = ["shelley", "sabin", "davis", "fletcher"];
+    segment.workers = names.map((name, index) => ({ id: ids[index], name, role: "Competitor", side: index < 2 ? "Side 1" : "Side 2", source: "tew" as const }));
+    show.segments = [segment];
+    const workerProfiles = names.map((name, index) => {
+      const value = createMatchEngineProfile({ id: ids[index], name, source: "tew" });
+      value.overall = 80 + index;
+      value.health = 95;
+      return value;
+    });
+    const setup = {
+      showId: show.id, showName: show.name, showDate: show.date, segmentId: segment.id, segmentTitle: segment.title,
+      matchType: segment.matchType, durationMinutes: 18, aimId: "competitive-tv-match" as const, importance: "Feature" as const,
+      championship: "", competitionRound: "", chemistry: 0, volatility: 8, format: "Team" as const,
+      workers: workerProfiles.map((profile, index) => ({
+        workerKey: profile.workerKey, workerId: profile.workerId, workerName: profile.workerName,
+        approachMode: "AI" as const, lockedApproachIds: [], manualApproachIds: [], storyNeed: 0, momentum: 0, bookingBias: 0,
+        teamId: index < 2 ? "mcmg" : "aussie-open", teamName: index < 2 ? "Motor City Machine Guns" : "Aussie Open",
+      })),
+    };
+    const attempt = resolveMatch({ setup, workers: workerProfiles.map((profile) => ({ profile, workbookMetrics: null })), seed: "team-consequences" });
+    const winningTeam = attempt.engineResult.teamResults!.find((team) => team.id === attempt.engineResult.winnerTeamId)!;
+    const losingTeam = attempt.engineResult.teamResults!.find((team) => team.id !== attempt.engineResult.winnerTeamId)!;
+    const championship = createChampionship(1);
+    championship.id = "tag-title";
+    championship.name = "PWL Tag Team Championship";
+    championship.status = "Active";
+    championship.currentChampions = losingTeam.memberNames.map((name) => ({ id: ids[names.indexOf(name)], name }));
+    segment.championshipId = championship.id;
+    segment.championship = championship.name;
+    segment.championEntering = losingTeam.memberNames.join(" & ");
+    segment.challenger = winningTeam.memberNames.join(" & ");
+    segment.championshipMatchPurpose = "Defense";
+    let competition = createCompetition(1);
+    competition.id = "tag-cup";
+    competition.name = "PWL Tag Cup";
+    competition.participantType = "Tag Team";
+    const firstTeam = createCompetitionParticipant(winningTeam.name, "Tag Team", { memberNames: winningTeam.memberNames });
+    const secondTeam = createCompetitionParticipant(losingTeam.name, "Tag Team", { memberNames: losingTeam.memberNames });
+    competition = generateCompetitionStructure({ ...competition, participants: [firstTeam, secondTeam] });
+    segment.competitionId = competition.id;
+    segment.competitionFixtureId = competition.fixtures[0].id;
+    segment.competitionRoundLabel = competition.fixtures[0].roundLabel;
+    const accepted = acceptEngineResult(createMatchResolutionRecord(setup, attempt));
+    const applied = applyCoreResultConsequences({
+      universe: emptyResultConsequenceUniverse(), resolution: accepted, shows: [show], profiles: workerProfiles,
+      championships: { championships: [championship] }, competitions: { competitions: [competition] },
+    });
+    const winningKeys = attempt.engineResult.winnerMemberKeys!;
+    expect(applied.universe.workerRecords.filter((record) => winningKeys.includes(record.workerKey)).every((record) => record.wins === 1)).toBe(true);
+    expect(applied.universe.workerRecords.filter((record) => !winningKeys.includes(record.workerKey)).every((record) => record.losses === 1)).toBe(true);
+    expect(applied.universe.teamRecords).toHaveLength(2);
+    expect(applied.universe.teamRecords.find((record) => record.teamKey === attempt.engineResult.winnerTeamId)).toMatchObject({ wins: 1, losses: 0, rankingPosition: 1 });
+    expect(applied.universe.applications[0].conditionChanges).toHaveLength(4);
+    expect(applied.universe.championshipProposals[0]).toMatchObject({ suggestedDecision: "Changed Hands", status: "Pending" });
+    expect(applied.universe.competitionProposals[0]).toMatchObject({ proposedWinnerParticipantId: firstTeam.id, status: "Pending" });
+    const confirmedTitle = confirmChampionshipConsequence({
+      universe: applied.universe, proposalId: applied.universe.championshipProposals[0].id, shows: applied.shows,
+      championships: { championships: [championship] }, knownWorkers: workerProfiles.map((profile) => ({ id: profile.workerId, name: profile.workerName })),
+    });
+    expect(confirmedTitle.championships.championships[0].currentChampions.map((champion) => champion.name)).toEqual(winningTeam.memberNames);
+    const confirmedCompetition = confirmCompetitionConsequence({ universe: applied.universe, proposalId: applied.universe.competitionProposals[0].id, competitions: { competitions: [competition] } });
+    expect(confirmedCompetition.competitions.competitions[0].fixtures[0].winnerId).toBe(firstTeam.id);
   });
 });
