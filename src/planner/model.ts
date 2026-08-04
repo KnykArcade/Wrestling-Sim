@@ -9,6 +9,55 @@ import type {
   SegmentReconciliation,
 } from "./types";
 
+export const MATCH_FORMATS = ["Singles", "Tag Team", "Trios", "Triple Threat", "Four-Way", "Elimination", "Battle Royal", "Custom"] as const;
+export type MatchFormat = typeof MATCH_FORMATS[number];
+
+const MATCH_FORMAT_RULES: Record<MatchFormat, { minimum: number; exact: number | null; sides: string[] }> = {
+  Singles: { minimum: 2, exact: 2, sides: ["Side 1", "Side 2"] },
+  "Tag Team": { minimum: 4, exact: 4, sides: ["Team 1", "Team 1", "Team 2", "Team 2"] },
+  Trios: { minimum: 6, exact: 6, sides: ["Team 1", "Team 1", "Team 1", "Team 2", "Team 2", "Team 2"] },
+  "Triple Threat": { minimum: 3, exact: 3, sides: ["Side 1", "Side 2", "Side 3"] },
+  "Four-Way": { minimum: 4, exact: 4, sides: ["Side 1", "Side 2", "Side 3", "Side 4"] },
+  Elimination: { minimum: 2, exact: null, sides: [] },
+  "Battle Royal": { minimum: 3, exact: null, sides: [] },
+  Custom: { minimum: 2, exact: null, sides: [] },
+};
+
+export function normalizeMatchFormat(value: string): MatchFormat {
+  if (value === "1 vs. 1") return "Singles";
+  return MATCH_FORMATS.includes(value as MatchFormat) ? value as MatchFormat : "Custom";
+}
+
+export function automaticMatchSide(format: MatchFormat, index: number): string {
+  const configured = MATCH_FORMAT_RULES[format].sides[index];
+  if (configured) return configured;
+  if (format === "Elimination" || format === "Battle Royal") return `Side ${index + 1}`;
+  return "";
+}
+
+export function assignAutomaticMatchSides(segment: PlannedSegment, format: MatchFormat): PlannedSegment {
+  return {
+    ...segment,
+    matchType: format,
+    workers: segment.workers.map((worker, index) => ({ ...worker, side: automaticMatchSide(format, index) })),
+  };
+}
+
+export function matchBookingValidation(segment: PlannedSegment): string {
+  const format = normalizeMatchFormat(segment.matchType);
+  const rule = MATCH_FORMAT_RULES[format];
+  const count = segment.workers.length;
+  if (rule.exact !== null && count !== rule.exact) {
+    const missing = rule.exact - count;
+    if (format === "Tag Team") return missing > 0 ? `Tag Team needs two wrestlers on each team. Add ${missing} more.` : `Tag Team uses four wrestlers. Remove ${Math.abs(missing)}.`;
+    if (format === "Trios") return missing > 0 ? `Trios needs three wrestlers on each team. Add ${missing} more.` : `Trios uses six wrestlers. Remove ${Math.abs(missing)}.`;
+    return missing > 0 ? `${format} needs ${rule.exact} wrestlers. Add ${missing} more.` : `${format} uses ${rule.exact} wrestlers. Remove ${Math.abs(missing)}.`;
+  }
+  if (count < rule.minimum) return `${format} needs at least ${rule.minimum} wrestlers. Add ${rule.minimum - count} more.`;
+  if (segment.workers.some((worker) => !worker.side.trim())) return "Every wrestler needs a side or team.";
+  return "Match setup is ready.";
+}
+
 function fallbackId(): string {
   return `planner-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -72,7 +121,7 @@ export function createPlannedSegment(type: PlannedSegmentType): PlannedSegment {
     followUp: "",
     privateNotes: "",
 
-    matchType: type === "match" ? "1 vs. 1" : "",
+    matchType: type === "match" ? "Singles" : "",
     championship: "",
     championshipId: "",
     championshipMatchPurpose: "",

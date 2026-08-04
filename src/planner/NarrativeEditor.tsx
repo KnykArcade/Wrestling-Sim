@@ -121,7 +121,7 @@ export default function NarrativeEditor({ segment, availableWorkers, availableSt
   return <details className="narrative-editor" open>
     <summary><span>Narrative Details</span><small>{segment.workers.length} worker{segment.workers.length === 1 ? "" : "s"} · {segment.storylines.length} storyline{segment.storylines.length === 1 ? "" : "s"}</small></summary>
     <div className="narrative-editor__body">
-      <section className="narrative-section">
+      {segment.type === "angle" && <section className="narrative-section">
         <header><div><h4>Workers and roles</h4><p>Use names from the imported TEW snapshot or enter a name manually.</p></div></header>
         <div className="reference-add-grid">
           <div className="reference-add-card">
@@ -134,7 +134,7 @@ export default function NarrativeEditor({ segment, availableWorkers, availableSt
           </div>
         </div>
         {segment.workers.length > 0 ? <div className="narrative-person-list">{segment.workers.map((worker) => <WorkerEditor key={worker.id} worker={worker} isMatch={segment.type === "match"} onChange={(updated) => onChange({ ...segment, workers: segment.workers.map((item) => item.id === updated.id ? updated : item) })} onDelete={() => onChange({ ...segment, workers: segment.workers.filter((item) => item.id !== worker.id) })} />)}</div> : <p className="narrative-empty-line">No workers have been assigned to this segment.</p>}
-      </section>
+      </section>}
 
       <section className="narrative-section">
         <header><div><h4>Related storylines</h4><p>Link one or more TEW storylines, or create a manual reference for planning.</p></div></header>
@@ -154,7 +154,6 @@ export default function NarrativeEditor({ segment, availableWorkers, availableSt
       {segment.type === "match" ? <section className="narrative-section narrative-section--primary">
         <header><div><h4>Match story</h4><p>Plan the result, finish, championship stakes, major beats, and what the audience sees.</p></div><div className="copy-actions"><button className="secondary-button compact-button" type="button" disabled={!segment.matchStory.trim()} onClick={() => void handleCopy(segment.matchStory)}>Copy Match Story</button><button className="secondary-button compact-button" type="button" onClick={() => void handleCopy(buildTewEntrySummary(segment))}>Copy TEW Entry Summary</button>{copyState && <span className={`copy-state copy-state--${copyState === "Copied" ? "ok" : "error"}`}>{copyState}</span>}</div></header>
         <div className="narrative-form-grid">
-          <label className="field"><span>Match type</span><input value={segment.matchType} onChange={(event) => onChange({ ...segment, matchType: event.target.value })} /></label>
           <label className="field"><span>Tracker championship</span><select aria-label="Tracker championship" value={segment.championshipId} onChange={(event) => selectChampionship(event.target.value)}><option value="">Manual / non-title match</option>{championships.map((championship) => <option key={championship.id} value={championship.id}>{championship.name}</option>)}</select></label>
           <label className="field"><span>Championship / legacy title name</span><input aria-label="Championship or legacy title name" placeholder="None or title name" value={segment.championship} onChange={(event) => onChange({ ...segment, championship: event.target.value })} /></label>
           <label className="field"><span>Title-match purpose</span><select aria-label="Title match purpose" value={segment.championshipMatchPurpose} onChange={(event) => onChange({ ...segment, championshipMatchPurpose: event.target.value as PlannedSegment["championshipMatchPurpose"] })}><option value="">Not specified</option><option>Defense</option><option>Vacant Title</option><option>Tournament Final</option><option>Unification</option><option>Other</option></select></label>

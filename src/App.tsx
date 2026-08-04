@@ -203,9 +203,10 @@ export default function App() {
   const standaloneViews: ViewName[] = ["universe", "runner", "resolution", "consequences", "session", "calendar", "operations", "workbench", "outputs", "profiles", "transfer", "results", "bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
 
   return <div className="app-shell">
-    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>Wrestling Sim</h1></div><div className="phase-badge">PHASE 6B3 · RESULT CONSEQUENCES</div></header>
+    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>Wrestling Sim</h1></div><div className="phase-badge">PHASE 6B5 · CORE BOOKING FLOW</div></header>
     <nav className="global-tabbar" aria-label="Wrestling Sim sections">
       <button className={view === "universe" ? "active" : ""} onClick={() => setView("universe")} type="button">Starting Universe</button>
+      <button className={view === "planner" ? "active" : ""} onClick={() => setView("planner")} type="button">Book Shows</button>
       <button className={view === "runner" ? "active" : ""} onClick={() => setView("runner")} type="button">Run Show</button>
       <button className={view === "resolution" ? "active" : ""} onClick={() => setView("resolution")} type="button">Run Matches</button>
       <button className={view === "consequences" ? "active" : ""} onClick={() => setView("consequences")} type="button">Consequences</button>
@@ -242,7 +243,7 @@ export default function App() {
       {view === "resolution" && <MatchResolutionWorkspace />}
       {view === "consequences" && <ResultConsequenceWorkspace onOpenLiveCard={() => setView("runner")} onOpenPlanner={openPlannedSegment} />}
       {view === "session" && <>
-        <CompanionHomeWorkspace activeSnapshot={snapshot} vault={vault} vaultReady={vaultReady} snapshotLoading={loading} snapshotError={error} onImportSnapshot={(file) => void handleFile(file, "session")} onActivateSnapshot={activateSnapshot} onVaultChange={setVault} onContinueShow={scrollToShowSession} onOpenCalendar={() => setView("calendar")} onOpenResults={() => setView("results")} onOpenProfiles={() => setView("profiles")} onOpenStorylines={() => setView("storyline-hub")} onOpenWrapUp={openWrapUp} />
+        <CompanionHomeWorkspace activeSnapshot={snapshot} vault={vault} vaultReady={vaultReady} snapshotLoading={loading} snapshotError={error} onImportSnapshot={(file) => void handleFile(file, "session")} onActivateSnapshot={activateSnapshot} onVaultChange={setVault} onContinueShow={scrollToShowSession} onOpenPlanner={() => setView("planner")} onOpenCalendar={() => setView("calendar")} onOpenResults={() => setView("results")} onOpenProfiles={() => setView("profiles")} onOpenStorylines={() => setView("storyline-hub")} onOpenWrapUp={openWrapUp} />
         <ShowSessionCalendarBridge onOpenCalendar={() => setView("calendar")} onOpenShow={() => openShowSession()} />
         <ShowSessionWorkspace key={sessionKey} snapshot={snapshot} snapshotLoading={loading} snapshotError={error} onSnapshotFile={(file) => void handleFile(file, "session")} onOpenWorkbench={() => setView("workbench")} onOpenOutputLibrary={() => setView("outputs")} onOpenPlanner={() => setView("planner")} onOpenTransfer={() => setView("transfer")} />
       </>}

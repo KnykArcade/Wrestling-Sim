@@ -278,6 +278,64 @@
   border: 1px dashed #61799f;
 }
 
+.card-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.card-summary button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  padding: 10px;
+  border: 1px solid #4c6489;
+  background: #0d1d34;
+  color: #fff;
+  text-align: left;
+}
+
+.card-summary button b { color: #fff200; }
+.card-summary button small { grid-column: 2; color: #9fb1cc; }
+
+.basic-match-booking {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid #4f7daf;
+  background: #0d2038;
+}
+
+.basic-match-booking > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.basic-match-booking h4 { margin: 4px 0; color: #fff; }
+.basic-match-booking header p { margin: 0; color: #afc0da; }
+.match-format-field { max-width: 360px; }
+.booking-ready, .booking-needed { padding: 7px 10px; border: 1px solid; font-size: .78rem; font-weight: 800; }
+.booking-ready { color: #82eba4; border-color: #3e8a58; }
+.booking-needed { color: #ffd37d; border-color: #a87932; }
+
+.basic-participant-list { display: grid; gap: 8px; }
+.basic-participant-list article {
+  display: grid;
+  grid-template-columns: auto minmax(150px, 1fr) minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #395270;
+  background: #071526;
+}
+.basic-participant-list article > b { align-self: center; color: #fff200; }
+.basic-participant-list article > div { display: grid; gap: 3px; align-self: center; }
+.basic-participant-list article small { color: #91a4c2; }
+
 .planned-segment-list {
   display: grid;
   gap: 12px;
@@ -377,6 +435,9 @@
   .planned-segment__header {
     flex-direction: column;
   }
+
+  .basic-match-booking > header,
+  .basic-participant-list article { grid-template-columns: 1fr; flex-direction: column; }
 
   .segment-actions {
     justify-content: flex-start;

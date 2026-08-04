@@ -6,7 +6,7 @@ A browser-based **Total Extreme Wrestling IX companion** for planning cards, sel
 
 ## Current phase: 5J — Companion Home, Persistent Snapshot Vault, and Guided Promotion Onboarding
 
-Phase 5J makes the companion practical to reopen and use throughout a real TEW save.
+The companion is designed to reopen and use throughout a real TEW save, with core show and match booking available directly from the main navigation.
 
 The beginning of Show Session is now a **Companion Home** showing:
 
@@ -316,9 +316,9 @@ The Data Center provides:
 - Clear parsed snapshot data separately
 - Retention and storage-warning settings
 
-### Backup version 21
+### Backup version 22
 
-Version 21 preserves:
+Version 22 preserves:
 
 - All planned shows and reconciliations
 - Match approaches and profiles
@@ -387,7 +387,7 @@ The normal backup intentionally stores the Snapshot Vault **manifest**, not ever
 
 Before deleting a Codespace or moving to a different forwarded preview origin, export:
 
-1. A complete **version 21 companion backup**.
+1. A complete **version 22 companion backup**.
 2. A separate **Snapshot Vault package** when stored parsed TEW snapshots must also move.
 
 Never commit a TEW `.mdb` or `.accdb` file to GitHub.
