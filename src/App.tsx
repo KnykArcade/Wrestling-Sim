@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import BridgeWorkspace from "./bridge/BridgeWorkspace";
 import ChampionshipHub from "./championships/ChampionshipHub";
 import CompetitionHub from "./competitions/CompetitionHub";
+import ResultConsequenceWorkspace from "./consequences/ResultConsequenceWorkspace";
 import CreativeControlCenter from "./control/CreativeControlCenter";
 import HandoffWorkspace from "./handoff/HandoffWorkspace";
 import LiveCardRunnerWorkspace from "./liveCard/LiveCardRunnerWorkspace";
@@ -34,7 +35,7 @@ import SegmentWorkbench from "./workbench/SegmentWorkbench";
 import { loadWorkbenchUniverse, updateWorkbenchSettings } from "./workbench/storage";
 import WorkerHub from "./workers/WorkerHub";
 
-type ViewName = "universe" | "runner" | "resolution" | "session" | "calendar" | "operations" | "workbench" | "outputs" | "profiles" | "transfer" | "results" | "bridge" | "control" | "planner" | "handoff" | "competitions" | "match-engine" | "storyline-hub" | "worker-hub" | "championship-hub" | "shows" | "tew-storylines" | "schema";
+type ViewName = "universe" | "runner" | "resolution" | "consequences" | "session" | "calendar" | "operations" | "workbench" | "outputs" | "profiles" | "transfer" | "results" | "bridge" | "control" | "planner" | "handoff" | "competitions" | "match-engine" | "storyline-hub" | "worker-hub" | "championship-hub" | "shows" | "tew-storylines" | "schema";
 
 const advancedViews: ViewName[] = ["operations", "bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub", "shows", "tew-storylines", "schema"];
 
@@ -199,14 +200,15 @@ export default function App() {
   }
 
   const needsSnapshot = (view === "shows" || view === "tew-storylines" || view === "schema") && snapshot === null;
-  const standaloneViews: ViewName[] = ["universe", "runner", "resolution", "session", "calendar", "operations", "workbench", "outputs", "profiles", "transfer", "results", "bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
+  const standaloneViews: ViewName[] = ["universe", "runner", "resolution", "consequences", "session", "calendar", "operations", "workbench", "outputs", "profiles", "transfer", "results", "bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
 
   return <div className="app-shell">
-    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>Wrestling Sim</h1></div><div className="phase-badge">PHASE 6B2 · REACTIVE LIVE CARD RUNNER</div></header>
+    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>Wrestling Sim</h1></div><div className="phase-badge">PHASE 6B3 · RESULT CONSEQUENCES</div></header>
     <nav className="global-tabbar" aria-label="Wrestling Sim sections">
       <button className={view === "universe" ? "active" : ""} onClick={() => setView("universe")} type="button">Starting Universe</button>
       <button className={view === "runner" ? "active" : ""} onClick={() => setView("runner")} type="button">Run Show</button>
       <button className={view === "resolution" ? "active" : ""} onClick={() => setView("resolution")} type="button">Run Matches</button>
+      <button className={view === "consequences" ? "active" : ""} onClick={() => setView("consequences")} type="button">Consequences</button>
       <button className={view === "session" ? "active" : ""} onClick={() => setView("session")} type="button">Show Session</button>
       <button className={view === "calendar" ? "active" : ""} onClick={() => setView("calendar")} type="button">Promotion Calendar</button>
       <button className={view === "workbench" ? "active" : ""} onClick={() => setView("workbench")} type="button">Match &amp; Angle Workbench</button>
@@ -238,6 +240,7 @@ export default function App() {
       {view === "universe" && <StartingUniverseWorkspace />}
       {view === "runner" && <LiveCardRunnerWorkspace onOpenResolution={() => setView("resolution")} onOpenPlanner={openPlannedSegment} />}
       {view === "resolution" && <MatchResolutionWorkspace />}
+      {view === "consequences" && <ResultConsequenceWorkspace onOpenLiveCard={() => setView("runner")} onOpenPlanner={openPlannedSegment} />}
       {view === "session" && <>
         <CompanionHomeWorkspace activeSnapshot={snapshot} vault={vault} vaultReady={vaultReady} snapshotLoading={loading} snapshotError={error} onImportSnapshot={(file) => void handleFile(file, "session")} onActivateSnapshot={activateSnapshot} onVaultChange={setVault} onContinueShow={scrollToShowSession} onOpenCalendar={() => setView("calendar")} onOpenResults={() => setView("results")} onOpenProfiles={() => setView("profiles")} onOpenStorylines={() => setView("storyline-hub")} onOpenWrapUp={openWrapUp} />
         <ShowSessionCalendarBridge onOpenCalendar={() => setView("calendar")} onOpenShow={() => openShowSession()} />
@@ -268,6 +271,6 @@ export default function App() {
         {view === "schema" && <section className="diagnostics-layout"><div className="content-panel"><div className="panel-heading large"><div><span>Matched TEW Tables</span><p>These mappings drive the read-only show, match, worker, and storyline views.</p></div></div><dl className="mapping-list">{Object.entries(snapshot.diagnostics.matchedTables).map(([purpose, table]) => <div key={purpose}><dt>{purpose}</dt><dd className={table ? "matched" : "missing"}>{table ?? "Not found"}</dd></div>)}</dl><div className="warning-list"><h3>Warnings</h3>{snapshot.diagnostics.warnings.length > 0 ? snapshot.diagnostics.warnings.map((warning, index) => <p key={`${warning}-${index}`}>{warning}</p>) : <p>No mapping warnings were generated.</p>}</div></div><div className="content-panel table-inventory"><div className="panel-heading large"><div><span>Database Table Inventory</span><p>Only recognized history tables are loaded into memory.</p></div><strong>{snapshot.tables.length}</strong></div><div className="inventory-list">{snapshot.tables.map((table) => <details key={table.name}><summary><span>{table.name}</span><small>{table.rowCount.toLocaleString()} rows · {table.columnCount} columns</small><b>{table.loaded ? "Mapped" : "Metadata only"}</b></summary><p>{table.columns.join(", ") || "No column names were returned."}</p>{table.truncated && <p className="truncate-warning">This table exceeded the read-only row limit.</p>}</details>)}</div></div></section>}
       </>}
     </main>
-    <footer>You book the opportunities. The wrestlers create the outcomes. You book the consequences. The live card changes as results happen, so the show is played rather than merely entered.</footer>
+    <footer>You book the opportunities. The wrestlers create the outcomes. You book the consequences. Records update from official results while permanent title, competition, and future booking changes remain in your control.</footer>
   </div>;
 }
