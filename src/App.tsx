@@ -6,6 +6,7 @@ import ResultConsequenceWorkspace from "./consequences/ResultConsequenceWorkspac
 import CreativeControlCenter from "./control/CreativeControlCenter";
 import HandoffWorkspace from "./handoff/HandoffWorkspace";
 import LiveCardRunnerWorkspace from "./liveCard/LiveCardRunnerWorkspace";
+import { loadLiveCardUniverse, saveLiveCardUniverse } from "./liveCard/storage";
 import MatchEngineFoundation from "./matchEngine/MatchEngineFoundation";
 import MatchResolutionWorkspace from "./matchResolution/MatchResolutionWorkspace";
 import ShowOperationsWorkspace from "./operations/ShowOperationsWorkspace";
@@ -108,6 +109,7 @@ export default function App() {
   const [advancedToolsVisible, setAdvancedToolsVisible] = useState(() => loadWorkbenchUniverse(window.localStorage).settings.advancedToolsVisible);
   const [plannerTarget, setPlannerTarget] = useState<{ showId: string; segmentId: string; key: number } | null>(null);
   const [sessionKey, setSessionKey] = useState(0);
+  const [resolutionReturnToRunner, setResolutionReturnToRunner] = useState(false);
 
   const selectedShow = useMemo(() => snapshot ? snapshot.shows.find((show) => show.id === selectedShowId) ?? snapshot.shows[0] ?? null : null, [selectedShowId, snapshot]);
 
@@ -182,6 +184,12 @@ export default function App() {
     setView("session");
   }
 
+  function runPlannedShow(showId: string): void {
+    const liveCard = loadLiveCardUniverse(window.localStorage);
+    saveLiveCardUniverse(window.localStorage, { ...liveCard, settings: { ...liveCard.settings, selectedShowId: showId } });
+    setView("runner");
+  }
+
   function scrollToShowSession(): void {
     document.querySelector(".show-session-workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -203,12 +211,12 @@ export default function App() {
   const standaloneViews: ViewName[] = ["universe", "runner", "resolution", "consequences", "session", "calendar", "operations", "workbench", "outputs", "profiles", "transfer", "results", "bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
 
   return <div className="app-shell">
-    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>Wrestling Sim</h1></div><div className="phase-badge">PHASE 6B5 · CORE BOOKING FLOW</div></header>
+    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>Wrestling Sim</h1></div><div className="phase-badge">BOOK · RUN · RECORD</div></header>
     <nav className="global-tabbar" aria-label="Wrestling Sim sections">
       <button className={view === "universe" ? "active" : ""} onClick={() => setView("universe")} type="button">Starting Universe</button>
       <button className={view === "planner" ? "active" : ""} onClick={() => setView("planner")} type="button">Book Shows</button>
       <button className={view === "runner" ? "active" : ""} onClick={() => setView("runner")} type="button">Run Show</button>
-      <button className={view === "resolution" ? "active" : ""} onClick={() => setView("resolution")} type="button">Run Matches</button>
+      <button className={view === "resolution" ? "active" : ""} onClick={() => { setResolutionReturnToRunner(false); setView("resolution"); }} type="button">Run Matches</button>
       <button className={view === "consequences" ? "active" : ""} onClick={() => setView("consequences")} type="button">Consequences</button>
       <button className={view === "session" ? "active" : ""} onClick={() => setView("session")} type="button">Show Session</button>
       <button className={view === "calendar" ? "active" : ""} onClick={() => setView("calendar")} type="button">Promotion Calendar</button>
@@ -239,8 +247,8 @@ export default function App() {
     </nav>
     <main>
       {view === "universe" && <StartingUniverseWorkspace />}
-      {view === "runner" && <LiveCardRunnerWorkspace onOpenResolution={() => setView("resolution")} onOpenPlanner={openPlannedSegment} />}
-      {view === "resolution" && <MatchResolutionWorkspace />}
+      {view === "runner" && <LiveCardRunnerWorkspace onOpenResolution={() => { setResolutionReturnToRunner(true); setView("resolution"); }} onOpenConsequences={() => setView("consequences")} onOpenPlanner={openPlannedSegment} />}
+      {view === "resolution" && <MatchResolutionWorkspace onReturnToShow={resolutionReturnToRunner ? () => { setResolutionReturnToRunner(false); setView("runner"); } : undefined} />}
       {view === "consequences" && <ResultConsequenceWorkspace onOpenLiveCard={() => setView("runner")} onOpenPlanner={openPlannedSegment} />}
       {view === "session" && <>
         <CompanionHomeWorkspace activeSnapshot={snapshot} vault={vault} vaultReady={vaultReady} snapshotLoading={loading} snapshotError={error} onImportSnapshot={(file) => void handleFile(file, "session")} onActivateSnapshot={activateSnapshot} onVaultChange={setVault} onContinueShow={scrollToShowSession} onOpenPlanner={() => setView("planner")} onOpenCalendar={() => setView("calendar")} onOpenResults={() => setView("results")} onOpenProfiles={() => setView("profiles")} onOpenStorylines={() => setView("storyline-hub")} onOpenWrapUp={openWrapUp} />
@@ -256,7 +264,7 @@ export default function App() {
       {view === "results" && <ResultsCoreWorkspace key="operations-results" snapshot={snapshot} onOpenShow={openPlannedSegment} onOpenHandoff={() => setView("handoff")} onOpenTransfer={() => setView("transfer")} />}
       {view === "bridge" && <BridgeWorkspace onOpenShow={openPlannedSegment} />}
       {view === "control" && <CreativeControlCenter snapshot={snapshot} onOpenShow={openPlannedSegment} onOpenStoryline={() => setView("storyline-hub")} onOpenWorker={() => setView("worker-hub")} />}
-      {view === "planner" && <PlannedShowWorkspace key={plannerTarget?.key ?? 0} snapshot={snapshot} snapshotLoading={loading} snapshotError={error} onSnapshotFile={(file) => void handleFile(file, "planner")} onCloseSnapshot={closeSnapshot} initialShowId={plannerTarget?.showId ?? ""} initialSegmentId={plannerTarget?.segmentId ?? ""} />}
+      {view === "planner" && <PlannedShowWorkspace key={plannerTarget?.key ?? 0} snapshot={snapshot} snapshotLoading={loading} snapshotError={error} onSnapshotFile={(file) => void handleFile(file, "planner")} onCloseSnapshot={closeSnapshot} initialShowId={plannerTarget?.showId ?? ""} initialSegmentId={plannerTarget?.segmentId ?? ""} onRunShow={runPlannedShow} />}
       {view === "handoff" && <HandoffWorkspace snapshot={snapshot} />}
       {view === "competitions" && <CompetitionHub snapshot={snapshot} onOpenShow={openPlannedSegment} />}
       {view === "match-engine" && <MatchEngineFoundation />}

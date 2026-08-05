@@ -25,7 +25,7 @@ test("resolves a tag match as teams and preserves the deciding fall", async ({ p
   await expect(match.locator(".match-competitor-card")).toHaveCount(4);
 
   await page.getByRole("button", { name: "Run Matches", exact: true }).click();
-  await expect(page.getByText("PHASE 6B4 · TEAM AND MULTI-PERSON MATCH RESOLUTION", { exact: true })).toBeVisible();
+  await expect(page.getByText("OFFICIAL MATCH", { exact: true })).toBeVisible();
   await expect(page.getByText("Team", { exact: true })).toBeVisible();
   await expect(page.locator(".match-resolution-worker-card")).toHaveCount(4);
   await page.getByRole("button", { name: "Run Official Match Calculation" }).click();

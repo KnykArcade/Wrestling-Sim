@@ -152,6 +152,7 @@ export default function PlannedShowWorkspace({
   onCloseSnapshot,
   initialShowId = "",
   initialSegmentId = "",
+  onRunShow,
 }: {
   snapshot: TewSnapshot | null;
   snapshotLoading?: boolean;
@@ -160,6 +161,7 @@ export default function PlannedShowWorkspace({
   onCloseSnapshot: () => void;
   initialShowId?: string;
   initialSegmentId?: string;
+  onRunShow?: (showId: string) => void;
 }) {
   const [shows, setShows] = useState<PlannedShow[]>(() => loadPlannedShows(window.localStorage));
   const [matchEngine, setMatchEngine] = useState<MatchEngineUniverse>(() => loadMatchEngineUniverse(window.localStorage));
@@ -248,6 +250,12 @@ export default function PlannedShowWorkspace({
     window.requestAnimationFrame(() => document.getElementById(`planned-segment-${segment.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
+  function runShow(): void {
+    if (!selectedShow || !onRunShow) return;
+    savePlannedShows(window.localStorage, shows);
+    onRunShow(selectedShow.id);
+  }
+
   async function importBackup(file: File): Promise<void> {
     try {
       const imported = parsePlannerBackup(await file.text());
@@ -290,7 +298,7 @@ export default function PlannedShowWorkspace({
         {!selectedShow ? <section className="planner-empty-card"><h3>Create your first show</h3><p>The card and its complete narrative can be written here before you create anything inside TEW.</p><button className="primary-button" type="button" onClick={addShow}>Create Show</button></section> : <div className="planner-editor">
           <nav className="show-workflow-tabs" aria-label="Selected show workflow"><button type="button" className={editorMode === "plan" ? "active" : ""} onClick={() => setEditorMode("plan")}>Plan Card</button><button type="button" className={editorMode === "reconcile" ? "active" : ""} onClick={() => setEditorMode("reconcile")}>{selectedShow.status === "Reconciled" ? "Enhanced History" : "Reconcile Results"}</button></nav>
           {editorMode === "reconcile" ? <ReconciliationWorkspace show={selectedShow} allShows={shows} snapshot={snapshot} onChange={(updated) => updateShow(selectedShow.id, () => updated)} /> : <>
-            <section className="planned-show-details"><header className="planned-show-details__header"><div><p className="eyebrow">SHOW DETAILS</p><h3>{selectedShow.name || "Untitled Show"}</h3></div><div className="show-record-actions"><button className="secondary-button" type="button" onClick={duplicateShow}>Duplicate</button><button className="danger-button" type="button" onClick={deleteShow}>Delete Show</button></div></header>
+            <section className="planned-show-details"><header className="planned-show-details__header"><div><p className="eyebrow">SHOW DETAILS</p><h3>{selectedShow.name || "Untitled Show"}</h3></div><div className="show-record-actions"><button className="primary-button" type="button" onClick={runShow}>Run This Show</button><button className="secondary-button" type="button" onClick={duplicateShow}>Duplicate</button><button className="danger-button" type="button" onClick={deleteShow}>Delete Show</button></div></header>
               <div className="show-form-grid">
                 <label className="field field--wide"><span>Show name</span><input value={selectedShow.name} onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, name: event.target.value }))} /></label>
                 <label className="field"><span>Date</span><input type="date" value={selectedShow.date} onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, date: event.target.value }))} /></label>

@@ -7,6 +7,7 @@ import {
   createLiveCardSession,
   insertGroundedAngle,
   lockMatchResult,
+  liveCardReadiness,
   nextUnfinishedMatchId,
   nextUnfinishedSegmentId,
   openSegmentCorrection,
@@ -121,6 +122,21 @@ function card() {
 }
 
 describe("Phase 6B2 reactive live card runner", () => {
+  test("blocks an incomplete card and clearly identifies what must be fixed", () => {
+    const show = createPlannedShow(1);
+    expect(liveCardReadiness(show)).toMatchObject({ ready: false, blockers: ["Add at least one match or angle to the card."] });
+    const match = createPlannedSegment("match");
+    match.title = "Opening Match";
+    show.segments = [match];
+    expect(liveCardReadiness(show)).toMatchObject({ ready: false });
+    expect(liveCardReadiness(show).blockers[0]).toContain("Add 2 more");
+    match.workers = [
+      { id: "one", name: "One", role: "Competitor", side: "Side 1", source: "manual" },
+      { id: "two", name: "Two", role: "Competitor", side: "Side 2", source: "manual" },
+    ];
+    expect(liveCardReadiness(show)).toEqual({ ready: true, blockers: [] });
+  });
+
   test("starts at the first segment and resumes the exact selected position", () => {
     const { show, opening, match } = card();
     let session = createLiveCardSession(show, { records: [], settings: { defaultImportance: "Television", defaultChemistry: 0, defaultVolatility: 8, requireOverrideReason: true, selectedShowId: "", selectedSegmentId: "" } });

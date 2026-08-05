@@ -1,6 +1,6 @@
 import { activeResolutionAttempt } from "../matchResolution/engine";
 import type { MatchResolutionRecord, MatchResolutionUniverse } from "../matchResolution/types";
-import { createPlannedSegment, createPlannerId, touchShow } from "../planner/model";
+import { createPlannedSegment, createPlannerId, matchBookingValidation, touchShow } from "../planner/model";
 import type { PlannedSegment, PlannedShow } from "../planner/types";
 import type {
   GroundedAngleInput,
@@ -23,6 +23,25 @@ function audit(action: LiveCardAuditAction, showId: string, segmentId: string, d
 
 export function emptyLiveCardUniverse(): LiveCardUniverse {
   return { sessions: [], settings: { selectedShowId: "", showRunnerVisible: true } };
+}
+
+export interface LiveCardReadiness {
+  ready: boolean;
+  blockers: string[];
+}
+
+export function liveCardReadiness(show: PlannedShow): LiveCardReadiness {
+  const blockers: string[] = [];
+  if (!show.name.trim()) blockers.push("Give the show a name.");
+  if (show.segments.length === 0) blockers.push("Add at least one match or angle to the card.");
+  show.segments.forEach((segment, index) => {
+    if (!segment.title.trim()) blockers.push(`Name segment ${index + 1}.`);
+    if (segment.type === "match") {
+      const validation = matchBookingValidation(segment);
+      if (validation !== "Match setup is ready.") blockers.push(`${segment.title || `Match ${index + 1}`}: ${validation}`);
+    }
+  });
+  return { ready: blockers.length === 0, blockers };
 }
 
 function resolutionForSegment(showId: string, segmentId: string, universe: MatchResolutionUniverse): MatchResolutionRecord | null {
