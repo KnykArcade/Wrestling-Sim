@@ -81,7 +81,8 @@ export default function MatchApproachSetupEditor({
     });
     return [...groups.entries()];
   }, [competitors]);
-  const slots = approachSlotsForDuration(segment.durationMinutes);
+  const recommendedSlots = approachSlotsForDuration(segment.durationMinutes);
+  const slots = segment.matchApproachSetup.approachLimit ?? recommendedSlots;
   const aim = MATCH_AIMS.find((item) => item.id === segment.matchApproachSetup.matchAimId) ?? MATCH_AIMS[0];
 
   function updateSetup(patch: Partial<PlannedSegment["matchApproachSetup"]>): void {
@@ -209,6 +210,15 @@ export default function MatchApproachSetupEditor({
       <button className="primary-button" type="button" onClick={runAll} disabled={competitors.length === 0}>Run AI for All Competitors</button>
     </header>
 
+    <div className="match-settings-heading"><p className="eyebrow">MATCH SETTINGS</p><strong>Set time, approach limits, aim, and pace before choosing strategies</strong></div>
+    <div className="match-approach-controls">
+      <label className="field"><span>Match aim</span><select aria-label="Match aim" value={aim.id} onChange={(event) => updateSetup({ matchAimId: event.target.value as PlannedSegment["matchApproachSetup"]["matchAimId"] })}>{MATCH_AIMS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <div><span>Match time</span><strong>{segment.durationMinutes} minutes</strong></div>
+      <label className="field"><span>Approach limit per wrestler</span><input aria-label="Approach limit per wrestler" type="number" min={1} max={8} value={slots} onChange={(event) => updateSetup({ approachLimit: Math.max(1, Math.min(8, Number(event.target.value) || recommendedSlots)) })} /><small>Recommended: {recommendedSlots}</small></label>
+      <div><span>Ideal pace</span><strong>{aim.idealPace === 0 ? "Open" : aim.idealPace}</strong></div>
+      <div className={`match-pace-result match-pace-result--${combinedPace && aim.idealPace && Math.abs(combinedPace - aim.idealPace) > 20 ? "risk" : "balanced"}`}><span>Projected pace</span><strong>{combinedPace || "—"}</strong><small>{!combinedPace ? "Choose approaches" : !aim.idealPace ? "Open pace" : Math.abs(combinedPace - aim.idealPace) <= 20 ? "Compatible" : "Off target"}</small></div>
+    </div>
+
     {competitors.length === 0 ? <div className="match-approach-empty">
       Add the wrestlers to this match above. Managers, referees, announcers, and commentators are excluded from approach selection.
     </div> : <div className={`match-side-board match-side-board--${Math.min(competitorSides.length, 4)}`}>
@@ -286,19 +296,14 @@ export default function MatchApproachSetupEditor({
                 const score = scoreApproachCandidate(previewProfile, aim.id, approach);
                 return <article className={`approach-candidate approach-candidate--${resultTone(score.rating)}`} key={approach.id}>
                   <div className="approach-candidate__title"><strong>{approach.name}</strong><span className={`approach-quality approach-quality--${resultTone(score.rating)}`}>{ratingLabel(score.rating)}</span></div>
-                  <p>{approach.summary}</p>
+                  <details className="approach-candidate__details"><summary>More details</summary><p>{approach.summary}</p><p><b>Rating source:</b> {profile ? (profile.workerSource === "tew" ? "Imported or saved wrestler profile" : "Manually entered wrestler profile") : "Estimated baseline until a wrestler profile is saved"}.</p><p><b>Rating formula:</b> {approach.formula.map((item) => `${item.skill} ${Math.round(item.weight * 100)}%`).join(" + ")}.</p><div className="approach-candidate__fit"><span>Style: <b>{score.styleBonus > 0 ? "Strong fit" : "Neutral"}</b></span><span>Match aim: <b>{score.aimCompatibility > 0 ? "Strong fit" : score.aimCompatibility < 0 ? "Clash" : "Neutral"}</b></span><span>Pacing: <b>{score.paceBonus >= 5 ? "Ideal" : score.paceBonus >= 0 ? "Usable" : "Risk"}</b></span></div></details>
                   <div className="approach-candidate__metrics">
                     <span>Rating <b>{score.rating.toFixed(1)}</b></span>
                     <span>Suitability <b>{ratingLabel(score.total)} · {score.total.toFixed(1)}</b></span>
                     <span>Stamina <b>{approach.staminaCost}</b></span>
                     <span>Pace <b>{approach.pace}</b></span>
                   </div>
-                  <div className="approach-candidate__fit">
-                    <span>Style: <b>{score.styleBonus > 0 ? "Strong fit" : "Neutral"}</b></span>
-                    <span>Match aim: <b>{score.aimCompatibility > 0 ? "Strong fit" : score.aimCompatibility < 0 ? "Clash" : "Neutral"}</b></span>
-                    <span>Pacing: <b>{score.paceBonus >= 5 ? "Ideal" : score.paceBonus >= 0 ? "Usable" : "Risk"}</b></span>
-                  </div>
-                  <button className="secondary-button compact-button" type="button" disabled={plan.selectedApproachIds.length >= slots} onClick={() => addManualApproach(worker, approach.id)}>Add {approach.name}</button>
+                  <button className="secondary-button compact-button approach-add-button" type="button" aria-label={`Add ${approach.name} for ${worker.name}`} disabled={plan.selectedApproachIds.length >= slots} onClick={() => addManualApproach(worker, approach.id)}>Add</button>
                 </article>;
               })}
             </div>
@@ -312,20 +317,6 @@ export default function MatchApproachSetupEditor({
         {sideIndex < competitorSides.length - 1 && <div className="match-vs-divider" aria-hidden="true"><span>VS</span></div>}
       </Fragment>)}
     </div>}
-
-    <div className="match-settings-heading"><p className="eyebrow">MATCH SETTINGS</p><strong>Set the match target after reviewing both sides</strong></div>
-    <div className="match-approach-controls">
-      <label className="field">
-        <span>Match aim</span>
-        <select aria-label="Match aim" value={aim.id} onChange={(event) => updateSetup({ matchAimId: event.target.value as PlannedSegment["matchApproachSetup"]["matchAimId"] })}>
-          {MATCH_AIMS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
-      </label>
-      <div><span>Match length</span><strong>{segment.durationMinutes} minutes</strong></div>
-      <div><span>Approach slots</span><strong>{slots} per wrestler</strong></div>
-      <div><span>Ideal pace</span><strong>{aim.idealPace === 0 ? "Open" : aim.idealPace}</strong></div>
-      <div className={`match-pace-result match-pace-result--${combinedPace && aim.idealPace && Math.abs(combinedPace - aim.idealPace) > 20 ? "risk" : "balanced"}`}><span>Estimated combined pace</span><strong>{combinedPace || "—"}</strong></div>
-    </div>
 
     <label className="field match-approach-notes"><span>Approach and road-agent notes</span><textarea rows={3} value={segment.matchApproachSetup.notes} placeholder="Explain why an approach is locked, how the styles should interact, or what should be copied into TEW road-agent notes." onChange={(event) => updateSetup({ notes: event.target.value })} /></label>
 

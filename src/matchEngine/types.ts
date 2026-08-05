@@ -258,6 +258,7 @@ export interface MatchPerformancePreview {
 
 export interface MatchApproachSetup {
   matchAimId: MatchAimId;
+  approachLimit: number | null;
   workerPlans: MatchWorkerApproachPlan[];
   notes: string;
   performanceSettings: MatchPerformanceSettings;

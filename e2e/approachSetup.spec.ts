@@ -12,7 +12,8 @@ test("selects and persists wrestler approaches inside a planned TEW match", asyn
   const match = page.locator('[data-segment-type="match"]');
   await match.getByLabel("Segment name").fill("Jay White vs PAC");
   await match.getByLabel("Length (minutes)").fill("20");
-  await expect(match.getByText("3 per wrestler", { exact: true })).toBeVisible();
+  await expect(match.getByLabel("Approach limit per wrestler")).toHaveValue("3");
+  await expect(match.getByText("Recommended: 3", { exact: true })).toBeVisible();
 
   await match.getByLabel("Manual worker name").fill("Jay White");
   await match.getByRole("button", { name: "Add Manual Worker" }).click();

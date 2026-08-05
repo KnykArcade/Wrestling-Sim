@@ -48,11 +48,15 @@ function narrativeIsComplete(segment: PlannedSegment): boolean {
   return segment.type === "match" ? Boolean(segment.matchStory.trim()) : Boolean(segment.segmentOutput.trim());
 }
 
-function BasicMatchBooking({ segment, snapshot, onChange }: { segment: PlannedSegment; snapshot: TewSnapshot | null; onChange: (segment: PlannedSegment) => void }) {
+function BasicMatchBooking({ segment, snapshot, company, onChange }: { segment: PlannedSegment; snapshot: TewSnapshot | null; company: string; onChange: (segment: PlannedSegment) => void }) {
   const [importedWorkerId, setImportedWorkerId] = useState("");
   const [manualWorkerName, setManualWorkerName] = useState("");
+  const [rosterCompany, setRosterCompany] = useState(company || "__all__");
   const format = normalizeMatchFormat(segment.matchType);
   const validation = matchBookingValidation(segment);
+  const companyNames = useMemo(() => Array.from(new Set(snapshot?.shows.map((show) => show.company).filter(Boolean) ?? [])).sort(), [snapshot]);
+  const companyWorkerIds = useMemo(() => new Set(snapshot?.shows.filter((show) => show.company === rosterCompany).flatMap((show) => show.matches.flatMap((match) => match.workers.map((worker) => worker.id))) ?? []), [snapshot, rosterCompany]);
+  const rosterWorkers = useMemo(() => rosterCompany === "__all__" ? snapshot?.workers ?? [] : (snapshot?.workers ?? []).filter((worker) => companyWorkerIds.has(worker.id)), [snapshot, rosterCompany, companyWorkerIds]);
 
   function appendWorker(id: string, name: string, source: "tew" | "manual"): void {
     if (segment.workers.some((worker) => worker.source === source && (worker.id === id || worker.name.toLowerCase() === name.toLowerCase()))) return;
@@ -61,7 +65,7 @@ function BasicMatchBooking({ segment, snapshot, onChange }: { segment: PlannedSe
   }
 
   function addImportedWorker(): void {
-    const worker = snapshot?.workers.find((item) => item.id === importedWorkerId);
+    const worker = rosterWorkers.find((item) => item.id === importedWorkerId);
     if (!worker) return;
     appendWorker(worker.id, worker.name, "tew");
     setImportedWorkerId("");
@@ -77,8 +81,9 @@ function BasicMatchBooking({ segment, snapshot, onChange }: { segment: PlannedSe
   return <section className="basic-match-booking" aria-label="Basic match booking">
     <header><div><p className="eyebrow">BASIC MATCH BOOKING</p><h4>Choose the format and wrestlers</h4><p>Sides and teams are assigned automatically. You can rename them below.</p></div><span className={validation === "Match setup is ready." ? "booking-ready" : "booking-needed"}>{validation}</span></header>
     <label className="field match-format-field"><span>Match format</span><select aria-label="Match format" value={format} onChange={(event) => onChange(assignAutomaticMatchSides(segment, event.target.value as typeof format))}>{MATCH_FORMATS.map((item) => <option key={item}>{item}</option>)}</select></label>
+    <label className="field match-format-field"><span>Roster company</span><select aria-label="Roster company" value={rosterCompany} onChange={(event) => { setRosterCompany(event.target.value); setImportedWorkerId(""); }}><option value="__all__">All Companies / Outside Talent</option>{companyNames.map((name) => <option key={name} value={name}>{name}</option>)}</select><small>{rosterCompany === "__all__" ? "Showing every imported wrestler." : `${rosterWorkers.length} wrestlers found for ${rosterCompany}.`}</small></label>
     <div className="reference-add-grid">
-      <div className="reference-add-card"><label className="field"><span>Imported TEW wrestler</span><select aria-label="Imported TEW wrestler" value={importedWorkerId} disabled={!snapshot?.workers.length} onChange={(event) => setImportedWorkerId(event.target.value)}><option value="">{snapshot?.workers.length ? "Select a wrestler" : "No TEW wrestlers loaded"}</option>{snapshot?.workers.map((worker) => <option key={`${worker.id}-${worker.name}`} value={worker.id}>{worker.name}</option>)}</select></label><button className="secondary-button compact-button" type="button" disabled={!importedWorkerId} onClick={addImportedWorker}>Add Imported Wrestler</button></div>
+      <div className="reference-add-card"><label className="field"><span>Imported TEW wrestler</span><select aria-label="Imported TEW wrestler" value={importedWorkerId} disabled={!rosterWorkers.length} onChange={(event) => setImportedWorkerId(event.target.value)}><option value="">{rosterWorkers.length ? "Select a wrestler" : "No wrestlers found for this company"}</option>{rosterWorkers.map((worker) => <option key={`${worker.id}-${worker.name}`} value={worker.id}>{worker.name}</option>)}</select></label><button className="secondary-button compact-button" type="button" disabled={!importedWorkerId} onClick={addImportedWorker}>Add Imported Wrestler</button></div>
       <div className="reference-add-card"><label className="field"><span>Manual worker name</span><input aria-label="Manual worker name" value={manualWorkerName} placeholder="Enter wrestler name" onChange={(event) => setManualWorkerName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addManualWorker(); } }} /></label><button className="secondary-button compact-button" type="button" disabled={!manualWorkerName.trim()} onClick={addManualWorker}>Add Manual Worker</button></div>
     </div>
     {segment.workers.length ? <div className="basic-participant-list">{segment.workers.map((worker, index) => <article key={worker.id}><b>{index + 1}</b><div><strong>{worker.name}</strong><small>{worker.source === "tew" ? "TEW roster" : "Manual entry"}</small></div><label className="field"><span>Side / team</span><input value={worker.side} onChange={(event) => onChange({ ...segment, workers: segment.workers.map((item) => item.id === worker.id ? { ...item, side: event.target.value } : item) })} /></label><button className="danger-button compact-button" type="button" aria-label={`Remove ${worker.name}`} onClick={() => onChange({ ...segment, workers: segment.workers.filter((item) => item.id !== worker.id) })}>Remove</button></article>)}</div> : <p className="narrative-empty-line">No wrestlers selected. Add wrestlers above; a TEW snapshot is optional.</p>}
@@ -90,6 +95,7 @@ function SegmentEditor({
   index,
   count,
   snapshot,
+  company = "",
   matchEngine,
   onMatchEngineChange,
   onChange,
@@ -101,6 +107,7 @@ function SegmentEditor({
   index: number;
   count: number;
   snapshot: TewSnapshot | null;
+  company?: string;
   matchEngine: MatchEngineUniverse;
   onMatchEngineChange: (universe: MatchEngineUniverse) => void;
   onChange: (segment: PlannedSegment) => void;
@@ -140,7 +147,7 @@ function SegmentEditor({
         {segment.type === "angle" && <label className="field field--full"><span>Quick planning outline</span><textarea rows={3} placeholder="A short overview for the running order. Use Narrative Details below for the complete story." value={segment.notes} onChange={(event) => onChange({ ...segment, notes: event.target.value })} /></label>}
       </div>
 
-      {segment.type === "match" && <BasicMatchBooking segment={segment} snapshot={snapshot} onChange={onChange} />}
+      {segment.type === "match" && <BasicMatchBooking segment={segment} snapshot={snapshot} company={company} onChange={onChange} />}
       {segment.type === "match" && <MatchApproachSetupEditor segment={segment} universe={matchEngine} onUniverseChange={onMatchEngineChange} onChange={onChange} />}
       <NarrativeEditor segment={segment} availableWorkers={snapshot?.workers ?? []} availableStorylines={snapshot?.storylines ?? []} onChange={onChange} />
       {segment.type === "angle" && <NarrativeGenerator segment={segment} universe={matchEngine} onChange={onChange} />}

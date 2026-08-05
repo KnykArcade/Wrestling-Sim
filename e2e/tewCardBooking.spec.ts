@@ -18,10 +18,11 @@ test("uses a compact TEW-style card and previews wrestler approach quality befor
   await jay.getByText("Choose an approach for Jay White").click();
   const choices = jay.getByLabel("Available approaches for Jay White");
   const firstChoice = choices.locator(".approach-candidate").first();
-  await expect(firstChoice.getByText(/Rating/)).toBeVisible();
-  await expect(firstChoice.getByText(/Suitability/)).toBeVisible();
-  await expect(firstChoice.getByText(/Stamina/)).toBeVisible();
-  await expect(firstChoice.getByText(/Pace/)).toBeVisible();
+  await expect(firstChoice.locator(".approach-candidate__metrics").getByText(/^Rating /)).toBeVisible();
+  await expect(firstChoice.locator(".approach-candidate__metrics").getByText(/^Suitability /)).toBeVisible();
+  await expect(firstChoice.locator(".approach-candidate__metrics").getByText(/^Stamina /)).toBeVisible();
+  await expect(firstChoice.locator(".approach-candidate__metrics").getByText(/^Pace /)).toBeVisible();
+  await firstChoice.getByText("More details", { exact: true }).click();
   await expect(firstChoice.getByText(/Style:/)).toBeVisible();
   await expect(firstChoice.getByText(/Match aim:/)).toBeVisible();
   await expect(firstChoice.locator(".approach-quality")).toHaveText(/Elite|Strong|Capable|Developing|Weak/);
