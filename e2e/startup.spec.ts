@@ -32,7 +32,7 @@ test("creates and persists match and angle narratives without browser errors", a
   await angle.getByRole("button", { name: "Add Manual Storyline" }).click();
   await expect(page.getByText("2 planned segments")).toBeVisible();
   await expect(page.getByText("2 narratives complete")).toBeVisible();
-  await expect(match.locator(".narrative-person-name strong").filter({ hasText: "Bret Hart" })).toBeVisible();
+  await expect(match.locator(".basic-participant-list strong").filter({ hasText: "Bret Hart" })).toBeVisible();
   await expect(angle.getByText("World Title Rivalry", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Reconcile Results" }).click();

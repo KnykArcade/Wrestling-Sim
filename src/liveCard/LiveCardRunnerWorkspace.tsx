@@ -241,7 +241,7 @@ export default function LiveCardRunnerWorkspace({ onOpenResolution, onOpenPlanne
       const next = completeLiveCard(session);
       setUniverse((current) => upsertLiveCardSession(current, next));
       setShows((current) => current.map((show) => show.id === selectedShow.id ? touchShow({ ...show, status: "Completed" }) : show));
-      setNotice("The live card is complete. Result consequences are applied in Phase 6B3.");
+      setNotice("The live card is complete. Official result consequences have been applied.");
     } catch (caught) {
       setNotice(caught instanceof Error ? caught.message : "The show could not be completed.");
     }
@@ -268,7 +268,7 @@ export default function LiveCardRunnerWorkspace({ onOpenResolution, onOpenPlanne
           {!['Completed', 'Skipped'].includes(currentProgress.status) && <section className="live-card-skip"><label className="field"><span>Skip reason</span><input aria-label="Live card skip reason" value={skipReason} onChange={(event) => setSkipReason(event.target.value)} /></label><button className="secondary-button" type="button" onClick={skipCurrent}>Skip This Segment Deliberately</button></section>}
         </>}</main>
       </div>
-      <section className="live-card-footer"><div><strong>{canCompleteLiveCard(session) ? "Every segment is finalized." : `${remainingSegments} segment${remainingSegments === 1 ? " remains" : "s remain"}.`}</strong><span>Completing the show locks the running order as played. Phase 6B3 applies records and consequences.</span></div><button className="primary-button" type="button" disabled={!canCompleteLiveCard(session) || session.status === "Completed"} onClick={completeShow}>{session.status === "Completed" ? "Show Completed" : "Complete Live Show"}</button></section>
+      <section className="live-card-footer"><div><strong>{canCompleteLiveCard(session) ? "Every segment is finalized." : `${remainingSegments} segment${remainingSegments === 1 ? " remains" : "s remain"}.`}</strong><span>Completing the show locks the running order as played and applies official records and consequences.</span></div><button className="primary-button" type="button" disabled={!canCompleteLiveCard(session) || session.status === "Completed"} onClick={completeShow}>{session.status === "Completed" ? "Show Completed" : "Complete Live Show"}</button></section>
       <details className="live-card-audit"><summary>Live show audit history · {session.audit.length}</summary>{session.audit.map((entry) => <article key={entry.id}><strong>{entry.action}</strong><span>{entry.detail}</span><small>{formatDate(entry.createdAt)}</small></article>)}</details>
     </>}
   </section>;

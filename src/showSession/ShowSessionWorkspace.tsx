@@ -613,12 +613,12 @@ export default function ShowSessionWorkspace({
     <section className="show-session-toolbar">
       <label className="field"><span>Show session</span><select aria-label="Show session planned show" value={selectedShow?.id ?? ""} onChange={(event) => selectShow(event.target.value)}><option value="">{shows.length ? "Select a planned show" : "No planned shows"}</option>{shows.map((show) => <option key={show.id} value={show.id}>{show.name} · {show.segments.length} segments</option>)}</select></label>
       <button className="secondary-button" type="button" onClick={() => setStep("overview")} disabled={!selectedShow}>Show Overview</button>
-      <button className="secondary-button" type="button" onClick={onOpenPlanner}>Open Full Planned Show Editor</button>
+      <button className="secondary-button" type="button" onClick={onOpenPlanner}>Edit Card / Add Match</button>
       <button className="secondary-button" type="button" onClick={onOpenWorkbench}>Open Workbench</button>
       <button className="secondary-button" type="button" onClick={onOpenOutputLibrary}>Open Output Library</button>
     </section>
 
-    {!selectedShow || !sessionRecord || !summary ? <div className="empty-state show-session-empty"><h3>No planned show is available</h3><p>Create the card in Planned Shows or build a Quick Segment, then return here to run the unified session.</p><button className="primary-button" type="button" onClick={onOpenPlanner}>Open Planned Shows</button></div> : <>
+    {!selectedShow || !sessionRecord || !summary ? <div className="empty-state show-session-empty"><h3>No planned show is available</h3><p>Create your first show and add its matches in Book Shows, then return here to run it.</p><button className="primary-button" type="button" onClick={onOpenPlanner}>Create First Show</button></div> : <>
       <section className="show-session-progress" aria-label="Show session progress">
         <div><span>Segments</span><strong>{summary.segmentCount}</strong><small>{summary.matchCount} matches · {summary.angleCount} angles</small></div>
         <div><span>Runtime</span><strong>{summary.plannedMinutes}</strong><small>of {selectedShow.expectedMinutes} minutes</small></div>

@@ -5,10 +5,16 @@ import type { MatchEngineUniverse } from "../matchEngine/types";
 import NarrativeGenerator from "../narratives/NarrativeGenerator";
 import type { TewSnapshot } from "../tew/types";
 import {
+  assignAutomaticMatchSides,
+  automaticMatchSide,
+  createPlannerId,
   createPlannedSegment,
   createPlannedShow,
   duplicatePlannedShow,
+  MATCH_FORMATS,
+  matchBookingValidation,
   movePlannedSegment,
+  normalizeMatchFormat,
   totalPlannedMinutes,
   touchShow,
 } from "./model";
@@ -40,6 +46,43 @@ function downloadBackup(shows: PlannedShow[], matchEngine: MatchEngineUniverse):
 
 function narrativeIsComplete(segment: PlannedSegment): boolean {
   return segment.type === "match" ? Boolean(segment.matchStory.trim()) : Boolean(segment.segmentOutput.trim());
+}
+
+function BasicMatchBooking({ segment, snapshot, onChange }: { segment: PlannedSegment; snapshot: TewSnapshot | null; onChange: (segment: PlannedSegment) => void }) {
+  const [importedWorkerId, setImportedWorkerId] = useState("");
+  const [manualWorkerName, setManualWorkerName] = useState("");
+  const format = normalizeMatchFormat(segment.matchType);
+  const validation = matchBookingValidation(segment);
+
+  function appendWorker(id: string, name: string, source: "tew" | "manual"): void {
+    if (segment.workers.some((worker) => worker.source === source && (worker.id === id || worker.name.toLowerCase() === name.toLowerCase()))) return;
+    const index = segment.workers.length;
+    onChange({ ...segment, workers: [...segment.workers, { id, name, source, role: "Competitor", side: automaticMatchSide(format, index) }] });
+  }
+
+  function addImportedWorker(): void {
+    const worker = snapshot?.workers.find((item) => item.id === importedWorkerId);
+    if (!worker) return;
+    appendWorker(worker.id, worker.name, "tew");
+    setImportedWorkerId("");
+  }
+
+  function addManualWorker(): void {
+    const name = manualWorkerName.trim();
+    if (!name) return;
+    appendWorker(createPlannerId(), name, "manual");
+    setManualWorkerName("");
+  }
+
+  return <section className="basic-match-booking" aria-label="Basic match booking">
+    <header><div><p className="eyebrow">BASIC MATCH BOOKING</p><h4>Choose the format and wrestlers</h4><p>Sides and teams are assigned automatically. You can rename them below.</p></div><span className={validation === "Match setup is ready." ? "booking-ready" : "booking-needed"}>{validation}</span></header>
+    <label className="field match-format-field"><span>Match format</span><select aria-label="Match format" value={format} onChange={(event) => onChange(assignAutomaticMatchSides(segment, event.target.value as typeof format))}>{MATCH_FORMATS.map((item) => <option key={item}>{item}</option>)}</select></label>
+    <div className="reference-add-grid">
+      <div className="reference-add-card"><label className="field"><span>Imported TEW wrestler</span><select aria-label="Imported TEW wrestler" value={importedWorkerId} disabled={!snapshot?.workers.length} onChange={(event) => setImportedWorkerId(event.target.value)}><option value="">{snapshot?.workers.length ? "Select a wrestler" : "No TEW wrestlers loaded"}</option>{snapshot?.workers.map((worker) => <option key={`${worker.id}-${worker.name}`} value={worker.id}>{worker.name}</option>)}</select></label><button className="secondary-button compact-button" type="button" disabled={!importedWorkerId} onClick={addImportedWorker}>Add Imported Wrestler</button></div>
+      <div className="reference-add-card"><label className="field"><span>Manual worker name</span><input aria-label="Manual worker name" value={manualWorkerName} placeholder="Enter wrestler name" onChange={(event) => setManualWorkerName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addManualWorker(); } }} /></label><button className="secondary-button compact-button" type="button" disabled={!manualWorkerName.trim()} onClick={addManualWorker}>Add Manual Worker</button></div>
+    </div>
+    {segment.workers.length ? <div className="basic-participant-list">{segment.workers.map((worker, index) => <article key={worker.id}><b>{index + 1}</b><div><strong>{worker.name}</strong><small>{worker.source === "tew" ? "TEW roster" : "Manual entry"}</small></div><label className="field"><span>Side / team</span><input value={worker.side} onChange={(event) => onChange({ ...segment, workers: segment.workers.map((item) => item.id === worker.id ? { ...item, side: event.target.value } : item) })} /></label><button className="danger-button compact-button" type="button" aria-label={`Remove ${worker.name}`} onClick={() => onChange({ ...segment, workers: segment.workers.filter((item) => item.id !== worker.id) })}>Remove</button></article>)}</div> : <p className="narrative-empty-line">No wrestlers selected. Add wrestlers above; a TEW snapshot is optional.</p>}
+  </section>;
 }
 
 function SegmentEditor({
@@ -93,6 +136,7 @@ function SegmentEditor({
         <label className="field field--full"><span>Quick planning outline</span><textarea rows={3} placeholder="A short overview for the running order. Use Narrative Details below for the complete story." value={segment.notes} onChange={(event) => onChange({ ...segment, notes: event.target.value })} /></label>
       </div>
 
+      {segment.type === "match" && <BasicMatchBooking segment={segment} snapshot={snapshot} onChange={onChange} />}
       {segment.type === "match" && <MatchApproachSetupEditor segment={segment} universe={matchEngine} onUniverseChange={onMatchEngineChange} onChange={onChange} />}
       <NarrativeEditor segment={segment} availableWorkers={snapshot?.workers ?? []} availableStorylines={snapshot?.storylines ?? []} onChange={onChange} />
       <NarrativeGenerator segment={segment} universe={matchEngine} onChange={onChange} />
@@ -198,7 +242,10 @@ export default function PlannedShowWorkspace({
 
   function addSegment(type: PlannedSegment["type"]): void {
     if (!selectedShow) return;
-    updateShow(selectedShow.id, (show) => ({ ...show, segments: [...show.segments, createPlannedSegment(type)] }));
+    const segment = createPlannedSegment(type);
+    updateShow(selectedShow.id, (show) => ({ ...show, segments: [...show.segments, segment] }));
+    setNotice(type === "match" ? "Match added. Choose the format and wrestlers below." : "Angle added to the card.");
+    window.requestAnimationFrame(() => document.getElementById(`planned-segment-${segment.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
 
   async function importBackup(file: File): Promise<void> {
@@ -256,6 +303,7 @@ export default function PlannedShowWorkspace({
               </div>
             </section>
             <section className="planned-card-editor"><header className="card-editor-header"><div><p className="eyebrow">CARD ORDER</p><h3>{selectedShow.segments.length} planned segment{selectedShow.segments.length === 1 ? "" : "s"}</h3><p>{totalPlannedMinutes(selectedShow)} of {selectedShow.expectedMinutes} expected minutes planned · {completeNarratives} narratives complete</p></div><div className="card-editor-actions"><button className="primary-button" type="button" onClick={() => addSegment("match")}>Add Match</button><button className="secondary-button" type="button" onClick={() => addSegment("angle")}>Add Angle</button></div></header>
+              {selectedShow.segments.length > 0 && <div className="card-summary" aria-label="Current card summary">{selectedShow.segments.map((segment, index) => <button type="button" key={segment.id} onClick={() => document.getElementById(`planned-segment-${segment.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}><b>{index + 1}</b><span>{segment.title}</span><small>{segment.type === "match" ? `${normalizeMatchFormat(segment.matchType)} · ${segment.workers.length} wrestlers` : `Angle · ${segment.workers.length} people`}</small></button>)}</div>}
               {selectedShow.segments.length === 0 ? <div className="empty-state card-empty">Add a match or angle to begin building the show in running order.</div> : <div className="planned-segment-list">{selectedShow.segments.map((segment, index) => <SegmentEditor key={segment.id} segment={segment} index={index} count={selectedShow.segments.length} snapshot={snapshot} matchEngine={matchEngine} onMatchEngineChange={setMatchEngine} onChange={(updated) => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.map((item) => item.id === updated.id ? updated : item) }))} onMove={(direction) => updateShow(selectedShow.id, (show) => ({ ...show, segments: movePlannedSegment(show.segments, segment.id, direction) }))} onDelete={() => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.filter((item) => item.id !== segment.id) }))} />)}</div>}
             </section>
           </>}

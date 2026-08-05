@@ -8,10 +8,12 @@ import { emptyMatchEngineUniverse } from "../src/matchEngine/storage";
 import { emptyShowOperationsUniverse } from "../src/operations/model";
 import { emptyOutputLibraryUniverse } from "../src/outputLibrary/model";
 import {
+  assignAutomaticMatchSides,
   buildTewEntrySummary,
   createPlannedSegment,
   createPlannedShow,
   duplicatePlannedShow,
+  matchBookingValidation,
   movePlannedSegment,
   totalPlannedMinutes,
 } from "../src/planner/model";
@@ -113,7 +115,7 @@ describe("planned show workspace", () => {
     expect(show.reconciliation).toBeNull();
     expect(match).toMatchObject({
       title: "Untitled Match",
-      matchType: "1 vs. 1",
+      matchType: "Singles",
       matchStory: "",
       workers: [],
       storylines: [],
@@ -379,5 +381,14 @@ describe("planned show workspace", () => {
     );
     expect(parsePlannerBackup(JSON.stringify(version22))).toEqual([]);
     expect(() => parsePlannerBackup('{"product":"TEW IX Story Tracker","version":23,"shows":[]}')).toThrow("not a supported TEW Story Tracker backup");
+  });
+
+  test("assigns format sides and explains incomplete core match booking", () => {
+    const match = createPlannedSegment("match");
+    match.workers = ["Alex Shelley", "Chris Sabin", "Mark Davis", "Kyle Fletcher"].map((name, index) => ({ id: `worker-${index}`, name, role: "Competitor", side: "", source: "manual" as const }));
+    const tag = assignAutomaticMatchSides(match, "Tag Team");
+    expect(tag.workers.map((worker) => worker.side)).toEqual(["Team 1", "Team 1", "Team 2", "Team 2"]);
+    expect(matchBookingValidation(tag)).toBe("Match setup is ready.");
+    expect(matchBookingValidation({ ...tag, workers: tag.workers.slice(0, 3) })).toBe("Tag Team needs two wrestlers on each team. Add 1 more.");
   });
 });
