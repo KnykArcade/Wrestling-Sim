@@ -72,7 +72,6 @@ export default function MatchApproachSetupEditor({
   onChange: (segment: PlannedSegment) => void;
 }) {
   const [editingProfileKey, setEditingProfileKey] = useState("");
-  const [pendingApproach, setPendingApproach] = useState<Record<string, MatchApproachId | "">>({});
   const competitors = useMemo(() => segment.workers.filter(isLikelyCompetitor), [segment.workers]);
   const competitorSides = useMemo(() => {
     const groups = new Map<string, PlannedWorkerReference[]>();
@@ -173,10 +172,8 @@ export default function MatchApproachSetupEditor({
     updateSetup({ workerPlans: nextPlans });
   }
 
-  function addManualApproach(worker: PlannedWorkerReference): void {
-    const key = workerProfileKey(worker);
-    const approachId = pendingApproach[key];
-    if (!approachId) return;
+  function addManualApproach(worker: PlannedWorkerReference, approachId: MatchApproachId): void {
+    ensureProfile(worker);
     const current = planForWorker(segment, worker);
     if (current.selectedApproachIds.includes(approachId) || current.selectedApproachIds.length >= slots) return;
     savePlan(worker, {
@@ -185,7 +182,6 @@ export default function MatchApproachSetupEditor({
       mode: "Manual",
       generatedAt: "",
     });
-    setPendingApproach((values) => ({ ...values, [key]: "" }));
   }
 
   function updateProfileNumber(profile: MatchEngineProfile, field: "overall" | "health" | "popularity" | "experience" | "fanReaction" | "gimmick", value: number): void {
@@ -222,6 +218,7 @@ export default function MatchApproachSetupEditor({
           {sideWorkers.map((worker) => {
         const key = workerProfileKey(worker);
         const profile = profileForWorker(universe, worker);
+        const previewProfile = profile ?? createMatchEngineProfile(worker);
         const plan = planForWorker(segment, worker);
         const result = profile ? evaluateApproachPlan(profile, aim.id, segment.durationMinutes, plan.selectedApproachIds) : null;
         const averageApproachRating = result?.candidateScores.length ? result.candidateScores.reduce((total, score) => total + score.rating, 0) / result.candidateScores.length : 0;
@@ -264,7 +261,7 @@ export default function MatchApproachSetupEditor({
 
           <div className="selected-approach-heading">
             <div><strong>Selected approaches</strong><span>{plan.selectedApproachIds.length}/{slots} · {plan.mode}</span></div>
-            {result && <div className={`strategy-status strategy-status--${result.stamina.status.toLowerCase()} strategy-status--tone-${resultTone(averageApproachRating)}`}><b>{result.usedStamina}/{result.availableStamina} stamina</b><span>{result.stamina.status} · Pace {result.actualPace} · Rating {averageApproachRating.toFixed(1)}</span></div>}
+            {result && <div className={`strategy-status strategy-status--${result.stamina.status.toLowerCase()} strategy-status--tone-${resultTone(averageApproachRating)}`}><b>{Math.max(0, result.availableStamina - result.usedStamina)} stamina remaining</b><span>{result.usedStamina}/{result.availableStamina} used · {result.stamina.status} · Pace {result.actualPace} · Rating {averageApproachRating.toFixed(1)}</span></div>}
           </div>
 
           {plan.selectedApproachIds.length === 0 ? <p className="match-profile-placeholder">No approaches selected. Run the AI or add an approach manually.</p> : <div className="selected-approach-list">
@@ -282,13 +279,30 @@ export default function MatchApproachSetupEditor({
             })}
           </div>}
 
-          <div className="manual-approach-row">
-            <select aria-label={`Add approach for ${worker.name}`} value={pendingApproach[key] ?? ""} disabled={plan.selectedApproachIds.length >= slots} onChange={(event) => setPendingApproach((values) => ({ ...values, [key]: event.target.value as MatchApproachId }))}>
-              <option value="">Select another approach</option>
-              {remainingApproaches.map((approach) => <option key={approach.id} value={approach.id}>{approach.name} · Cost {approach.staminaCost}</option>)}
-            </select>
-            <button className="secondary-button compact-button" type="button" disabled={!pendingApproach[key] || plan.selectedApproachIds.length >= slots} onClick={() => addManualApproach(worker)}>Add Manually</button>
-          </div>
+          <details className="approach-selection-panel">
+            <summary>{plan.selectedApproachIds.length >= slots ? "All approach slots filled" : `Choose an approach for ${worker.name}`}</summary>
+            <div className="approach-candidate-list" aria-label={`Available approaches for ${worker.name}`}>
+              {remainingApproaches.map((approach) => {
+                const score = scoreApproachCandidate(previewProfile, aim.id, approach);
+                return <article className={`approach-candidate approach-candidate--${resultTone(score.rating)}`} key={approach.id}>
+                  <div className="approach-candidate__title"><strong>{approach.name}</strong><span className={`approach-quality approach-quality--${resultTone(score.rating)}`}>{ratingLabel(score.rating)}</span></div>
+                  <p>{approach.summary}</p>
+                  <div className="approach-candidate__metrics">
+                    <span>Rating <b>{score.rating.toFixed(1)}</b></span>
+                    <span>Suitability <b>{ratingLabel(score.total)} · {score.total.toFixed(1)}</b></span>
+                    <span>Stamina <b>{approach.staminaCost}</b></span>
+                    <span>Pace <b>{approach.pace}</b></span>
+                  </div>
+                  <div className="approach-candidate__fit">
+                    <span>Style: <b>{score.styleBonus > 0 ? "Strong fit" : "Neutral"}</b></span>
+                    <span>Match aim: <b>{score.aimCompatibility > 0 ? "Strong fit" : score.aimCompatibility < 0 ? "Clash" : "Neutral"}</b></span>
+                    <span>Pacing: <b>{score.paceBonus >= 5 ? "Ideal" : score.paceBonus >= 0 ? "Usable" : "Risk"}</b></span>
+                  </div>
+                  <button className="secondary-button compact-button" type="button" disabled={plan.selectedApproachIds.length >= slots} onClick={() => addManualApproach(worker, approach.id)}>Add {approach.name}</button>
+                </article>;
+              })}
+            </div>
+          </details>
 
           {result && <div className="approach-plan-explanation">{result.explanation.map((line) => <span key={line}>{line}</span>)}</div>}
           {plan.selectedApproachIds.length > slots && <div className="source-warning"><strong>Too many approaches</strong><span>This match length allows {slots}. Run the AI again or remove approaches manually.</span></div>}

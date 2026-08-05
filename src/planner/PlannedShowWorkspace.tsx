@@ -95,6 +95,7 @@ function SegmentEditor({
   onChange,
   onMove,
   onDelete,
+  onClose,
 }: {
   segment: PlannedSegment;
   index: number;
@@ -105,6 +106,7 @@ function SegmentEditor({
   onChange: (segment: PlannedSegment) => void;
   onMove: (direction: -1 | 1) => void;
   onDelete: () => void;
+  onClose: (saved: boolean) => void;
 }) {
   return (
     <article
@@ -123,6 +125,8 @@ function SegmentEditor({
           <span className="workflow-status">{segment.workflowStatus}</span>
         </div>
         <div className="segment-actions">
+          <button type="button" onClick={() => onClose(false)}>Back to Card</button>
+          <button className="primary-button" type="button" onClick={() => onClose(true)}>Save and Close</button>
           <button type="button" onClick={() => onMove(-1)} disabled={index === 0} aria-label="Move segment up">Move Up</button>
           <button type="button" onClick={() => onMove(1)} disabled={index === count - 1} aria-label="Move segment down">Move Down</button>
           <button className="danger-button" type="button" onClick={onDelete}>Remove</button>
@@ -169,6 +173,7 @@ export default function PlannedShowWorkspace({
   const [saveState, setSaveState] = useState<SaveState>("Saved");
   const [notice, setNotice] = useState("");
   const [editorMode, setEditorMode] = useState<EditorMode>("plan");
+  const [activeSegmentId, setActiveSegmentId] = useState(initialSegmentId);
   const importRef = useRef<HTMLInputElement | null>(null);
   const snapshotRef = useRef<HTMLInputElement | null>(null);
 
@@ -204,9 +209,15 @@ export default function PlannedShowWorkspace({
   }, [selectedShow?.id, selectedShow?.status]);
 
   useEffect(() => {
+    if (!activeSegmentId) return;
+    if (!selectedShow?.segments.some((segment) => segment.id === activeSegmentId)) setActiveSegmentId("");
+  }, [activeSegmentId, selectedShow]);
+
+  useEffect(() => {
     if (!initialShowId || selectedShow?.id !== initialShowId) return;
     setEditorMode("plan");
     if (!initialSegmentId) return;
+    setActiveSegmentId(initialSegmentId);
     const frame = window.requestAnimationFrame(() => {
       document.getElementById(`planned-segment-${initialSegmentId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
@@ -222,6 +233,7 @@ export default function PlannedShowWorkspace({
     setShows((current) => [show, ...current]);
     setSelectedId(show.id);
     setEditorMode("plan");
+    setActiveSegmentId("");
     setNotice("New planned show created.");
   }
 
@@ -231,6 +243,7 @@ export default function PlannedShowWorkspace({
     setShows((current) => [duplicate, ...current]);
     setSelectedId(duplicate.id);
     setEditorMode("plan");
+    setActiveSegmentId("");
     setNotice("Show duplicated with a clean reconciliation record.");
   }
 
@@ -239,6 +252,7 @@ export default function PlannedShowWorkspace({
     const remaining = shows.filter((show) => show.id !== selectedShow.id);
     setShows(remaining);
     setSelectedId(remaining[0]?.id ?? "");
+    setActiveSegmentId("");
     setNotice("Planned show deleted.");
   }
 
@@ -246,6 +260,7 @@ export default function PlannedShowWorkspace({
     if (!selectedShow) return;
     const segment = createPlannedSegment(type);
     updateShow(selectedShow.id, (show) => ({ ...show, segments: [...show.segments, segment] }));
+    setActiveSegmentId(segment.id);
     setNotice(type === "match" ? "Match added. Choose the format and wrestlers below." : "Angle added to the card.");
     window.requestAnimationFrame(() => document.getElementById(`planned-segment-${segment.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
@@ -271,6 +286,7 @@ export default function PlannedShowWorkspace({
   }
 
   const completeNarratives = selectedShow?.segments.filter(narrativeIsComplete).length ?? 0;
+  const activeSegment = selectedShow?.segments.find((segment) => segment.id === activeSegmentId) ?? null;
 
   return (
     <section className="planner-workspace">
@@ -293,7 +309,7 @@ export default function PlannedShowWorkspace({
       {notice && <div className="status-banner planner-notice" role="status"><span>{notice}</span><button type="button" onClick={() => setNotice("")}>Dismiss</button></div>}
 
       <div className="planner-layout">
-        <aside className="planned-show-list"><div className="panel-heading"><span>Planned Shows</span><strong>{shows.length}</strong></div>{shows.length === 0 ? <div className="empty-state compact">No shows have been planned yet.</div> : shows.map((show) => <button type="button" className={selectedShow?.id === show.id ? "selected" : ""} key={show.id} onClick={() => { setSelectedId(show.id); setEditorMode(show.status === "Reconciled" ? "reconcile" : "plan"); }}><strong>{show.name || "Untitled Show"}</strong><span>{show.date || "Date not set"}</span><small>{show.segments.length} segment{show.segments.length === 1 ? "" : "s"} · {show.status}</small>{show.reconciliation && <em>Linked: {show.reconciliation.actualShow.name}</em>}</button>)}</aside>
+        <aside className="planned-show-list"><div className="panel-heading"><span>Planned Shows</span><strong>{shows.length}</strong></div>{shows.length === 0 ? <div className="empty-state compact">No shows have been planned yet.</div> : shows.map((show) => <button type="button" className={selectedShow?.id === show.id ? "selected" : ""} key={show.id} onClick={() => { setSelectedId(show.id); setEditorMode(show.status === "Reconciled" ? "reconcile" : "plan"); setActiveSegmentId(""); }}><strong>{show.name || "Untitled Show"}</strong><span>{show.date || "Date not set"}</span><small>{show.segments.length} segment{show.segments.length === 1 ? "" : "s"} · {show.status}</small>{show.reconciliation && <em>Linked: {show.reconciliation.actualShow.name}</em>}</button>)}</aside>
 
         {!selectedShow ? <section className="planner-empty-card"><h3>Create your first show</h3><p>The card and its complete narrative can be written here before you create anything inside TEW.</p><button className="primary-button" type="button" onClick={addShow}>Create Show</button></section> : <div className="planner-editor">
           <nav className="show-workflow-tabs" aria-label="Selected show workflow"><button type="button" className={editorMode === "plan" ? "active" : ""} onClick={() => setEditorMode("plan")}>Plan Card</button><button type="button" className={editorMode === "reconcile" ? "active" : ""} onClick={() => setEditorMode("reconcile")}>{selectedShow.status === "Reconciled" ? "Enhanced History" : "Reconcile Results"}</button></nav>
@@ -310,9 +326,10 @@ export default function PlannedShowWorkspace({
                 <label className="field field--full"><span>Show notes</span><textarea rows={3} value={selectedShow.notes} onChange={(event) => updateShow(selectedShow.id, (show) => ({ ...show, notes: event.target.value }))} /></label>
               </div>
             </section>
-            <section className="planned-card-editor"><header className="card-editor-header"><div><p className="eyebrow">CARD ORDER</p><h3>{selectedShow.segments.length} planned segment{selectedShow.segments.length === 1 ? "" : "s"}</h3><p>{totalPlannedMinutes(selectedShow)} of {selectedShow.expectedMinutes} expected minutes planned · {completeNarratives} narratives complete</p></div><div className="card-editor-actions"><button className="primary-button" type="button" onClick={() => addSegment("match")}>Add Match</button><button className="secondary-button" type="button" onClick={() => addSegment("angle")}>Add Angle</button></div></header>
-              {selectedShow.segments.length > 0 && <div className="card-summary" aria-label="Current card summary">{selectedShow.segments.map((segment, index) => <button type="button" key={segment.id} onClick={() => document.getElementById(`planned-segment-${segment.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}><b>{index + 1}</b><span>{segment.title}</span><small>{segment.type === "match" ? `${normalizeMatchFormat(segment.matchType)} · ${segment.workers.length} wrestlers` : `Angle · ${segment.workers.length} people`}</small></button>)}</div>}
-              {selectedShow.segments.length === 0 ? <div className="empty-state card-empty">Add a match or angle to begin building the show in running order.</div> : <div className="planned-segment-list">{selectedShow.segments.map((segment, index) => <SegmentEditor key={segment.id} segment={segment} index={index} count={selectedShow.segments.length} snapshot={snapshot} matchEngine={matchEngine} onMatchEngineChange={setMatchEngine} onChange={(updated) => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.map((item) => item.id === updated.id ? updated : item) }))} onMove={(direction) => updateShow(selectedShow.id, (show) => ({ ...show, segments: movePlannedSegment(show.segments, segment.id, direction) }))} onDelete={() => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.filter((item) => item.id !== segment.id) }))} />)}</div>}
+            <section className="planned-card-editor"><header className="card-editor-header"><div><p className="eyebrow">{activeSegment ? "SEGMENT BOOKING" : "CARD / BOOKING"}</p><h3>{activeSegment ? activeSegment.title : `${selectedShow.segments.length} planned segment${selectedShow.segments.length === 1 ? "" : "s"}`}</h3><p>{activeSegment ? "Complete this segment, save it, then return to the running order." : `${totalPlannedMinutes(selectedShow)} of ${selectedShow.expectedMinutes} expected minutes planned · ${completeNarratives} narratives complete`}</p></div>{!activeSegment && <div className="card-editor-actions"><button className="primary-button" type="button" onClick={() => addSegment("match")}>Add Match</button><button className="secondary-button" type="button" onClick={() => addSegment("angle")}>Add Angle</button></div>}</header>
+              {!activeSegment && selectedShow.segments.length > 0 && <div className="tew-card-list" aria-label="Current card summary">{selectedShow.segments.map((segment, index) => <button type="button" key={segment.id} className={`tew-card-row tew-card-row--${segment.type}`} onClick={() => setActiveSegmentId(segment.id)}><b>{index + 1}</b><span>{segment.title || (segment.type === "match" ? "Untitled Match" : "Untitled Angle")}</span><small>{segment.type === "match" ? "MATCH" : "ANGLE"}</small></button>)}</div>}
+              {!activeSegment && selectedShow.segments.length === 0 && <div className="empty-state card-empty">Add a match or angle to begin building the show in running order.</div>}
+              {activeSegment && <div className="planned-segment-list"><SegmentEditor key={activeSegment.id} segment={activeSegment} index={selectedShow.segments.findIndex((segment) => segment.id === activeSegment.id)} count={selectedShow.segments.length} snapshot={snapshot} matchEngine={matchEngine} onMatchEngineChange={setMatchEngine} onChange={(updated) => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.map((item) => item.id === updated.id ? updated : item) }))} onMove={(direction) => updateShow(selectedShow.id, (show) => ({ ...show, segments: movePlannedSegment(show.segments, activeSegment.id, direction) }))} onDelete={() => { updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.filter((item) => item.id !== activeSegment.id) })); setActiveSegmentId(""); setNotice("Segment removed from the card."); }} onClose={(saved) => { setActiveSegmentId(""); if (saved) setNotice("Segment saved. Returned to the card."); }} /></div>}
             </section>
           </>}
         </div>}

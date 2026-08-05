@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openAdvancedTools } from "./helpers";
+import { openAdvancedTools, openCardSegment } from "./helpers";
 
 const showSessionHeading = "Open one show, finish every segment, enter it in TEW, and reconcile the actual result";
 
@@ -19,22 +19,24 @@ test("creates and persists match and angle narratives without browser errors", a
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("Monday Night Test");
   await page.getByRole("button", { name: "Add Match" }).click();
-  await page.getByRole("button", { name: "Add Angle" }).click();
   const match = page.locator('[data-segment-type="match"]');
-  const angle = page.locator('[data-segment-type="angle"]');
   await match.getByLabel("Match Story", { exact: true }).fill("Bret controls the knee, survives a late comeback, and wins with the Sharpshooter.");
   await match.getByText("Optional match result and championship settings").click();
   await match.getByLabel("Planned winner").fill("Bret Hart");
   await match.getByLabel("Planned finish").fill("Submission");
   await match.getByLabel("Manual worker name").fill("Bret Hart");
   await match.getByRole("button", { name: "Add Manual Worker" }).click();
+  await expect(match.locator(".basic-participant-list strong").filter({ hasText: "Bret Hart" })).toBeVisible();
+  await match.getByRole("button", { name: "Save and Close" }).click();
+  await page.getByRole("button", { name: "Add Angle" }).click();
+  const angle = page.locator('[data-segment-type="angle"]');
   await angle.getByLabel("Full Segment Output").fill("The champion opens the show, is interrupted by the challenger, and accepts the main event.");
   await angle.getByLabel("Manual storyline name").fill("World Title Rivalry");
   await angle.getByRole("button", { name: "Add Manual Storyline" }).click();
+  await expect(angle.getByText("World Title Rivalry", { exact: true })).toBeVisible();
+  await angle.getByRole("button", { name: "Save and Close" }).click();
   await expect(page.getByText("2 planned segments")).toBeVisible();
   await expect(page.getByText("2 narratives complete")).toBeVisible();
-  await expect(match.locator(".basic-participant-list strong").filter({ hasText: "Bret Hart" })).toBeVisible();
-  await expect(angle.getByText("World Title Rivalry", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Reconcile Results" }).click();
   await expect(page.getByRole("heading", { name: "Connect the plan to the completed TEW show" })).toBeVisible();
@@ -45,9 +47,12 @@ test("creates and persists match and angle narratives without browser errors", a
   await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await expect(page.getByLabel("Show name")).toHaveValue("Monday Night Test");
-  await expect(page.locator('[data-segment-type="match"]').getByLabel("Match Story", { exact: true })).toContainText("Bret controls the knee");
-  await expect(page.locator('[data-segment-type="angle"]').getByLabel("Full Segment Output")).toContainText("The champion opens the show");
   await expect(page.getByText("2 narratives complete")).toBeVisible();
+  await openCardSegment(page, "Untitled Match");
+  await expect(page.locator('[data-segment-type="match"]').getByLabel("Match Story", { exact: true })).toContainText("Bret controls the knee");
+  await page.getByRole("button", { name: "Back to Card" }).click();
+  await openCardSegment(page, "Untitled Angle");
+  await expect(page.locator('[data-segment-type="angle"]').getByLabel("Full Segment Output")).toContainText("The champion opens the show");
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });

@@ -11,6 +11,7 @@ async function addManualSinglesMatch(page: import("@playwright/test").Page, titl
   await match.getByLabel("Manual worker name").fill(second);
   await match.getByRole("button", { name: "Add Manual Worker" }).click();
   await match.getByRole("button", { name: "Run AI for All Competitors" }).click();
+  await match.getByRole("button", { name: "Save and Close" }).click();
   return match;
 }
 
@@ -20,13 +21,14 @@ test("runs a show one result at a time and inserts a grounded reaction angle", a
   await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Live Card Test");
-  const firstMatch = await addManualSinglesMatch(page, "Jay White vs PAC", "Jay White", "PAC");
+  await addManualSinglesMatch(page, "Jay White vs PAC", "Jay White", "PAC");
   await page.getByRole("button", { name: "Add Angle" }).click();
   const plannedAngle = page.locator('[data-segment-type="angle"]').last();
   await plannedAngle.getByLabel("Segment name").fill("Commissioner Update");
   await plannedAngle.getByLabel("Full Segment Output").fill("The commissioner reviews the opening result and confirms the main event remains scheduled.");
+  await plannedAngle.getByRole("button", { name: "Save and Close" }).click();
   await addManualSinglesMatch(page, "Brian Cage vs Bobby Lashley", "Brian Cage", "Bobby Lashley");
-  await expect(firstMatch.getByLabel("Planned winner")).toHaveValue("");
+  await expect(page.getByLabel("Current card summary")).toContainText("Jay White vs PAC");
   await expect(page.locator(".save-state")).toHaveText("Saved");
 
   await page.getByRole("button", { name: "Run Show", exact: true }).click();

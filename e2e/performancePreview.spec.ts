@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openAdvancedTools } from "./helpers";
+import { openAdvancedTools, openCardSegment } from "./helpers";
 
 test("generates and persists a TEW-authoritative match performance preview", async ({ page }) => {
   await page.goto("/");
@@ -31,6 +31,7 @@ test("generates and persists a TEW-authoritative match performance preview", asy
   await page.reload();
   await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
+  await openCardSegment(page, "Jay White vs PAC");
   const persistedMatch = page.locator('[data-segment-type="match"]');
   await expect(page.getByLabel("Show name")).toHaveValue("PWL Performance Preview");
   await expect(persistedMatch.getByText("Determined in TEW", { exact: true })).toBeVisible();

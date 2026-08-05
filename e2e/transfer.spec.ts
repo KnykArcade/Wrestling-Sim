@@ -8,10 +8,8 @@ test("generates and persists an assisted TEW transfer package", async ({ page })
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByLabel("Show name").fill("PWL Transfer Test");
   await page.getByRole("button", { name: "Add Match" }).click();
-  await page.getByRole("button", { name: "Add Angle" }).click();
 
   const match = page.locator('[data-segment-type="match"]');
-  const angle = page.locator('[data-segment-type="angle"]');
   await match.getByLabel("Segment name").fill("Jay White vs PAC");
   await match.getByText("Optional match result and championship settings").click();
   await match.getByLabel("Planned winner").fill("Jay White");
@@ -19,6 +17,9 @@ test("generates and persists an assisted TEW transfer package", async ({ page })
   await match.getByLabel("Match Story", { exact: true }).fill("PAC controls the pace before White creates the decisive opening.");
   await match.getByLabel("Manual worker name").fill("Jay White");
   await match.getByRole("button", { name: "Add Manual Worker" }).click();
+  await match.getByRole("button", { name: "Save and Close" }).click();
+  await page.getByRole("button", { name: "Add Angle" }).click();
+  const angle = page.locator('[data-segment-type="angle"]');
   await angle.getByLabel("Segment name").fill("Post-Match Confrontation");
   await angle.getByLabel("Full Segment Output").fill("The next challenger confronts the winner without physical contact.");
   await expect(page.locator(".save-state")).toHaveText("Saved");

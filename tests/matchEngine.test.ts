@@ -209,6 +209,25 @@ describe("Phase 4C2 match setup and approach AI", () => {
     expect(boosted.total).toBeGreaterThan(unboosted.total);
   });
 
+  test("provides every value needed to preview an approach before selection", () => {
+    const profile = testProfile();
+    const approach = MATCH_APPROACHES.find((item) => item.id === "high-tempo-hybrid")!;
+    const candidate = scoreApproachCandidate(profile, "sprint", approach);
+    expect(candidate).toMatchObject({
+      approachId: "high-tempo-hybrid",
+      rating: expect.any(Number),
+      total: expect.any(Number),
+      styleBonus: expect.any(Number),
+      aimCompatibility: expect.any(Number),
+      paceBonus: expect.any(Number),
+      staminaEfficiency: expect.any(Number),
+    });
+    expect(candidate.reasons).toEqual(expect.arrayContaining([
+      expect.stringContaining("weighted approach rating"),
+      expect.stringContaining("stamina"),
+    ]));
+  });
+
   test("persists tracker-side wrestler profiles without modifying TEW data", () => {
     const storage = new MemoryStorage();
     const profile = testProfile();
