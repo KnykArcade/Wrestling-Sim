@@ -33,6 +33,7 @@ import { emptyStartingUniverseState } from "../src/startingUniverse/storage";
 import { emptyTransferUniverse } from "../src/transfer/model";
 import { emptyWorkbenchUniverse } from "../src/workbench/model";
 import { emptyWrapUpUniverse } from "../src/wrapUp/model";
+import { CALCULATION_SYSTEM_VERSION } from "../src/calculations/foundation";
 
 class MemoryStorage {
   private values = new Map<string, string>();
@@ -46,6 +47,7 @@ function addAdvisoryPreview(match: ReturnType<typeof createPlannedSegment>): voi
     generatedAt: "2026-08-01T00:00:00.000Z",
     seed: "test-night",
     authority: "tew-authoritative",
+    calculationVersion: CALCULATION_SYSTEM_VERSION,
     matchScore: 80,
     starRating: 4,
     performanceLeaderKey: "tew:1",

@@ -11,6 +11,7 @@ import {
   evaluateApproachPlan,
   getApproach,
   profileStaminaCapacity,
+  profileApproachRatingInputs,
   scoreApproachCandidate,
   workerProfileKey,
 } from "./model";
@@ -278,7 +279,7 @@ export default function MatchApproachSetupEditor({
             {plan.selectedApproachIds.map((approachId) => {
               const approach = getApproach(approachId)!;
               const score = profile ? scoreApproachCandidate(profile, aim.id, approach) : null;
-              const approachRating = profile ? calculateApproachRating(approach, profile.skills) : null;
+              const approachRating = profile ? calculateApproachRating(approach, profileApproachRatingInputs(profile)) : null;
               return <div className={`selected-approach-row ${approachRating === null ? "" : `selected-approach-row--${resultTone(approachRating)}`}`} key={approachId}>
                 <div><strong>{approach.name}</strong><span>{approach.summary}</span></div>
                 <div className="selected-approach-numbers"><span>Rating <b>{approachRating?.toFixed(1) ?? "—"}</b></span><span>Cost <b>{approach.staminaCost}</b></span><span>Pace <b>{approach.pace}</b></span></div>

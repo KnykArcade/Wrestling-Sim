@@ -2,6 +2,7 @@ export type MatchApproachId =
   | "aerial-showstopper"
   | "big-match-performer"
   | "chain-technician"
+  | "counter-specialist"
   | "dirty-rulebreaker"
   | "hardcore-daredevil"
   | "heavy-striker-brawler"
@@ -35,8 +36,10 @@ export type WrestlerSkill =
   | "Technical"
   | "Toughness";
 
+export type ApproachFormulaSource = WrestlerSkill | "Experience" | "Crowd Work";
+
 export interface ApproachSkillWeight {
-  skill: WrestlerSkill;
+  skill: ApproachFormulaSource;
   weight: number;
 }
 
@@ -245,6 +248,7 @@ export interface MatchPerformancePreview {
   generatedAt: string;
   seed: string;
   authority: MatchOutcomeAuthority;
+  calculationVersion: string;
   matchScore: number;
   starRating: number;
   performanceLeaderKey: string;

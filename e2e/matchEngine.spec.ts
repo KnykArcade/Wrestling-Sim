@@ -7,7 +7,7 @@ test("loads canonical match data and calculates an approach rating", async ({ pa
   await page.getByRole("button", { name: "Match Engine Formulas" }).click();
 
   await expect(page.getByRole("heading", { name: "Match Data Foundation" })).toBeVisible();
-  await expect(page.getByText("15", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("16", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Aerial Showstopper" })).toBeVisible();
 
   await page.getByLabel("Aerial rating").fill("80");

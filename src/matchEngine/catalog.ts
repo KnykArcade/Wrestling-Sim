@@ -72,6 +72,22 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
     sourceNotes: [],
   },
   {
+    id: "counter-specialist",
+    name: "Counter Specialist",
+    summary: "Anticipates offense and turns an opponent's strengths against them.",
+    formula: [
+      { skill: "Basics", weight: 0.35 },
+      { skill: "Psychology", weight: 0.25 },
+      { skill: "Consistency", weight: 0.25 },
+      { skill: "Technical", weight: 0.15 },
+    ],
+    pace: 1,
+    staminaCost: 1,
+    sourceNames: ["Counter Specialist"],
+    narrative: null,
+    sourceNotes: ["Canonical workbook formula; retained separately from Ring General / Pace Controller."],
+  },
+  {
     id: "dirty-rulebreaker",
     name: "Dirty Rulebreaker",
     summary: "Cheating, shortcuts, and intelligent rule bending.",
@@ -176,21 +192,23 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
     name: "Pace Controller",
     summary: "Dictates match rhythm and shifts the flow deliberately.",
     formula: [
-      { skill: "Psychology", weight: 0.35 },
-      { skill: "Basics", weight: 0.25 },
-      { skill: "Consistency", weight: 0.25 },
-      { skill: "Technical", weight: 0.15 },
+      { skill: "Psychology", weight: 1 / 6 },
+      { skill: "Experience", weight: 1 / 6 },
+      { skill: "Technical", weight: 1 / 6 },
+      { skill: "Basics", weight: 1 / 6 },
+      { skill: "Crowd Work", weight: 1 / 6 },
+      { skill: "Consistency", weight: 1 / 6 },
     ],
     pace: 1,
     staminaCost: 1,
-    sourceNames: ["Pace Controller"],
+    sourceNames: ["Pace Controller", "Ring General"],
     narrative: {
       styleSummary: "dictated the tempo and structure",
       offensePhrase: "slowing things down and speeding them up at will",
       sellingPhrase: "directing the flow even while on defense",
       finishPhrase: "guiding the match into the finish they wanted",
     },
-    sourceNotes: ["The source workbook contains both pace 0 and pace 1. Canonical pace 1 preserves the active Data table and Match Aims-Approaches lookup result."],
+    sourceNotes: ["Uses the six-part Ring General workbook formula. Pace Controller is the companion display name."],
   },
   {
     id: "power-dominance",
@@ -364,8 +382,8 @@ export const APPROACH_ALIASES: ApproachAliasRecord[] = [
   { sourceName: "Heavy Striker/Brawler", normalizedName: "heavy striker brawler", canonicalId: "heavy-striker-brawler", status: "alias", note: "Workbook punctuation alias." },
   { sourceName: "High Tempo Hybrid", normalizedName: "high tempo hybrid", canonicalId: "high-tempo-hybrid", status: "canonical", note: "Canonical name from the approach-definition document." },
   { sourceName: "Workrate Machine", normalizedName: "workrate machine", canonicalId: "high-tempo-hybrid", status: "alias", note: "Phrase-library name for High Tempo Hybrid." },
-  { sourceName: "Counter Specialist", normalizedName: "counter specialist", canonicalId: null, status: "legacy-unmapped", note: "Present in the match workbook but absent from the fifteen-approach definition document. Preserved for manual review." },
-  { sourceName: "Ring General", normalizedName: "ring general", canonicalId: null, status: "legacy-unmapped", note: "Present in the match workbook but absent from the fifteen-approach definition document. Preserved for manual review." },
+  { sourceName: "Counter Specialist", normalizedName: "counter specialist", canonicalId: "counter-specialist", status: "canonical", note: "Canonical workbook approach, distinct from Ring General / Pace Controller." },
+  { sourceName: "Ring General", normalizedName: "ring general", canonicalId: "pace-controller", status: "alias", note: "Workbook name for the companion's Pace Controller approach." },
 ];
 
 export const SOURCE_CONFLICTS: SourceConflictRecord[] = [

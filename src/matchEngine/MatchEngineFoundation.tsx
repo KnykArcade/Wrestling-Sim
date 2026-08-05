@@ -14,7 +14,7 @@ import {
   evaluatePace,
   evaluateStamina,
 } from "./model";
-import type { MatchApproachId, WrestlerSkill } from "./types";
+import type { ApproachFormulaSource, MatchApproachId } from "./types";
 
 type FoundationView = "approaches" | "aims" | "states" | "sources";
 
@@ -26,12 +26,12 @@ export default function MatchEngineFoundation() {
   const [view, setView] = useState<FoundationView>("approaches");
   const [selectedId, setSelectedId] = useState<MatchApproachId>(MATCH_APPROACHES[0].id);
   const selected = MATCH_APPROACHES.find((approach) => approach.id === selectedId) ?? MATCH_APPROACHES[0];
-  const [ratings, setRatings] = useState<Partial<Record<WrestlerSkill, number>>>(() =>
-    Object.fromEntries(MATCH_APPROACHES[0].formula.map((item) => [item.skill, 75])) as Partial<Record<WrestlerSkill, number>>,
+  const [ratings, setRatings] = useState<Partial<Record<ApproachFormulaSource, number>>>(() =>
+    Object.fromEntries(MATCH_APPROACHES[0].formula.map((item) => [item.skill, 75])) as Partial<Record<ApproachFormulaSource, number>>,
   );
 
   useEffect(() => {
-    setRatings(Object.fromEntries(selected.formula.map((item) => [item.skill, 75])) as Partial<Record<WrestlerSkill, number>>);
+    setRatings(Object.fromEntries(selected.formula.map((item) => [item.skill, 75])) as Partial<Record<ApproachFormulaSource, number>>);
   }, [selected.id]);
 
   const score = useMemo(() => calculateApproachRating(selected, ratings), [ratings, selected]);

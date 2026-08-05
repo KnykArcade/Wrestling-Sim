@@ -59,6 +59,7 @@ describe("Phase 4C4 generated narrative outputs", () => {
       generatedAt: "2026-08-01T00:00:00.000Z",
       seed: "seed",
       authority: "competitive-preview",
+      calculationVersion: "test",
       matchScore: 80,
       starRating: 4,
       performanceLeaderKey: "manual:pac",

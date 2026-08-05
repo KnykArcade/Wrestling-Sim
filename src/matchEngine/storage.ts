@@ -41,7 +41,15 @@ function clamp(value: number, minimum: number, maximum: number): number {
 function validApproachIds(value: unknown): MatchApproachId[] {
   if (!Array.isArray(value)) return [];
   const valid = new Set(MATCH_APPROACHES.map((approach) => approach.id));
-  return Array.from(new Set(value.filter((item): item is MatchApproachId => typeof item === "string" && valid.has(item as MatchApproachId))));
+  const migrations: Record<string, MatchApproachId> = {
+    "aerial-specialist": "aerial-showstopper",
+    "ring-general-pace-controller": "pace-controller",
+  };
+  return Array.from(new Set(value.flatMap((item) => {
+    if (typeof item !== "string") return [];
+    const migrated = migrations[item] ?? item;
+    return valid.has(migrated as MatchApproachId) ? [migrated as MatchApproachId] : [];
+  })));
 }
 
 function normalizeProfile(value: unknown): MatchEngineProfile | null {
@@ -140,6 +148,7 @@ function normalizePerformancePreview(value: unknown): MatchPerformancePreview | 
     generatedAt: text(value.generatedAt),
     seed: text(value.seed),
     authority: settings.authority,
+    calculationVersion: text(value.calculationVersion, "legacy-unversioned"),
     matchScore: clamp(finiteNumber(value.matchScore, 0), 0, 100),
     starRating: clamp(finiteNumber(value.starRating, 0), 0, 5),
     performanceLeaderKey: text(value.performanceLeaderKey),

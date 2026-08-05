@@ -1,6 +1,7 @@
 import { APPROACH_ALIASES, MATCH_AIMS, MATCH_APPROACHES, MENTAL_STATES } from "./catalog";
 import { AIM_APPROACH_HINTS, MATCH_ENGINE_SKILLS, WRESTLER_STYLES } from "./profileCatalog";
 import type {
+  ApproachFormulaSource,
   ApproachCandidateScore,
   ApproachPlanResult,
   MatchApproachDefinition,
@@ -50,10 +51,23 @@ export function getApproach(value: MatchApproachId | string): MatchApproachDefin
 
 export function calculateApproachRating(
   approach: MatchApproachDefinition,
-  ratings: Partial<Record<WrestlerSkill, number>>,
+  ratings: Partial<Record<ApproachFormulaSource, number>>,
 ): number {
   const result = approach.formula.reduce((total, item) => total + (ratings[item.skill] ?? 0) * item.weight, 0);
   return Math.round(result * 100) / 100;
+}
+
+export function profileApproachRatingInputs(profile: MatchEngineProfile): Partial<Record<ApproachFormulaSource, number>> {
+  return {
+    ...profile.skills,
+    Experience: profile.experience,
+    "Crowd Work": (
+      profile.skills.Charisma +
+      profile.popularity +
+      profile.fanReaction * 20 +
+      profile.gimmick * 20
+    ) / 4,
+  };
 }
 
 export function approachFormulaLabel(approach: MatchApproachDefinition): string {
@@ -220,7 +234,7 @@ export function scoreApproachCandidate(
 ): ApproachCandidateScore {
   const aim = aimForId(aimId);
   const style = getWrestlerStyle(profile);
-  const rating = calculateApproachRating(approach, profile.skills);
+  const rating = calculateApproachRating(approach, profileApproachRatingInputs(profile));
   const styleBonus = style.approachBoosts.includes(approach.id) ? 8 : 0;
   const hintedForAim = AIM_APPROACH_HINTS[aim.id].includes(approach.id);
   const styleMatchesAim = style.aimBoosts.includes(aim.id) || style.aimStyleNames.some((name) => aim.bestFitStyles.includes(name));

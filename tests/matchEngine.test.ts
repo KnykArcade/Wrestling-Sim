@@ -32,8 +32,10 @@ import { WRESTLER_STYLES } from "../src/matchEngine/profileCatalog";
 import {
   MATCH_ENGINE_STORAGE_KEY,
   loadMatchEngineUniverse,
+  normalizeMatchApproachSetup,
   saveMatchEngineUniverse,
 } from "../src/matchEngine/storage";
+import { CALCULATION_SYSTEM_VERSION, calculationQualityLabel, normalizeRating } from "../src/calculations/foundation";
 import type { MatchEngineProfile, MatchWorkerApproachPlan } from "../src/matchEngine/types";
 
 class MemoryStorage {
@@ -79,12 +81,12 @@ function testPlan(profile: MatchEngineProfile, approaches: MatchWorkerApproachPl
 }
 
 describe("native match engine data foundation", () => {
-  test("loads fifteen canonical approaches with normalized one-hundred-percent formulas", () => {
-    expect(MATCH_APPROACHES).toHaveLength(15);
+  test("loads sixteen canonical approaches with normalized one-hundred-percent formulas", () => {
+    expect(MATCH_APPROACHES).toHaveLength(16);
     const ids = new Set(MATCH_APPROACHES.map((approach) => approach.id));
-    expect(ids.size).toBe(15);
+    expect(ids.size).toBe(16);
     MATCH_APPROACHES.forEach((approach) => {
-      expect(approach.formula).toHaveLength(4);
+      expect([4, 6]).toContain(approach.formula.length);
       expect(approach.formula.reduce((sum, item) => sum + item.weight, 0)).toBeCloseTo(1, 8);
       expect(approach.staminaCost).toBeGreaterThanOrEqual(1);
       expect(approach.staminaCost).toBeLessThanOrEqual(3);
@@ -95,22 +97,43 @@ describe("native match engine data foundation", () => {
     const aerial = MATCH_APPROACHES.find((approach) => approach.id === "aerial-showstopper");
     const bigMatch = MATCH_APPROACHES.find((approach) => approach.id === "big-match-performer");
     const submission = MATCH_APPROACHES.find((approach) => approach.id === "submission-specialist");
+    const counter = MATCH_APPROACHES.find((approach) => approach.id === "counter-specialist");
+    const ringGeneral = MATCH_APPROACHES.find((approach) => approach.id === "pace-controller");
     expect(aerial).toBeDefined();
     expect(bigMatch).toBeDefined();
     expect(submission).toBeDefined();
     expect(calculateApproachRating(aerial!, { Aerial: 80, Athleticism: 70, Flashiness: 60, Basics: 50 })).toBe(70);
     expect(calculateApproachRating(bigMatch!, { Psychology: 90, Consistency: 80, Charisma: 70, Stamina: 60 })).toBe(80);
     expect(calculateApproachRating(submission!, { Technical: 85, Psychology: 75, Basics: 65, Toughness: 55 })).toBe(74.5);
+    expect(calculateApproachRating(counter!, { Basics: 80, Psychology: 70, Consistency: 60, Technical: 50 })).toBe(68);
+    expect(calculateApproachRating(ringGeneral!, { Psychology: 90, Experience: 80, Technical: 70, Basics: 60, "Crowd Work": 50, Consistency: 40 })).toBe(65);
   });
 
-  test("normalizes workbook aliases without inventing mappings for unresolved records", () => {
+  test("normalizes every workbook approach to its canonical booking ID", () => {
     expect(resolveApproachId("Aerial Specialist")).toBe("aerial-showstopper");
     expect(resolveApproachId("Heavy Striker/Brawler")).toBe("heavy-striker-brawler");
     expect(resolveApproachId("Heavy Striker / Brawler")).toBe("heavy-striker-brawler");
     expect(resolveApproachId("Workrate Machine")).toBe("high-tempo-hybrid");
-    expect(resolveApproachId("Counter Specialist")).toBeNull();
-    expect(resolveApproachId("Ring General")).toBeNull();
-    expect(APPROACH_ALIASES.filter((record) => record.status === "legacy-unmapped")).toHaveLength(2);
+    expect(resolveApproachId("Counter Specialist")).toBe("counter-specialist");
+    expect(resolveApproachId("Ring General")).toBe("pace-controller");
+    expect(APPROACH_ALIASES.filter((record) => record.status === "legacy-unmapped")).toHaveLength(0);
+  });
+
+  test("uses shared rating caps labels and calculation version", () => {
+    expect(normalizeRating(104.126)).toBe(100);
+    expect(normalizeRating(-4)).toBe(0);
+    expect(calculationQualityLabel(85)).toBe("Elite");
+    expect(calculationQualityLabel(49.99)).toBe("Weak");
+    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b10a-v1");
+  });
+
+  test("migrates saved resolver IDs without losing selected or locked approaches", () => {
+    const setup = normalizeMatchApproachSetup({
+      matchAimId: "technical-showcase",
+      workerPlans: [{ workerKey: "tew:1", workerName: "Worker", selectedApproachIds: ["aerial-specialist", "ring-general-pace-controller", "counter-specialist"], lockedApproachIds: ["ring-general-pace-controller"], mode: "Manual" }],
+    });
+    expect(setup.workerPlans[0].selectedApproachIds).toEqual(["aerial-showstopper", "pace-controller", "counter-specialist"]);
+    expect(setup.workerPlans[0].lockedApproachIds).toEqual(["pace-controller"]);
   });
 
   test("uses the approved duration boundaries for approach slots", () => {
