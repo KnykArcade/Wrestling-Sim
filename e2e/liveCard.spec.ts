@@ -61,7 +61,9 @@ test("runs a show one result at a time and inserts a grounded reaction angle", a
   await page.getByLabel("Live card final angle output").fill("The winner celebrates the result. The loser acknowledges the loss but refuses to let it end the rivalry.");
   await page.getByLabel("Live card angle consequences").fill("The rivalry remains active because the loser disputes what the result means for the future.");
   await page.getByLabel("Live card angle follow up").fill("Review a rematch only if the rankings and next results support it.");
-  await page.getByRole("button", { name: "Complete Angle" }).click();
+  await page.getByRole("button", { name: "Calculate Angle Result" }).click();
+  await expect(page.getByLabel("Angle result review")).toBeVisible();
+  await page.getByRole("button", { name: "Accept Angle Result" }).click();
   await expect(page.locator(".live-card-status-badge")).toHaveText("Completed");
 
   await page.getByRole("button", { name: "Next Match" }).first().click();

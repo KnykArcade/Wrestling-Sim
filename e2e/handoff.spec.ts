@@ -12,9 +12,10 @@ test("finalizes a card and persists TEW entry progress", async ({ page }) => {
 
   const match = page.locator('[data-segment-type="match"]');
   await match.getByLabel("Segment name").fill("PWL Championship Match");
+  await match.getByText("Optional match result and championship settings").click();
   await match.getByLabel("Planned winner").fill("Bret Hart");
   await match.getByLabel("Planned finish").fill("Submission");
-  await match.getByLabel("Full match story").fill("Bret controls the knee and wins with the Sharpshooter.");
+  await match.getByLabel("Match Story", { exact: true }).fill("Bret controls the knee and wins with the Sharpshooter.");
   await match.getByLabel("Manual worker name").fill("Bret Hart");
   await match.getByRole("button", { name: "Add Manual Worker" }).click();
 
