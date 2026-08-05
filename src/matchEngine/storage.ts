@@ -163,6 +163,7 @@ export function normalizeMatchApproachSetup(value: unknown): MatchApproachSetup 
     : [];
   return {
     matchAimId,
+    approachLimit: value.approachLimit === null || value.approachLimit === undefined ? null : clamp(Math.round(finiteNumber(value.approachLimit, 1)), 1, 8),
     workerPlans,
     notes: text(value.notes),
     performanceSettings: normalizePerformanceSettings(value.performanceSettings),

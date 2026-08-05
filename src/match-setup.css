@@ -72,8 +72,8 @@
 .match-competitor-grid,
 .match-side-board {
   display: grid;
-  gap: 16px;
-  padding: 18px;
+  gap: 10px;
+  padding: 10px;
 }
 
 .match-side-board {
@@ -88,7 +88,7 @@
 
 .match-side-column {
   display: grid;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -153,7 +153,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
-  padding: 13px 15px;
+  padding: 9px 11px;
   border-bottom: 1px solid #3b6291;
   background: linear-gradient(90deg, #174d9a, #123566);
 }
@@ -184,7 +184,7 @@
 .match-profile-summary > div {
   display: grid;
   gap: 4px;
-  padding: 10px 12px;
+  padding: 7px 9px;
   border-right: 1px solid #263f61;
 }
 
@@ -252,7 +252,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px 8px;
+  padding: 8px 10px 6px;
 }
 
 .selected-approach-heading > div:first-child {
@@ -280,7 +280,7 @@
 .selected-approach-list {
   display: grid;
   gap: 8px;
-  padding: 0 14px 12px;
+  padding: 0 10px 8px;
 }
 
 .selected-approach-row {
@@ -288,7 +288,7 @@
   grid-template-columns: minmax(0, 1.45fr) auto auto auto;
   align-items: center;
   gap: 10px;
-  padding: 11px;
+  padding: 7px 9px;
   border: 1px solid #2d4a70;
   background: #0e2440;
 }
@@ -346,7 +346,7 @@
 }
 
 .approach-selection-panel {
-  margin: 0 14px 14px;
+  margin: 0 10px 10px;
   border: 1px solid #3f628a;
   background: #08182b;
 }
@@ -360,17 +360,18 @@
 
 .approach-candidate-list {
   display: grid;
-  gap: 8px;
-  max-height: 480px;
+  gap: 5px;
+  max-height: 360px;
   overflow: auto;
   padding: 0 10px 10px;
 }
 
 .approach-candidate {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 7px 12px;
-  padding: 11px;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(320px, 2fr) 58px;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 7px 8px;
   border: 1px solid #315278;
   border-left-width: 4px;
   background: #0e2440;
@@ -385,10 +386,12 @@
 .approach-quality--strong { color: #82eba4; border-color: #3e8a58; }
 .approach-quality--balanced { color: #ffe28a; border-color: #9c7b29; }
 .approach-quality--risk { color: #ffaaaa; border-color: #9e4e54; }
-.approach-candidate p { grid-column: 1 / -1; margin: 0; color: #aebed3; font-size: 12px; }
-.approach-candidate__metrics, .approach-candidate__fit { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 7px 14px; color: #aebed3; font-size: 12px; }
+.approach-candidate p { margin: 6px 0 0; color: #aebed3; font-size: 12px; }
+.approach-candidate__metrics, .approach-candidate__fit { display: flex; flex-wrap: wrap; gap: 5px 12px; color: #aebed3; font-size: 12px; }
 .approach-candidate__metrics b, .approach-candidate__fit b { color: #fff; }
-.approach-candidate > button { grid-column: 2; grid-row: 1; }
+.approach-candidate__details { grid-column: 1 / 3; color: #aebed3; font-size: 12px; }
+.approach-candidate__details summary { padding: 0; color: #8fa9c9; font-weight: 700; }
+.approach-add-button { grid-column: 3; grid-row: 1; width: 54px; min-width: 54px; padding: 5px 8px !important; justify-self: end; white-space: nowrap; }
 
 .approach-plan-explanation {
   display: grid;
@@ -409,7 +412,7 @@
   display: grid;
   gap: 3px;
   padding: 14px 18px 10px;
-  border-top: 1px solid #35587f;
+  border-bottom: 1px solid #35587f;
   background: #081526;
 }
 

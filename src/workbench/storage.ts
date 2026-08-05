@@ -151,13 +151,14 @@ function normalizeSettings(value: unknown): WorkbenchSettings {
 export function parseWorkbenchUniverse(value: unknown): WorkbenchUniverse {
   const defaults = emptyWorkbenchUniverse();
   if (!isRecord(value)) return defaults;
+  const safely = <T,>(items: unknown[], normalize: (item: unknown) => T | null): T[] => items.flatMap((item) => { try { const normalized = normalize(item); return normalized ? [normalized] : []; } catch { return []; } });
   const customTemplates = Array.isArray(value.templates)
-    ? value.templates.map(normalizeTemplate).filter((item): item is WorkbenchTemplate => item !== null && !item.builtIn)
+    ? safely(value.templates, normalizeTemplate).filter((item) => !item.builtIn)
     : [];
   return {
-    quickSegments: Array.isArray(value.quickSegments) ? value.quickSegments.map(normalizeQuick).filter((item): item is QuickSegmentRecord => item !== null) : [],
+    quickSegments: Array.isArray(value.quickSegments) ? safely(value.quickSegments, normalizeQuick) : [],
     templates: [...BUILT_IN_WORKBENCH_TEMPLATES.map((template) => ({ ...template })), ...customTemplates],
-    ratingSources: Array.isArray(value.ratingSources) ? value.ratingSources.map(normalizeRatingRecord).filter((item): item is WorkerRatingSourceRecord => item !== null) : [],
+    ratingSources: Array.isArray(value.ratingSources) ? safely(value.ratingSources, normalizeRatingRecord) : [],
     recentSegmentIds: Array.isArray(value.recentSegmentIds) ? value.recentSegmentIds.filter((id): id is string => typeof id === "string").slice(0, 12) : [],
     settings: normalizeSettings(value.settings),
   };

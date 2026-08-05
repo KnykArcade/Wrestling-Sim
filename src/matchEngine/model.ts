@@ -186,6 +186,7 @@ export function getWrestlerStyle(profile: Pick<MatchEngineProfile, "styleId">): 
 export function createEmptyMatchApproachSetup(): MatchApproachSetup {
   return {
     matchAimId: "call-it-in-the-ring",
+    approachLimit: null,
     workerPlans: [],
     notes: "",
     performanceSettings: {
