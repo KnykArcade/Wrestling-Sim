@@ -20,7 +20,8 @@
 
 .live-card-readiness,
 .live-card-next-step,
-.live-card-complete-summary {
+.live-card-complete-summary,
+.live-card-angle-result-review {
   margin: 16px 0;
   padding: 18px;
   border: 1px solid #35547d;
@@ -59,6 +60,125 @@
   flex: 1;
   display: grid;
   gap: 3px;
+}
+
+.live-card-angle-result-review {
+  display: grid;
+  gap: 13px;
+  margin: 0;
+  border-color: #d1c83b;
+  background: linear-gradient(120deg, rgba(75, 67, 10, .35), #07162e 58%);
+}
+
+.live-card-angle-result-review > header,
+.live-card-participant-results article,
+.live-card-crowd-path article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.live-card-angle-result-review > header > strong {
+  color: #fff200;
+  font-size: 2rem;
+}
+
+.live-card-evaluation-factors,
+.live-card-participant-results,
+.live-card-crowd-path {
+  display: grid;
+  gap: 8px;
+}
+
+.live-card-evaluation-factors {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.live-card-evaluation-factors article,
+.live-card-participant-results article,
+.live-card-crowd-path article,
+.live-card-show-score article {
+  padding: 10px;
+  border: 1px solid #405477;
+  background: #07162e;
+}
+
+.live-card-evaluation-factors article {
+  display: grid;
+  gap: 4px;
+}
+
+.live-card-evaluation-factors b,
+.live-card-participant-results > article > b,
+.live-card-crowd-path em,
+.live-card-show-score strong {
+  color: #fff200;
+}
+
+.live-card-evaluation-factors small,
+.live-card-participant-results small,
+.live-card-crowd-path small,
+.live-card-show-score small {
+  color: #aebed8;
+  line-height: 1.4;
+}
+
+.live-card-angle-override {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding-top: 12px;
+  border-top: 1px solid #405477;
+}
+
+.live-card-angle-override .field {
+  margin: 0;
+}
+
+.live-card-show-score {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.live-card-show-score article {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-height: 95px;
+}
+
+.live-card-show-score strong {
+  font-size: 1.5rem;
+}
+
+.live-card-crowd-path {
+  margin-top: 12px;
+}
+
+.live-card-crowd-path article div {
+  flex: 1;
+}
+
+.live-card-crowd-path article small {
+  min-width: 135px;
+  text-align: right;
+}
+
+.live-card-report-explanation {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #405477;
+  background: #07162e;
+}
+
+.live-card-report-explanation summary {
+  cursor: pointer;
+  color: #fff200;
+  font-weight: 800;
 }
 
 .live-card-hero {
@@ -457,6 +577,15 @@
     grid-template-columns: 1fr;
   }
 
+  .live-card-evaluation-factors,
+  .live-card-show-score {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .live-card-angle-override {
+    grid-template-columns: 1fr;
+  }
+
   .live-card-angle-form .field:nth-child(3) {
     grid-column: auto;
   }
@@ -504,5 +633,21 @@
   .live-card-correction-history article,
   .live-card-audit article {
     grid-template-columns: 1fr;
+  }
+
+  .live-card-evaluation-factors,
+  .live-card-show-score {
+    grid-template-columns: 1fr;
+  }
+
+  .live-card-angle-result-review > header,
+  .live-card-participant-results article,
+  .live-card-crowd-path article {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .live-card-crowd-path article small {
+    text-align: left;
   }
 }

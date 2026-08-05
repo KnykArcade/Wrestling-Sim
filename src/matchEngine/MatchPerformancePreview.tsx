@@ -86,8 +86,8 @@ export default function MatchPerformancePreviewEditor({
   return <section className="match-performance-preview" aria-label="Advisory match performance preview">
     <header className="match-performance-preview__header">
       <div>
-        <p className="eyebrow">OPTIONAL TEW COMPANION PREVIEW</p>
-        <h4>Performance, mental state, and match-quality preview</h4>
+        <p className="eyebrow">MATCH RESULT / RECAP</p>
+        <h4>Performance, mental state, and match-quality result</h4>
         <p>The preview uses your selected approaches and tracker ratings. TEW remains the final authority for the actual match result and rating.</p>
       </div>
       <div className="match-performance-actions">

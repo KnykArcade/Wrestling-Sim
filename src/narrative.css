@@ -239,6 +239,28 @@
   resize: vertical;
 }
 
+.match-story-only > .narrative-main-text {
+  display: grid;
+}
+
+.match-administration {
+  margin-top: 14px;
+  border: 1px solid #344c70;
+  background: #081629;
+}
+
+.match-administration > summary {
+  padding: 12px 14px;
+  color: #c8d6e9;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.match-administration > .narrative-form-grid {
+  padding: 14px;
+  border-top: 1px solid #344c70;
+}
+
 .copy-actions {
   display: flex;
   align-items: center;

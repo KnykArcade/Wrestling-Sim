@@ -15,6 +15,11 @@ test("books, runs, resolves, records, and completes one show without losing cont
   }
   await match.getByRole("button", { name: "Run AI for All Competitors" }).click();
   await expect(match.getByText("Match setup is ready.")).toBeVisible();
+  await expect(match.getByText("VS", { exact: true })).toBeVisible();
+  await expect(match.getByLabel("Match Story", { exact: true })).toHaveCount(1);
+  await expect(match.getByLabel("Quick planning outline")).toHaveCount(0);
+  await expect(match.getByText("Key moments / spots", { exact: true })).toHaveCount(0);
+  await match.getByLabel("Match Story", { exact: true }).fill("PAC controls the pace until Jay White creates an opening; PAC survives and wins decisively.");
 
   await page.getByRole("button", { name: "Run This Show" }).click();
   await expect(page.getByLabel("Live card planned show").locator("option:checked")).toContainText("PWL Unified Flow Test");
