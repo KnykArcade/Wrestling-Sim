@@ -1,4 +1,4 @@
-import type { MatchAimId, MatchEngineProfile, MentalStateId, PaceStatus, StaminaStatus } from "../matchEngine/types";
+import type { MatchAimId, MatchEngineProfile, MentalStateDefinition, MentalStateId, PaceStatus, StaminaStatus } from "../matchEngine/types";
 import type { ImportedApproachFormulaId, StartingUniverseWorkbookMetrics } from "../startingUniverse/types";
 
 export type ResolutionApproachId = ImportedApproachFormulaId;
@@ -67,6 +67,7 @@ export interface MatchResolutionSetup {
   segmentTitle: string;
   matchType: string;
   durationMinutes: number;
+  approachLimit?: number | null;
   aimId: MatchAimId;
   importance: MatchResolutionImportance;
   championship: string;
@@ -110,7 +111,7 @@ export interface MatchResolutionWorkerResult {
   competitiveScore: number;
   winProbability: number;
   mentalStateId: MentalStateId;
-  mentalStateName: string;
+  mentalStateName: MentalStateDefinition["name"];
   mentalStateScore: number;
   mentalModifier: number;
   luck: number;

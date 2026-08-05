@@ -69,6 +69,7 @@ export default function MatchPerformancePreviewEditor({
       workers,
       aimId: segment.matchApproachSetup.matchAimId,
       durationMinutes: segment.durationMinutes,
+      approachLimit: segment.matchApproachSetup.approachLimit,
       plannedWinner: segment.plannedWinner,
       settings,
       seed: reuseSeed ? preview?.seed : undefined,

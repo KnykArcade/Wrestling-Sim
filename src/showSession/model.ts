@@ -1,5 +1,5 @@
 import { MATCH_APPROACHES } from "../matchEngine/catalog";
-import { approachSlotsForDuration } from "../matchEngine/model";
+import { approachLimitForSetup } from "../matchEngine/model";
 import type { ShowOperationsRecord } from "../operations/types";
 import { snapshotOutputSegment } from "../outputLibrary/model";
 import type {
@@ -134,7 +134,7 @@ function setupComplete(segment: PlannedSegment): boolean {
 export function segmentApproachesComplete(segment: PlannedSegment): boolean {
   if (segment.type === "angle") return true;
   if (segment.workers.length === 0) return false;
-  const required = approachSlotsForDuration(segment.durationMinutes);
+  const required = approachLimitForSetup(segment.durationMinutes, segment.matchApproachSetup.approachLimit);
   return segment.workers.every((worker) => {
     const workerKey = `${worker.source}:${worker.id}`;
     const plan = segment.matchApproachSetup.workerPlans.find((item) => item.workerKey === workerKey || normalize(item.workerName) === normalize(worker.name));

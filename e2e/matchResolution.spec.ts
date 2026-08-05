@@ -33,6 +33,10 @@ test("books wrestlers without a winner, runs one official result, and preserves 
   await expect(pac.getByText("Counter Specialist", { exact: true })).toBeVisible();
   await expect(pac.getByText("Pace Controller", { exact: true })).toBeVisible();
   await expect(page.locator(".match-resolution-approach-grid > label")).toHaveCount(32);
+  await expect(jay.getByLabel("Jay White approach mode")).toHaveValue("Manual");
+  await expect(pac.getByLabel("PAC approach mode")).toHaveValue("Manual");
+  await expect(jay.locator('.match-resolution-approach-grid input:checked')).toHaveCount(3);
+  await expect(pac.locator('.match-resolution-approach-grid input:checked')).toHaveCount(3);
 
   await jay.getByText("Dirty Rulebreaker", { exact: true }).click();
   await pac.getByText("Counter Specialist", { exact: true }).click();

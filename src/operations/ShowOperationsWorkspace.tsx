@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { loadHandoffUniverse } from "../handoff/storage";
+import { loadMatchEngineUniverse } from "../matchEngine/storage";
 import { loadPlannedShows, savePlannedShows } from "../planner/storage";
 import type { PlannedShow } from "../planner/types";
 import type { TewSnapshot } from "../tew/types";
@@ -82,6 +83,7 @@ export default function ShowOperationsWorkspace({
   const [shows, setShows] = useState<PlannedShow[]>(() => loadPlannedShows(window.localStorage));
   const [handoff] = useState(() => loadHandoffUniverse(window.localStorage));
   const [transfer] = useState(() => loadTransferUniverse(window.localStorage));
+  const [matchEngine] = useState(() => loadMatchEngineUniverse(window.localStorage));
   const [operations, setOperations] = useState<ShowOperationsUniverse>(() => loadShowOperationsUniverse(window.localStorage));
   const [selectedShowId, setSelectedShowId] = useState(() => shows[0]?.id ?? "");
   const [notice, setNotice] = useState("");
@@ -92,7 +94,7 @@ export default function ShowOperationsWorkspace({
   const record = selectedShow
     ? operations.records.find((item) => item.showId === selectedShow.id) ?? createShowOperationsRecord(selectedShow.id)
     : null;
-  const preflight = useMemo(() => selectedShow ? buildShowPreflight(selectedShow, handoff, transfer, record?.acknowledgedIssueIds ?? []) : null, [handoff, record?.acknowledgedIssueIds, selectedShow, transfer]);
+  const preflight = useMemo(() => selectedShow ? buildShowPreflight(selectedShow, handoff, transfer, record?.acknowledgedIssueIds ?? [], matchEngine.profiles) : null, [handoff, matchEngine.profiles, record?.acknowledgedIssueIds, selectedShow, transfer]);
   const summary = useMemo(() => selectedShow && preflight ? buildShowOperationsSummary(selectedShow, handoff, transfer, preflight, snapshot) : null, [handoff, preflight, selectedShow, snapshot, transfer]);
   const transferRecord = selectedShow ? transfer.records.find((item) => item.showId === selectedShow.id) ?? null : null;
   const transferPackage = activeTransfer(transferRecord);

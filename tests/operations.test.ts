@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { emptyHandoffUniverse } from "../src/handoff/storage";
+import { createMatchEngineProfile } from "../src/matchEngine/model";
 import {
   applyConfirmedResultLinks,
   buildResultIntakeSession,
@@ -100,6 +101,27 @@ describe("Phase 5C unified show operations", () => {
     expect(summary.approachesComplete).toBe(1);
     expect(summary.narrativesComplete).toBe(1);
     expect(summary.nextActionTarget).toBe("handoff");
+  });
+
+  test("uses the custom approach limit and each wrestler's actual stamina capacity in preflight", () => {
+    const show = completeShow();
+    const match = show.segments[0];
+    match.matchApproachSetup.approachLimit = 2;
+    match.matchApproachSetup.workerPlans.forEach((plan) => { plan.selectedApproachIds = ["aerial-showstopper", "high-tempo-hybrid"]; });
+    const profiles = match.workers.map((worker) => {
+      const profile = createMatchEngineProfile(worker);
+      profile.experience = 10;
+      profile.skills.Selling = 10;
+      profile.skills.Stamina = 10;
+      profile.skills.Resilience = 10;
+      profile.skills.Athleticism = 10;
+      profile.skills.Toughness = 10;
+      return profile;
+    });
+    const report = buildShowPreflight(show, emptyHandoffUniverse(), emptyTransferUniverse(), [], profiles);
+    expect(report.issues.some((issue) => issue.id.includes("approach-count"))).toBe(false);
+    expect(report.issues.filter((issue) => issue.id.includes("stamina-")).length).toBe(2);
+    expect(report.issues.find((issue) => issue.id.includes("stamina-"))?.detail).toContain("6/1 stamina");
   });
 
   test("matches planned results to TEW history and applies only confirmed links", () => {

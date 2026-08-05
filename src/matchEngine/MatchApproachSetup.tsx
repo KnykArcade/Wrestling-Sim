@@ -9,6 +9,7 @@ import {
   chooseApproachPlan,
   createMatchEngineProfile,
   evaluateApproachPlan,
+  evaluatePace,
   getApproach,
   profileStaminaCapacity,
   profileApproachRatingInputs,
@@ -135,6 +136,7 @@ export default function MatchApproachSetupEditor({
       segment.matchApproachSetup.matchAimId,
       segment.durationMinutes,
       current.lockedApproachIds,
+      slots,
     );
     savePlan(worker, {
       ...current,
@@ -156,7 +158,7 @@ export default function MatchApproachSetupEditor({
         nextProfiles.push(profile);
       }
       const current = nextPlans.find((item) => item.workerKey === workerKey) ?? planForWorker(segment, worker);
-      const result = chooseApproachPlan(profile, segment.matchApproachSetup.matchAimId, segment.durationMinutes, current.lockedApproachIds);
+      const result = chooseApproachPlan(profile, segment.matchApproachSetup.matchAimId, segment.durationMinutes, current.lockedApproachIds, slots);
       const replacement: MatchWorkerApproachPlan = {
         ...current,
         workerKey,
@@ -195,11 +197,12 @@ export default function MatchApproachSetupEditor({
   const planResults = competitors.map((worker) => {
     const profile = profileForWorker(universe, worker);
     const plan = planForWorker(segment, worker);
-    return profile ? evaluateApproachPlan(profile, aim.id, segment.durationMinutes, plan.selectedApproachIds) : null;
+    return profile ? evaluateApproachPlan(profile, aim.id, segment.durationMinutes, plan.selectedApproachIds, slots) : null;
   }).filter((result) => result !== null);
   const combinedPace = planResults.length > 0
     ? Math.round(planResults.reduce((sum, result) => sum + result.actualPace, 0) / planResults.length)
     : 0;
+  const combinedPaceEvaluation = evaluatePace(aim.idealPace, combinedPace);
 
   return <section className="match-approach-setup" aria-label="Match approach setup">
     <header className="match-approach-setup__header">
@@ -217,7 +220,7 @@ export default function MatchApproachSetupEditor({
       <div><span>Match time</span><strong>{segment.durationMinutes} minutes</strong></div>
       <label className="field"><span>Approach limit per wrestler</span><input aria-label="Approach limit per wrestler" type="number" min={1} max={8} value={slots} onChange={(event) => updateSetup({ approachLimit: Math.max(1, Math.min(8, Number(event.target.value) || recommendedSlots)) })} /><small>Recommended: {recommendedSlots}</small></label>
       <div><span>Ideal pace</span><strong>{aim.idealPace === 0 ? "Open" : aim.idealPace}</strong></div>
-      <div className={`match-pace-result match-pace-result--${combinedPace && aim.idealPace && Math.abs(combinedPace - aim.idealPace) > 20 ? "risk" : "balanced"}`}><span>Projected pace</span><strong>{combinedPace || "—"}</strong><small>{!combinedPace ? "Choose approaches" : !aim.idealPace ? "Open pace" : Math.abs(combinedPace - aim.idealPace) <= 20 ? "Compatible" : "Off target"}</small></div>
+      <div className={`match-pace-result match-pace-result--${combinedPace && combinedPaceEvaluation.modifier < 0 ? "risk" : "balanced"}`}><span>Projected pace</span><strong>{combinedPace || "—"}</strong><small>{!combinedPace ? "Choose approaches" : combinedPaceEvaluation.status}</small></div>
     </div>
 
     {competitors.length === 0 ? <div className="match-approach-empty">
@@ -231,7 +234,7 @@ export default function MatchApproachSetupEditor({
         const profile = profileForWorker(universe, worker);
         const previewProfile = profile ?? createMatchEngineProfile(worker);
         const plan = planForWorker(segment, worker);
-        const result = profile ? evaluateApproachPlan(profile, aim.id, segment.durationMinutes, plan.selectedApproachIds) : null;
+        const result = profile ? evaluateApproachPlan(profile, aim.id, segment.durationMinutes, plan.selectedApproachIds, slots) : null;
         const averageApproachRating = result?.candidateScores.length ? result.candidateScores.reduce((total, score) => total + score.rating, 0) / result.candidateScores.length : 0;
         const remainingApproaches = MATCH_APPROACHES.filter((approach) => !plan.selectedApproachIds.includes(approach.id));
         return <article className="match-competitor-card" key={key} data-match-worker={key}>

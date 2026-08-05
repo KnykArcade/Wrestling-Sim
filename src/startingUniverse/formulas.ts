@@ -257,6 +257,14 @@ export const IMPORTED_APPROACH_FORMULAS: ImportedApproachFormulaDefinition[] = I
   };
 });
 
+export function importedApproachIdForMatchEngineId(id: string): ImportedApproachFormulaId | null {
+  return IMPORTED_APPROACH_FORMULAS.find((formula) => formula.currentMatchEngineId === id)?.id ?? null;
+}
+
+export function matchEngineIdForImportedApproachId(id: ImportedApproachFormulaId): NonNullable<ImportedApproachFormulaDefinition["currentMatchEngineId"]> {
+  return MATCH_ENGINE_ID_BY_IMPORTED_ID[id];
+}
+
 const WORKBOOK_US_POPULARITY_FIELDS = [
   "Great_Lakes",
   "Mid_Atlantic",

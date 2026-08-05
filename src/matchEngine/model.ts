@@ -1,5 +1,6 @@
 import { APPROACH_ALIASES, MATCH_AIMS, MATCH_APPROACHES, MENTAL_STATES } from "./catalog";
 import { AIM_APPROACH_HINTS, MATCH_ENGINE_SKILLS, WRESTLER_STYLES } from "./profileCatalog";
+import { calculateSuitability } from "../calculations/foundation";
 import type {
   ApproachFormulaSource,
   ApproachCandidateScore,
@@ -80,6 +81,11 @@ export function approachSlotsForDuration(minutes: number): 1 | 2 | 3 | 4 {
   if (duration <= 15) return 2;
   if (duration < 25) return 3;
   return 4;
+}
+
+export function approachLimitForSetup(minutes: number, configuredLimit?: number | null): number {
+  if (typeof configuredLimit !== "number" || !Number.isFinite(configuredLimit)) return approachSlotsForDuration(minutes);
+  return Math.max(1, Math.min(MATCH_APPROACHES.length, Math.round(configuredLimit)));
 }
 
 export function evaluatePace(idealPace: number, actualPace: number): PaceEvaluation {
@@ -231,10 +237,13 @@ export function scoreApproachCandidate(
   profile: MatchEngineProfile,
   aimId: MatchAimId,
   approach: MatchApproachDefinition,
+  options: { ratingOverride?: number; opponentCompatibility?: number } = {},
 ): ApproachCandidateScore {
   const aim = aimForId(aimId);
   const style = getWrestlerStyle(profile);
-  const rating = calculateApproachRating(approach, profileApproachRatingInputs(profile));
+  const rating = typeof options.ratingOverride === "number"
+    ? Math.max(0, Math.min(100, options.ratingOverride))
+    : calculateApproachRating(approach, profileApproachRatingInputs(profile));
   const styleBonus = style.approachBoosts.includes(approach.id) ? 8 : 0;
   const hintedForAim = AIM_APPROACH_HINTS[aim.id].includes(approach.id);
   const styleMatchesAim = style.aimBoosts.includes(aim.id) || style.aimStyleNames.some((name) => aim.bestFitStyles.includes(name));
@@ -242,15 +251,23 @@ export function scoreApproachCandidate(
   const aimCompatibility = (hintedForAim ? 6 : 0) + (styleMatchesAim ? 3 : 0) - (styleClashes ? 6 : 0);
   const paceBonus = paceSelectionBonus(aim.idealPace, approach.pace);
   const staminaEfficiency = (4 - approach.staminaCost) * 1.5;
-  const total = Math.round((rating + styleBonus + aimCompatibility + paceBonus + staminaEfficiency) * 100) / 100;
+  const opponentCompatibility = options.opponentCompatibility ?? 0;
+  const total = calculateSuitability(rating, {
+    style: styleBonus,
+    aim: aimCompatibility,
+    pace: paceBonus,
+    stamina: staminaEfficiency,
+    opponent: opponentCompatibility,
+  });
   const reasons = [
     `${rating.toFixed(1)} weighted approach rating`,
     styleBonus ? `${style.name} style boost` : "No wrestler-style boost",
     hintedForAim ? `${aim.name} compatibility hint` : "No direct match-aim hint",
     `Pace ${approach.pace} against ideal ${aim.idealPace}`,
     `Costs ${approach.staminaCost} stamina`,
+    opponentCompatibility ? `${opponentCompatibility.toFixed(1)} opponent-fit adjustment` : "No opponent-specific adjustment",
   ];
-  return { approachId: approach.id, rating, styleBonus, aimCompatibility, paceBonus, staminaEfficiency, total, reasons };
+  return { approachId: approach.id, rating, styleBonus, aimCompatibility, paceBonus, staminaEfficiency, opponentCompatibility, total, reasons };
 }
 
 function combinations<T>(items: T[], choose: number): T[][] {
@@ -269,6 +286,7 @@ export function evaluateApproachPlan(
   aimId: MatchAimId,
   durationMinutes: number,
   approachIds: MatchApproachId[],
+  configuredLimit?: number | null,
 ): ApproachPlanResult {
   const aim = aimForId(aimId);
   const selected = Array.from(new Set(approachIds)).filter((id) => MATCH_APPROACHES.some((approach) => approach.id === id));
@@ -300,7 +318,7 @@ export function evaluateApproachPlan(
     actualPace,
     pace,
     explanation: [
-      `${selected.length} of ${approachSlotsForDuration(durationMinutes)} available approach slots filled.`,
+      `${selected.length} of ${approachLimitForSetup(durationMinutes, configuredLimit)} available approach slots filled.`,
       `${usedStamina}/${availableStamina} stamina used: ${stamina.status}.`,
       aim.idealPace === 0 ? "The selected match aim allows open pacing." : `Estimated pace ${actualPace} against ideal ${aim.idealPace}: ${pace.status}.`,
       "The score uses visible approach ratings, wrestler-style boosts, match-aim hints, pace, and stamina pressure.",
@@ -313,8 +331,9 @@ export function chooseApproachPlan(
   aimId: MatchAimId,
   durationMinutes: number,
   lockedApproachIds: MatchApproachId[] = [],
+  configuredLimit?: number | null,
 ): ApproachPlanResult {
-  const slots = approachSlotsForDuration(durationMinutes);
+  const slots = approachLimitForSetup(durationMinutes, configuredLimit);
   const locked = Array.from(new Set(lockedApproachIds))
     .filter((id) => MATCH_APPROACHES.some((approach) => approach.id === id))
     .slice(0, slots);
@@ -322,14 +341,14 @@ export function chooseApproachPlan(
   const candidateSets = combinations(remaining, slots - locked.length).map((set) => [...locked, ...set]);
   let best: ApproachPlanResult | null = null;
   for (const selected of candidateSets) {
-    const result = evaluateApproachPlan(profile, aimId, durationMinutes, selected);
+    const result = evaluateApproachPlan(profile, aimId, durationMinutes, selected, slots);
     if (
       !best ||
       result.totalScore > best.totalScore ||
       (result.totalScore === best.totalScore && result.usedStamina < best.usedStamina)
     ) best = result;
   }
-  return best ?? evaluateApproachPlan(profile, aimId, durationMinutes, locked);
+  return best ?? evaluateApproachPlan(profile, aimId, durationMinutes, locked, slots);
 }
 
 export function normalizeProfileRatings(profile: MatchEngineProfile): MatchEngineProfile {
