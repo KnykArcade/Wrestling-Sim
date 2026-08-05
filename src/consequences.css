@@ -401,6 +401,12 @@
 
 .consequence-status--rolled-back { border-color: #9a6666 !important; }
 
+.consequence-return {
+  display: flex;
+  justify-content: flex-end;
+  margin: -6px 0 16px;
+}
+
 @media (max-width: 1250px) {
   .consequence-overview {
     grid-template-columns: repeat(2, minmax(0, 1fr));

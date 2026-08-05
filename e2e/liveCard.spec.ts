@@ -42,12 +42,12 @@ test("runs a show one result at a time and inserts a grounded reaction angle", a
   await page.getByRole("button", { name: "Run Official Match Calculation" }).click();
   await expect(page.locator(".match-resolution-result").getByText("OFFICIAL ENGINE RESULT", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Accept Engine Result" }).click();
-  const acceptedWinner = await page.locator(".match-resolution-final--accepted h3").textContent();
+  await expect(page.getByRole("heading", { name: /Run the show one segment at a time/ })).toBeVisible();
+  const acceptedWinner = await page.locator(".live-card-match-panel h3").textContent();
   expect(acceptedWinner).toMatch(/defeated/);
-
-  await page.getByRole("button", { name: "Run Show", exact: true }).click();
   await expect(page.locator(".live-card-current-header").getByRole("heading", { name: "Jay White vs PAC" })).toBeVisible();
   await page.getByRole("button", { name: "Lock Result Into Live Card" }).click();
+  await expect(page.getByText("Result locked and consequences recorded once")).toBeVisible();
   await expect(page.getByRole("heading", { name: "What happens because of this result?" })).toBeVisible();
   await expect(page.locator(".live-card-grounded-facts")).toContainText(/defeated/);
   await expect(page.getByLabel("Live card inserted angle title")).toHaveValue(/Post-Match Reaction/);

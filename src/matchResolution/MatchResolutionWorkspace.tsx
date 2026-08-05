@@ -147,7 +147,7 @@ function statusClass(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 }
 
-export default function MatchResolutionWorkspace() {
+export default function MatchResolutionWorkspace({ onReturnToShow }: { onReturnToShow?: () => void }) {
   const [universe, setUniverse] = useState<MatchResolutionUniverse>(() => loadMatchResolutionUniverse(window.localStorage));
   const [shows] = useState<PlannedShow[]>(() => loadPlannedShows(window.localStorage));
   const [startingUniverse, setStartingUniverse] = useState<StartingUniverseRecord | null>(null);
@@ -271,8 +271,11 @@ export default function MatchResolutionWorkspace() {
     if (!existingRecord) return;
     try {
       const record = acceptEngineResult(existingRecord);
-      setUniverse((current) => upsertMatchResolutionRecord(current, record));
-      setNotice("The engine result is now official. Records and guarded championship consequences have been applied.");
+      const next = upsertMatchResolutionRecord(universe, record);
+      setUniverse(next);
+      saveMatchResolutionUniverse(window.localStorage, next);
+      setNotice("The engine result is now official.");
+      onReturnToShow?.();
     } catch (caught) {
       setNotice(caught instanceof Error ? caught.message : "The result could not be accepted.");
     }
@@ -282,9 +285,12 @@ export default function MatchResolutionWorkspace() {
     if (!existingRecord) return;
     try {
       const record = overrideEngineResult(existingRecord, overrideWinnerKey, overrideFinishType, overrideDescription, overrideReason);
-      setUniverse((current) => upsertMatchResolutionRecord(current, record));
+      const next = upsertMatchResolutionRecord(universe, record);
+      setUniverse(next);
+      saveMatchResolutionUniverse(window.localStorage, next);
       setNotice("The booker override is official. The original engine winner, probabilities, performance scores, and roll remain permanently recorded.");
       setOverrideReason("");
+      onReturnToShow?.();
     } catch (caught) {
       setNotice(caught instanceof Error ? caught.message : "The result could not be overridden.");
     }
@@ -296,7 +302,7 @@ export default function MatchResolutionWorkspace() {
 
   return <section className="match-resolution-workspace">
     <header className="match-resolution-hero">
-      <div><p className="eyebrow">PHASE 6B4 · TEAM AND MULTI-PERSON MATCH RESOLUTION</p><h2>You book the opportunity. The wrestlers create the outcome. You book the consequences.</h2><p>Resolve singles, tag, trios, multi-person, elimination, and battle-royal matches through the same permanent calculation and explicit override process.</p></div>
+      <div><p className="eyebrow">OFFICIAL MATCH</p><h2>You book the opportunity. The wrestlers create the outcome. You book the consequences.</h2><p>Resolve singles, tag, trios, multi-person, elimination, and battle-royal matches through the same permanent calculation and explicit override process.</p></div>
       <div className="match-resolution-principle"><span>Outcome authority</span><strong>Wrestling Sim</strong><small>One official calculation per material setup. Accept or explicitly override.</small></div>
     </header>
 

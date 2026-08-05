@@ -1,4 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { loadChampionshipUniverse } from "../championships/storage";
+import { loadCompetitionUniverse } from "../competitions/storage";
+import { applyCoreResultConsequences } from "../consequences/model";
+import { loadResultConsequenceUniverse, saveResultConsequenceUniverse } from "../consequences/storage";
+import type { ResultConsequenceUniverse } from "../consequences/types";
+import { loadMatchEngineUniverse } from "../matchEngine/storage";
 import { activeResolutionAttempt } from "../matchResolution/engine";
 import { loadMatchResolutionUniverse, saveMatchResolutionUniverse } from "../matchResolution/storage";
 import type { MatchResolutionRecord, MatchResolutionUniverse } from "../matchResolution/types";
@@ -13,6 +19,7 @@ import {
   createLiveCardSession,
   insertGroundedAngle,
   lockMatchResult,
+  liveCardReadiness,
   nextUnfinishedMatchId,
   nextUnfinishedSegmentId,
   openSegmentCorrection,
@@ -27,6 +34,7 @@ import type { GroundedAngleInput, LiveCardSession, LiveCardUniverse } from "./ty
 
 interface LiveCardRunnerWorkspaceProps {
   onOpenResolution: () => void;
+  onOpenConsequences: () => void;
   onOpenPlanner: (showId: string, segmentId: string) => void;
 }
 
@@ -70,10 +78,11 @@ function selectedSession(show: PlannedShow | null, resolutions: MatchResolutionU
   return synchronizeLiveCardSession(show, resolutions, universe.sessions.find((session) => session.showId === show.id) ?? null);
 }
 
-export default function LiveCardRunnerWorkspace({ onOpenResolution, onOpenPlanner }: LiveCardRunnerWorkspaceProps) {
+export default function LiveCardRunnerWorkspace({ onOpenResolution, onOpenConsequences, onOpenPlanner }: LiveCardRunnerWorkspaceProps) {
   const [shows, setShows] = useState<PlannedShow[]>(() => loadPlannedShows(window.localStorage));
   const [resolutions, setResolutions] = useState<MatchResolutionUniverse>(() => loadMatchResolutionUniverse(window.localStorage));
   const [universe, setUniverse] = useState<LiveCardUniverse>(() => loadLiveCardUniverse(window.localStorage));
+  const [consequences, setConsequences] = useState<ResultConsequenceUniverse>(() => loadResultConsequenceUniverse(window.localStorage));
   const initialShowId = universe.settings.selectedShowId && shows.some((show) => show.id === universe.settings.selectedShowId) ? universe.settings.selectedShowId : shows[0]?.id ?? "";
   const [selectedShowId, setSelectedShowId] = useState(initialShowId);
   const selectedShow = shows.find((show) => show.id === selectedShowId) ?? shows[0] ?? null;
@@ -96,6 +105,12 @@ export default function LiveCardRunnerWorkspace({ onOpenResolution, onOpenPlanne
   const remainingSegments = session?.progress.filter((progress) => !["Completed", "Skipped"].includes(progress.status)).length ?? 0;
   const completedSegments = session?.progress.filter((progress) => progress.status === "Completed").length ?? 0;
   const insertedSegments = session?.progress.filter((progress) => progress.insertedDuringShow).length ?? 0;
+  const readiness = useMemo(() => selectedShow ? liveCardReadiness(selectedShow) : { ready: false, blockers: ["Create a show before starting the live card."] }, [selectedShow]);
+  const currentApplication = consequences.applications.find((application) => application.resolutionAttemptId === currentAttempt?.id && application.status === "Applied") ?? null;
+  const guardedDecisions = currentApplication ? [
+    ...consequences.championshipProposals.filter((proposal) => proposal.applicationId === currentApplication.id && proposal.status !== "Confirmed"),
+    ...consequences.competitionProposals.filter((proposal) => proposal.applicationId === currentApplication.id && proposal.status !== "Confirmed"),
+  ].length : 0;
 
   useEffect(() => savePlannedShows(window.localStorage, shows), [shows]);
   useEffect(() => saveLiveCardUniverse(window.localStorage, universe), [universe]);
@@ -139,6 +154,10 @@ export default function LiveCardRunnerWorkspace({ onOpenResolution, onOpenPlanne
 
   function startShow(): void {
     if (!selectedShow || !session) return;
+    if (!readiness.ready) {
+      setNotice("The card is not ready. Fix the requirements shown below before starting the show.");
+      return;
+    }
     updateSession(startLiveCardSession);
     setShows((current) => current.map((show) => show.id === selectedShow.id ? touchShow({ ...show, status: show.status === "Draft" ? "Ready" : show.status }) : show));
     setNotice("The live show is now in progress. Resolve each match once, then react to what actually happened.");
@@ -164,13 +183,43 @@ export default function LiveCardRunnerWorkspace({ onOpenResolution, onOpenPlanne
   }
 
   function lockCurrentMatch(): void {
-    if (!session || !currentResolution) return;
+    if (!session || !currentResolution || !selectedShow) return;
     try {
-      updateSession((value) => lockMatchResult(value, currentResolution));
-      setNotice("The official result is locked into the live card. Create a grounded follow-up angle or continue through the running order.");
+      const nextSession = lockMatchResult(session, currentResolution);
+      setUniverse((current) => upsertLiveCardSession(current, nextSession));
+      const currentConsequences = loadResultConsequenceUniverse(window.localStorage);
+      const attempt = activeResolutionAttempt(currentResolution);
+      const alreadyApplied = currentConsequences.applications.some((application) => application.resolutionAttemptId === attempt?.id && application.status === "Applied");
+      if (alreadyApplied) {
+        setConsequences(currentConsequences);
+        setNotice("The official result is locked. Its consequences were already applied, so no duplicate records were created.");
+        return;
+      }
+      const consequenceResult = applyCoreResultConsequences({
+        universe: currentConsequences,
+        resolution: currentResolution,
+        shows: loadPlannedShows(window.localStorage),
+        profiles: loadMatchEngineUniverse(window.localStorage).profiles,
+        championships: loadChampionshipUniverse(window.localStorage),
+        competitions: loadCompetitionUniverse(window.localStorage),
+      });
+      saveResultConsequenceUniverse(window.localStorage, consequenceResult.universe);
+      savePlannedShows(window.localStorage, consequenceResult.shows);
+      setConsequences(consequenceResult.universe);
+      setShows(consequenceResult.shows);
+      const application = consequenceResult.universe.applications.find((item) => item.resolutionAttemptId === attempt?.id);
+      const decisionCount = application ? consequenceResult.universe.championshipProposals.filter((item) => item.applicationId === application.id).length + consequenceResult.universe.competitionProposals.filter((item) => item.applicationId === application.id).length : 0;
+      setNotice(decisionCount ? `The result is locked and core consequences are applied. ${decisionCount} permanent decision${decisionCount === 1 ? " is" : "s are"} ready for your confirmation.` : "The result is locked and its records, rankings, momentum, condition, and history are updated exactly once.");
     } catch (caught) {
       setNotice(caught instanceof Error ? caught.message : "The match result could not be locked.");
     }
+  }
+
+  function reviewConsequences(): void {
+    if (!currentApplication) return;
+    const next = { ...consequences, settings: { ...consequences.settings, selectedApplicationId: currentApplication.id, activeTab: guardedDecisions ? "decisions" as const : "overview" as const } };
+    saveResultConsequenceUniverse(window.localStorage, next);
+    onOpenConsequences();
   }
 
   function updateAngleField(patch: Partial<PlannedSegment>): void {
@@ -241,20 +290,21 @@ export default function LiveCardRunnerWorkspace({ onOpenResolution, onOpenPlanne
       const next = completeLiveCard(session);
       setUniverse((current) => upsertLiveCardSession(current, next));
       setShows((current) => current.map((show) => show.id === selectedShow.id ? touchShow({ ...show, status: "Completed" }) : show));
-      setNotice("The live card is complete. Official result consequences have been applied.");
+      setNotice("The show is complete. Every finalized match result and one-time core consequence is preserved in the summary below.");
     } catch (caught) {
       setNotice(caught instanceof Error ? caught.message : "The show could not be completed.");
     }
   }
 
   return <section className="live-card-workspace">
-    <header className="live-card-hero"><div><p className="eyebrow">PHASE 6B2 · REACTIVE LIVE CARD RUNNER</p><h2>Run the show one segment at a time and let completed results reshape everything that follows</h2><p>The planned card is a starting order, not a finished script. A match must receive one official result before it can be locked. You can then insert a grounded angle, change later creative work, or move directly to the next match.</p></div><div className="live-card-principle"><span>Live booking loop</span><strong>Result → Reaction → Next Decision</strong><small>Completed results are locked. Corrections create audit history instead of invisible recalculation.</small></div></header>
+    <header className="live-card-hero"><div><p className="eyebrow">RUN LIVE SHOW</p><h2>Run the show one segment at a time and let completed results reshape everything that follows</h2><p>The selected show and segment stay with you from the booked card through the official result, consequences, and final show summary.</p></div><div className="live-card-principle"><span>Live booking loop</span><strong>Result → Consequence → Next Segment</strong><small>Completed results are locked. Corrections create audit history instead of invisible recalculation.</small></div></header>
     {notice && <div className="status-banner planner-notice" role="status"><span>{notice}</span><button type="button" onClick={() => setNotice("")}>Dismiss</button></div>}
 
-    <section className="live-card-toolbar"><label className="field"><span>Show to run</span><select aria-label="Live card planned show" value={selectedShow?.id ?? ""} onChange={(event) => selectShow(event.target.value)}><option value="">No planned show</option>{shows.map((show) => <option key={show.id} value={show.id}>{show.name} · {show.date || "Unscheduled"}</option>)}</select></label><button className="primary-button" type="button" disabled={!session || session.status !== "Planned"} onClick={startShow}>Start Live Show</button><button className="secondary-button" type="button" disabled={!currentSegment} onClick={() => currentSegment && onOpenPlanner(selectedShow?.id ?? "", currentSegment.id)}>Open Full Segment Editor</button><button className="secondary-button" type="button" onClick={refreshResult}>Refresh Official Results</button></section>
+    <section className="live-card-toolbar"><label className="field"><span>Show to run</span><select aria-label="Live card planned show" value={selectedShow?.id ?? ""} onChange={(event) => selectShow(event.target.value)}><option value="">No planned show</option>{shows.map((show) => <option key={show.id} value={show.id}>{show.name} · {show.date || "Unscheduled"}</option>)}</select></label><button className="primary-button" type="button" disabled={!session || session.status !== "Planned" || !readiness.ready} onClick={startShow}>Start Live Show</button><button className="secondary-button" type="button" disabled={!currentSegment} onClick={() => currentSegment && onOpenPlanner(selectedShow?.id ?? "", currentSegment.id)}>Edit Current Segment</button><button className="secondary-button" type="button" onClick={refreshResult}>Refresh Official Results</button></section>
 
     {!selectedShow || !session ? <div className="empty-state live-card-empty"><h3>No planned show is available</h3><p>Create the card first. Participants and context may be booked, but match winners can remain unresolved.</p></div> : <>
-      <section className="live-card-summary"><article><span>Show status</span><strong>{session.status}</strong></article><article><span>Completed</span><strong>{completedSegments}/{session.progress.length}</strong></article><article><span>Remaining</span><strong>{remainingSegments}</strong></article><article><span>Inserted live</span><strong>{insertedSegments}</strong></article><article><span>Current segment</span><strong>{currentSegment ? session.segmentOrder.indexOf(currentSegment.id) + 1 : 0}</strong></article></section>
+      {!readiness.ready && session.status === "Planned" && <section className="live-card-readiness" role="alert"><header><div><p className="eyebrow">CARD NOT READY</p><h3>Fix these requirements before starting</h3></div><span>{readiness.blockers.length}</span></header>{readiness.blockers.map((blocker) => <p key={blocker}>{blocker}</p>)}<button className="primary-button" type="button" onClick={() => onOpenPlanner(selectedShow.id, "")}>Return to Card Editor</button></section>}
+      <section className="live-card-summary"><article><span>Show status</span><strong>{session.status}</strong></article><article><span>Card progress</span><strong>{completedSegments}/{session.progress.length}</strong></article><article><span>Remaining</span><strong>{remainingSegments}</strong></article><article><span>Inserted live</span><strong>{insertedSegments}</strong></article><article><span>Current segment</span><strong>{currentSegment ? session.segmentOrder.indexOf(currentSegment.id) + 1 : 0}</strong></article></section>
 
       <div className="live-card-layout"><aside className="live-card-running-order"><header><div><p className="eyebrow">RUNNING ORDER</p><h3>{selectedShow.name}</h3><span>{selectedShow.date || "Unscheduled"}</span></div><b>{session.progress.length}</b></header><div>{session.segmentOrder.map((segmentId, index) => { const progress = session.progress.find((item) => item.segmentId === segmentId); const segment = selectedShow.segments.find((item) => item.id === segmentId); if (!progress || !segment) return null; return <button type="button" key={segmentId} className={`${currentSegment?.id === segmentId ? "active" : ""} live-card-status--${statusClass(progress.status)}`} onClick={() => selectSegment(segmentId)}><strong>{index + 1}</strong><span><b>{segment.title}</b><small>{segment.type === "match" ? "Match" : "Angle"} · {segment.durationMinutes} min</small><em>{progress.status}{progress.insertedDuringShow ? " · Inserted live" : ""}</em></span></button>; })}</div><footer><button className="secondary-button" type="button" onClick={() => moveNext("segment")}>Next Unfinished Segment</button><button className="secondary-button" type="button" onClick={() => moveNext("match")}>Next Match</button></footer></aside>
 
@@ -265,10 +315,12 @@ export default function LiveCardRunnerWorkspace({ onOpenResolution, onOpenPlanne
             {currentProgress.status === "Completed" && currentProgress.result && <section className="live-card-post-result"><header><div><p className="eyebrow">REACTIVE BOOKING</p><h3>What happens because of this result?</h3></div><span>{currentProgress.result.status}</span></header><div className="live-card-grounded-facts">{currentProgress.groundedFacts.length ? currentProgress.groundedFacts.map((fact) => <p key={fact}>{fact}</p>) : resultFacts(currentResolution).map((fact) => <p key={fact}>{fact}</p>)}</div><div className="live-card-angle-form"><label className="field"><span>New segment type</span><select aria-label="Live card inserted segment mode" value={angleMode} onChange={(event) => setAngleMode(event.target.value as GroundedAngleInput["mode"])}><option>Follow-Up Angle</option><option>Post-Match Segment</option></select></label><label className="field"><span>Segment name</span><input aria-label="Live card inserted angle title" value={angleTitle} onChange={(event) => setAngleTitle(event.target.value)} /></label><label className="field"><span>Purpose</span><textarea aria-label="Live card inserted angle purpose" rows={3} value={anglePurpose} onChange={(event) => setAnglePurpose(event.target.value)} /></label><label className="field"><span>Location</span><input aria-label="Live card inserted angle location" value={angleLocation} onChange={(event) => setAngleLocation(event.target.value)} /></label><label className="field"><span>Content type</span><input aria-label="Live card inserted angle content type" value={angleContentType} onChange={(event) => setAngleContentType(event.target.value)} /></label></div><div className="live-card-actions"><button className="primary-button" type="button" onClick={insertAngle}>Insert After This Match</button><button className="secondary-button" type="button" onClick={() => moveNext("segment")}>Move to Next Segment</button><button className="secondary-button" type="button" onClick={() => moveNext("match")}>Move to Next Match</button></div></section>}
           </section> : <section className="live-card-angle-panel"><header><div><p className="eyebrow">ANGLE OUTPUT</p><h3>{currentProgress.insertedDuringShow ? "Write the reaction to the actual result" : "Complete the planned angle in the context of the live show"}</h3></div><span>{currentProgress.corrections.length ? `${currentProgress.corrections.length} correction${currentProgress.corrections.length === 1 ? "" : "s"}` : "Original record"}</span></header>{currentProgress.groundedFacts.length > 0 && <div className="live-card-grounded-facts"><strong>Fixed result facts</strong>{currentProgress.groundedFacts.map((fact) => <p key={fact}>{fact}</p>)}<small>No dialogue, attack, challenge, turn, or new action was generated.</small></div>}<label className="field"><span>Final Angle Output</span><textarea aria-label="Live card final angle output" rows={12} value={currentSegment.segmentOutput} disabled={currentProgress.status === "Completed"} onChange={(event) => updateAngleField({ segmentOutput: event.target.value })} /></label><div className="live-card-angle-form"><label className="field"><span>Actual consequences</span><textarea aria-label="Live card angle consequences" rows={4} value={currentSegment.consequences} disabled={currentProgress.status === "Completed"} onChange={(event) => updateAngleField({ consequences: event.target.value })} /></label><label className="field"><span>Final follow-up</span><textarea aria-label="Live card angle follow up" rows={4} value={currentSegment.followUp} disabled={currentProgress.status === "Completed"} onChange={(event) => updateAngleField({ followUp: event.target.value })} /></label></div><div className="live-card-actions"><button className="primary-button" type="button" disabled={currentProgress.status === "Completed"} onClick={completeAngle}>{currentProgress.status === "Correction" ? "Complete Angle Correction" : "Complete Angle"}</button><button className="secondary-button" type="button" onClick={() => moveNext("segment")}>Move to Next Segment</button></div>{currentProgress.status === "Completed" && <div className="live-card-correction"><label className="field"><span>Correction reason</span><textarea aria-label="Live card correction reason" rows={3} value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} /></label><button className="secondary-button" type="button" onClick={openCorrection}>Open Explicit Correction</button></div>}{currentProgress.corrections.length > 0 && <details className="live-card-correction-history"><summary>Correction history</summary>{currentProgress.corrections.map((entry) => <article key={entry.id}><strong>{entry.reason}</strong><span>{entry.beforeOutput || "No prior output"}</span><b>→</b><span>{entry.afterOutput || "Correction still open"}</span><small>{formatDate(entry.openedAt)}{entry.completedAt ? ` · completed ${formatDate(entry.completedAt)}` : ""}</small></article>)}</details>}</section>}
 
+          {currentSegment.type === "match" && currentProgress.status === "Completed" && currentApplication && <section className="live-card-next-step"><div><p className="eyebrow">NEXT STEP</p><h3>Result locked and consequences recorded once</h3><p>{guardedDecisions ? `${guardedDecisions} permanent decision${guardedDecisions === 1 ? " needs" : "s need"} your confirmation.` : "Records, rankings, momentum, condition, and history are updated."}</p></div><div className="live-card-actions"><button className="secondary-button" type="button" onClick={reviewConsequences}>{guardedDecisions ? `Review ${guardedDecisions} Guarded Decision${guardedDecisions === 1 ? "" : "s"}` : "View Applied Consequences"}</button><button className="primary-button" type="button" onClick={() => moveNext("segment")}>Continue to Next Segment</button></div></section>}
           {!['Completed', 'Skipped'].includes(currentProgress.status) && <section className="live-card-skip"><label className="field"><span>Skip reason</span><input aria-label="Live card skip reason" value={skipReason} onChange={(event) => setSkipReason(event.target.value)} /></label><button className="secondary-button" type="button" onClick={skipCurrent}>Skip This Segment Deliberately</button></section>}
         </>}</main>
       </div>
       <section className="live-card-footer"><div><strong>{canCompleteLiveCard(session) ? "Every segment is finalized." : `${remainingSegments} segment${remainingSegments === 1 ? " remains" : "s remain"}.`}</strong><span>Completing the show locks the running order as played and applies official records and consequences.</span></div><button className="primary-button" type="button" disabled={!canCompleteLiveCard(session) || session.status === "Completed"} onClick={completeShow}>{session.status === "Completed" ? "Show Completed" : "Complete Live Show"}</button></section>
+      {session.status === "Completed" && <section className="live-card-complete-summary"><header><div><p className="eyebrow">FINAL SHOW SUMMARY</p><h3>{selectedShow.name} is complete</h3><p>{completedSegments} completed · {session.progress.filter((item) => item.status === "Skipped").length} skipped · {insertedSegments} inserted live</p></div><span>{formatDate(session.completedAt)}</span></header>{session.progress.map((progress, index) => <article key={progress.segmentId}><b>{index + 1}</b><div><strong>{progress.title}</strong><span>{progress.result ? `${progress.result.finalResult.winnerName} defeated ${progress.result.finalResult.loserName}` : progress.finalAngleOutput || progress.skipReason || progress.status}</span></div><em>{progress.status}</em></article>)}</section>}
       <details className="live-card-audit"><summary>Live show audit history · {session.audit.length}</summary>{session.audit.map((entry) => <article key={entry.id}><strong>{entry.action}</strong><span>{entry.detail}</span><small>{formatDate(entry.createdAt)}</small></article>)}</details>
     </>}
   </section>;
