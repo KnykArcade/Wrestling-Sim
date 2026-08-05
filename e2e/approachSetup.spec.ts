@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openAdvancedTools } from "./helpers";
+import { openAdvancedTools, openCardSegment } from "./helpers";
 
 test("selects and persists wrestler approaches inside a planned TEW match", async ({ page }) => {
   await page.goto("/");
@@ -40,6 +40,7 @@ test("selects and persists wrestler approaches inside a planned TEW match", asyn
   await page.reload();
   await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
+  await openCardSegment(page, "Jay White vs PAC");
   const persistedMatch = page.locator('[data-segment-type="match"]');
   await expect(page.getByLabel("Show name")).toHaveValue("PWL Approach Test");
   await expect(persistedMatch.getByLabel("Match aim")).toHaveValue("technical-showcase");

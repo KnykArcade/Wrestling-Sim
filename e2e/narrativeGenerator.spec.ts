@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openAdvancedTools } from "./helpers";
+import { openAdvancedTools, openCardSegment } from "./helpers";
 
 test("persists one direct Match Story and generates an editable Angle Segment Output draft", async ({ page }) => {
   await page.goto("/");
@@ -19,6 +19,7 @@ test("persists one direct Match Story and generates an editable Angle Segment Ou
   await match.getByRole("button", { name: "Run AI for All Competitors" }).click();
   await match.getByLabel("Match Story", { exact: true }).fill("Jay White survives PAC's pressure and wins by pinfall after countering the Black Arrow.");
   await expect(match.getByLabel("Match Story generator")).toHaveCount(0);
+  await match.getByRole("button", { name: "Save and Close" }).click();
 
   await page.getByRole("button", { name: "Add Angle" }).click();
   const angle = page.locator('[data-segment-type="angle"]');
@@ -42,6 +43,9 @@ test("persists one direct Match Story and generates an editable Angle Segment Ou
   await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await expect(page.getByLabel("Show name")).toHaveValue("PWL Generated Output Test");
+  await openCardSegment(page, "Jay White vs PAC");
   await expect(page.locator('[data-segment-type="match"]').getByLabel("Match Story", { exact: true })).toContainText("Jay White");
+  await page.getByRole("button", { name: "Back to Card" }).click();
+  await openCardSegment(page, "Championship Challenge");
   await expect(page.locator('[data-segment-type="angle"]').getByLabel("Full Segment Output")).toContainText("championship match is now official");
 });

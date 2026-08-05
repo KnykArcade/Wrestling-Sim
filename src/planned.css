@@ -299,6 +299,34 @@
 .card-summary button b { color: #fff200; }
 .card-summary button small { grid-column: 2; color: #9fb1cc; }
 
+.tew-card-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.tew-card-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 54px;
+  padding: 9px 14px;
+  border: 1px solid #4c6489;
+  border-left-width: 5px;
+  background: #0d1d34;
+  color: #fff;
+  text-align: left;
+}
+
+.tew-card-row--match { border-left-color: #4aa5ff; }
+.tew-card-row--angle { border-left-color: #d99bff; }
+.tew-card-row:hover, .tew-card-row:focus-visible { background: #153153; outline: 2px solid #fff200; outline-offset: 2px; }
+.tew-card-row b { color: #fff200; text-align: center; }
+.tew-card-row span { font-size: 1rem; font-weight: 800; }
+.tew-card-row small { color: #9fb1cc; font-size: .7rem; font-weight: 900; letter-spacing: .08em; }
+
 .basic-match-booking {
   display: grid;
   gap: 12px;
