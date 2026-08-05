@@ -246,7 +246,7 @@ export default function App() {
       </details>}
     </nav>
     <main>
-      {view === "universe" && <StartingUniverseWorkspace />}
+      {view === "universe" && <StartingUniverseWorkspace onUniverseLoaded={() => setView("session")} />}
       {view === "runner" && <LiveCardRunnerWorkspace onOpenResolution={() => { setResolutionReturnToRunner(true); setView("resolution"); }} onOpenConsequences={() => setView("consequences")} onOpenPlanner={openPlannedSegment} />}
       {view === "resolution" && <MatchResolutionWorkspace onReturnToShow={resolutionReturnToRunner ? () => { setResolutionReturnToRunner(false); setView("runner"); } : undefined} />}
       {view === "consequences" && <ResultConsequenceWorkspace onOpenLiveCard={() => setView("runner")} onOpenPlanner={openPlannedSegment} />}
