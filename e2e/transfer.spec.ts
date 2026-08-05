@@ -13,9 +13,10 @@ test("generates and persists an assisted TEW transfer package", async ({ page })
   const match = page.locator('[data-segment-type="match"]');
   const angle = page.locator('[data-segment-type="angle"]');
   await match.getByLabel("Segment name").fill("Jay White vs PAC");
+  await match.getByText("Optional match result and championship settings").click();
   await match.getByLabel("Planned winner").fill("Jay White");
   await match.getByLabel("Planned finish").fill("Pinfall after Blade Runner");
-  await match.getByLabel("Full match story").fill("PAC controls the pace before White creates the decisive opening.");
+  await match.getByLabel("Match Story", { exact: true }).fill("PAC controls the pace before White creates the decisive opening.");
   await match.getByLabel("Manual worker name").fill("Jay White");
   await match.getByRole("button", { name: "Add Manual Worker" }).click();
   await angle.getByLabel("Segment name").fill("Post-Match Confrontation");

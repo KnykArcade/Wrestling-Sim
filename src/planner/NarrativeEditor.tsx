@@ -119,7 +119,7 @@ export default function NarrativeEditor({ segment, availableWorkers, availableSt
   const primaryNarrative = segment.type === "match" ? segment.matchStory : segment.segmentOutput;
 
   return <details className="narrative-editor" open>
-    <summary><span>Narrative Details</span><small>{segment.workers.length} worker{segment.workers.length === 1 ? "" : "s"} · {segment.storylines.length} storyline{segment.storylines.length === 1 ? "" : "s"}</small></summary>
+    <summary><span>{segment.type === "match" ? "Match Story" : "Narrative Details"}</span><small>{segment.type === "match" ? "One complete saved story" : `${segment.workers.length} worker${segment.workers.length === 1 ? "" : "s"} · ${segment.storylines.length} storyline${segment.storylines.length === 1 ? "" : "s"}`}</small></summary>
     <div className="narrative-editor__body">
       {segment.type === "angle" && <section className="narrative-section">
         <header><div><h4>Workers and roles</h4><p>Use names from the imported TEW snapshot or enter a name manually.</p></div></header>
@@ -136,7 +136,7 @@ export default function NarrativeEditor({ segment, availableWorkers, availableSt
         {segment.workers.length > 0 ? <div className="narrative-person-list">{segment.workers.map((worker) => <WorkerEditor key={worker.id} worker={worker} isMatch={segment.type === "match"} onChange={(updated) => onChange({ ...segment, workers: segment.workers.map((item) => item.id === updated.id ? updated : item) })} onDelete={() => onChange({ ...segment, workers: segment.workers.filter((item) => item.id !== worker.id) })} />)}</div> : <p className="narrative-empty-line">No workers have been assigned to this segment.</p>}
       </section>}
 
-      <section className="narrative-section">
+      {segment.type === "angle" && <section className="narrative-section">
         <header><div><h4>Related storylines</h4><p>Link one or more TEW storylines, or create a manual reference for planning.</p></div></header>
         <div className="reference-add-grid">
           <div className="reference-add-card">
@@ -149,11 +149,14 @@ export default function NarrativeEditor({ segment, availableWorkers, availableSt
           </div>
         </div>
         {segment.storylines.length > 0 ? <div className="storyline-reference-list">{segment.storylines.map((storyline: PlannedStorylineReference) => <span className="storyline-reference-chip" key={`${storyline.source}-${storyline.id}`}><b>{storyline.name}</b><small>{storyline.source === "tew" ? "TEW" : "Manual"}</small><button type="button" aria-label={`Remove storyline ${storyline.name}`} onClick={() => onChange({ ...segment, storylines: segment.storylines.filter((item) => item.id !== storyline.id) })}>×</button></span>)}</div> : <p className="narrative-empty-line">No storyline is linked to this segment.</p>}
-      </section>
+      </section>}
 
-      {segment.type === "match" ? <section className="narrative-section narrative-section--primary">
-        <header><div><h4>Match story</h4><p>Plan the result, finish, championship stakes, major beats, and what the audience sees.</p></div><div className="copy-actions"><button className="secondary-button compact-button" type="button" disabled={!segment.matchStory.trim()} onClick={() => void handleCopy(segment.matchStory)}>Copy Match Story</button><button className="secondary-button compact-button" type="button" onClick={() => void handleCopy(buildTewEntrySummary(segment))}>Copy TEW Entry Summary</button>{copyState && <span className={`copy-state copy-state--${copyState === "Copied" ? "ok" : "error"}`}>{copyState}</span>}</div></header>
-        <div className="narrative-form-grid">
+      {segment.type === "match" ? <section className="narrative-section narrative-section--primary match-story-only">
+        <header><div><h4>Match Story</h4><p>Write everything you want saved for this match in this one box.</p></div><div className="copy-actions"><button className="secondary-button compact-button" type="button" disabled={!segment.matchStory.trim()} onClick={() => void handleCopy(segment.matchStory)}>Copy Match Story</button><button className="secondary-button compact-button" type="button" onClick={() => void handleCopy(buildTewEntrySummary(segment))}>Copy TEW Entry Summary</button>{copyState && <span className={`copy-state copy-state--${copyState === "Copied" ? "ok" : "error"}`}>{copyState}</span>}</div></header>
+        <label className="field narrative-main-text"><span>Match Story</span><textarea aria-label="Match Story" rows={14} placeholder="Write the complete match story exactly as you want it saved." value={segment.matchStory} onChange={(event) => onChange({ ...segment, matchStory: event.target.value })} /></label>
+        <details className="match-administration">
+          <summary>Optional match result and championship settings</summary>
+          <div className="narrative-form-grid">
           <label className="field"><span>Tracker championship</span><select aria-label="Tracker championship" value={segment.championshipId} onChange={(event) => selectChampionship(event.target.value)}><option value="">Manual / non-title match</option>{championships.map((championship) => <option key={championship.id} value={championship.id}>{championship.name}</option>)}</select></label>
           <label className="field"><span>Championship / legacy title name</span><input aria-label="Championship or legacy title name" placeholder="None or title name" value={segment.championship} onChange={(event) => onChange({ ...segment, championship: event.target.value })} /></label>
           <label className="field"><span>Title-match purpose</span><select aria-label="Title match purpose" value={segment.championshipMatchPurpose} onChange={(event) => onChange({ ...segment, championshipMatchPurpose: event.target.value as PlannedSegment["championshipMatchPurpose"] })}><option value="">Not specified</option><option>Defense</option><option>Vacant Title</option><option>Tournament Final</option><option>Unification</option><option>Other</option></select></label>
@@ -162,12 +165,8 @@ export default function NarrativeEditor({ segment, availableWorkers, availableSt
           <label className="field"><span>Expected title change</span><select aria-label="Expected title change" value={segment.expectedTitleChange === null ? "" : segment.expectedTitleChange ? "yes" : "no"} onChange={(event) => onChange({ ...segment, expectedTitleChange: event.target.value === "" ? null : event.target.value === "yes" })}><option value="">Undecided</option><option value="no">No — champion retains</option><option value="yes">Yes — new champion planned</option></select></label>
           <label className="field"><span>Planned winner</span><input list={`winners-${segment.id}`} value={segment.plannedWinner} onChange={(event) => onChange({ ...segment, plannedWinner: event.target.value })} /><datalist id={`winners-${segment.id}`}>{winnerSuggestions.map((name) => <option key={name} value={name} />)}</datalist></label>
           <label className="field"><span>Planned finish</span><input placeholder="Pinfall, submission, DQ…" value={segment.plannedFinish} onChange={(event) => onChange({ ...segment, plannedFinish: event.target.value })} /></label>
-          <label className="field field--wide"><span>Championship stakes and notes</span><textarea aria-label="Championship stakes and notes" rows={3} placeholder="Why the title is at stake, special eligibility, rematch terms, or lineage notes." value={segment.championshipStakes} onChange={(event) => onChange({ ...segment, championshipStakes: event.target.value })} /></label>
-          <label className="field field--full narrative-main-text"><span>Full match story</span><textarea rows={9} placeholder="Describe the match from opening strategy through the decisive finish." value={segment.matchStory} onChange={(event) => onChange({ ...segment, matchStory: event.target.value })} /></label>
-          <label className="field field--full"><span>Key moments / spots</span><textarea rows={4} value={segment.keyMoments} onChange={(event) => onChange({ ...segment, keyMoments: event.target.value })} /></label>
-          <label className="field field--wide"><span>Interference</span><textarea rows={3} value={segment.interference} onChange={(event) => onChange({ ...segment, interference: event.target.value })} /></label>
-          <label className="field field--wide"><span>Post-match events</span><textarea rows={3} value={segment.postMatch} onChange={(event) => onChange({ ...segment, postMatch: event.target.value })} /></label>
-        </div>
+          </div>
+        </details>
       </section> : <section className="narrative-section narrative-section--primary">
         <header><div><h4>Angle Segment Output</h4><p>Write the complete on-screen story that should remain in the permanent show record.</p></div><div className="copy-actions"><button className="secondary-button compact-button" type="button" disabled={!segment.segmentOutput.trim()} onClick={() => void handleCopy(segment.segmentOutput)}>Copy Segment Output</button><button className="secondary-button compact-button" type="button" onClick={() => void handleCopy(buildTewEntrySummary(segment))}>Copy TEW Entry Summary</button>{copyState && <span className={`copy-state copy-state--${copyState === "Copied" ? "ok" : "error"}`}>{copyState}</span>}</div></header>
         <div className="narrative-form-grid">
@@ -178,7 +177,7 @@ export default function NarrativeEditor({ segment, availableWorkers, availableSt
         </div>
       </section>}
 
-      <section className="narrative-section">
+      {segment.type === "angle" && <section className="narrative-section">
         <header><div><h4>Story purpose and consequences</h4><p>Track why the segment exists and what must happen next.</p></div></header>
         <div className="narrative-form-grid">
           <label className="field field--wide"><span>Purpose</span><textarea rows={3} value={segment.purpose} onChange={(event) => onChange({ ...segment, purpose: event.target.value })} /></label>
@@ -186,7 +185,7 @@ export default function NarrativeEditor({ segment, availableWorkers, availableSt
           <label className="field field--wide"><span>Planned follow-up</span><textarea rows={3} value={segment.followUp} onChange={(event) => onChange({ ...segment, followUp: event.target.value })} /></label>
           <label className="field field--wide"><span>Private booking notes</span><textarea rows={3} value={segment.privateNotes} onChange={(event) => onChange({ ...segment, privateNotes: event.target.value })} /></label>
         </div>
-      </section>
+      </section>}
 
       {!primaryNarrative.trim() && <p className="narrative-reminder">{segment.type === "match" ? "Add the full match story before marking this show Ready." : "Add the Segment Output before marking this show Ready."}</p>}
     </div>

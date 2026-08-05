@@ -22,7 +22,8 @@ test("creates and persists match and angle narratives without browser errors", a
   await page.getByRole("button", { name: "Add Angle" }).click();
   const match = page.locator('[data-segment-type="match"]');
   const angle = page.locator('[data-segment-type="angle"]');
-  await match.getByLabel("Full match story").fill("Bret controls the knee, survives a late comeback, and wins with the Sharpshooter.");
+  await match.getByLabel("Match Story", { exact: true }).fill("Bret controls the knee, survives a late comeback, and wins with the Sharpshooter.");
+  await match.getByText("Optional match result and championship settings").click();
   await match.getByLabel("Planned winner").fill("Bret Hart");
   await match.getByLabel("Planned finish").fill("Submission");
   await match.getByLabel("Manual worker name").fill("Bret Hart");
@@ -44,7 +45,7 @@ test("creates and persists match and angle narratives without browser errors", a
   await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows", exact: true }).click();
   await expect(page.getByLabel("Show name")).toHaveValue("Monday Night Test");
-  await expect(page.locator('[data-segment-type="match"]').getByLabel("Full match story")).toContainText("Bret controls the knee");
+  await expect(page.locator('[data-segment-type="match"]').getByLabel("Match Story", { exact: true })).toContainText("Bret controls the knee");
   await expect(page.locator('[data-segment-type="angle"]').getByLabel("Full Segment Output")).toContainText("The champion opens the show");
   await expect(page.getByText("2 narratives complete")).toBeVisible();
   expect(pageErrors).toEqual([]);

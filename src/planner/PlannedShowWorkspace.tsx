@@ -133,13 +133,13 @@ function SegmentEditor({
         <label className="field field--wide"><span>Segment name</span><input value={segment.title} onChange={(event) => onChange({ ...segment, title: event.target.value })} /></label>
         <label className="field"><span>Placement</span><select value={segment.section} onChange={(event) => onChange({ ...segment, section: event.target.value as PlannedSegment["section"] })}><option>Pre-Show</option><option>Main Show</option><option>Post-Show</option></select></label>
         <label className="field"><span>Length (minutes)</span><input type="number" min={1} max={180} value={segment.durationMinutes} onChange={(event) => onChange({ ...segment, durationMinutes: Math.max(1, Number(event.target.value) || 1) })} /></label>
-        <label className="field field--full"><span>Quick planning outline</span><textarea rows={3} placeholder="A short overview for the running order. Use Narrative Details below for the complete story." value={segment.notes} onChange={(event) => onChange({ ...segment, notes: event.target.value })} /></label>
+        {segment.type === "angle" && <label className="field field--full"><span>Quick planning outline</span><textarea rows={3} placeholder="A short overview for the running order. Use Narrative Details below for the complete story." value={segment.notes} onChange={(event) => onChange({ ...segment, notes: event.target.value })} /></label>}
       </div>
 
       {segment.type === "match" && <BasicMatchBooking segment={segment} snapshot={snapshot} onChange={onChange} />}
       {segment.type === "match" && <MatchApproachSetupEditor segment={segment} universe={matchEngine} onUniverseChange={onMatchEngineChange} onChange={onChange} />}
       <NarrativeEditor segment={segment} availableWorkers={snapshot?.workers ?? []} availableStorylines={snapshot?.storylines ?? []} onChange={onChange} />
-      <NarrativeGenerator segment={segment} universe={matchEngine} onChange={onChange} />
+      {segment.type === "angle" && <NarrativeGenerator segment={segment} universe={matchEngine} onChange={onChange} />}
     </article>
   );
 }
