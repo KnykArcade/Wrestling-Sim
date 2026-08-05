@@ -9,10 +9,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export function parseShowEvaluationUniverse(value: unknown): ShowEvaluationUniverse {
   if (!isRecord(value)) return emptyShowEvaluationUniverse();
+  const angleEvaluations = Array.isArray(value.angleEvaluations)
+    ? value.angleEvaluations.map((item) => isRecord(item) ? { ...item, calculationVersion: typeof item.calculationVersion === "string" ? item.calculationVersion : "legacy-unversioned" } : item) as ShowEvaluationUniverse["angleEvaluations"]
+    : [];
+  const showReports = Array.isArray(value.showReports)
+    ? value.showReports.map((item) => isRecord(item) ? { ...item, calculationVersion: typeof item.calculationVersion === "string" ? item.calculationVersion : "legacy-unversioned" } : item) as ShowEvaluationUniverse["showReports"]
+    : [];
   return {
-    angleEvaluations: Array.isArray(value.angleEvaluations) ? value.angleEvaluations as ShowEvaluationUniverse["angleEvaluations"] : [],
+    angleEvaluations,
     workerImpacts: Array.isArray(value.workerImpacts) ? value.workerImpacts as ShowEvaluationUniverse["workerImpacts"] : [],
-    showReports: Array.isArray(value.showReports) ? value.showReports as ShowEvaluationUniverse["showReports"] : [],
+    showReports,
     promotionPopularity: typeof value.promotionPopularity === "number" && Number.isFinite(value.promotionPopularity) ? Math.max(0, Math.min(100, value.promotionPopularity)) : 50,
   };
 }

@@ -2,6 +2,7 @@ import type { MatchEngineProfile } from "../matchEngine/types";
 import { createPlannerId } from "../planner/model";
 import type { PlannedSegment, PlannedShow, PlannedWorkerReference } from "../planner/types";
 import type { LiveCardSession } from "../liveCard/types";
+import { CALCULATION_SYSTEM_VERSION } from "../calculations/foundation";
 import type {
   AngleEvaluation,
   AngleParticipantEvaluation,
@@ -81,7 +82,7 @@ export function calculateAngleEvaluation(show: PlannedShow, segment: PlannedSegm
   });
   return {
     id: createPlannerId(), showId: show.id, showName: show.name, segmentId: segment.id, segmentTitle: segment.title,
-    status: "Calculated", calculatedScore, finalScore: calculatedScore, overrideReason: "",
+    status: "Calculated", calculationVersion: CALCULATION_SYSTEM_VERSION, calculatedScore, finalScore: calculatedScore, overrideReason: "",
     factors: [
       { label: "Participant performance", value: round(performance * .78 + 12), detail: "Role-specific skills and popularity form the foundation." },
       { label: "Content", value: content.value, detail: content.detail },
@@ -173,7 +174,7 @@ export function evaluateCompletedShow(universe: ShowEvaluationUniverse, show: Pl
   const estimatedAttendance = Math.max(100, Math.round((350 + promotionPopularityBefore * 85 + overallScore * 25) * showTypeMultiplier));
   const timestamp = now();
   const report: ShowEvaluationReport = {
-    id: createPlannerId(), showId: show.id, showName: show.name, showDate: show.date, overallScore, audienceReaction: reaction(overallScore), estimatedAttendance,
+    id: createPlannerId(), showId: show.id, showName: show.name, showDate: show.date, calculationVersion: CALCULATION_SYSTEM_VERSION, overallScore, audienceReaction: reaction(overallScore), estimatedAttendance,
     promotionPopularityBefore, promotionPopularityAfter, promotionPopularityDelta, crowdStart: 50, crowdFinish: crowd, segments,
     explanations: [
       "Every completed segment contributes its accepted score.",

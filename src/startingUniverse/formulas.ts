@@ -1,4 +1,5 @@
 import type { WrestlerSkill } from "../matchEngine/types";
+import { MATCH_APPROACHES } from "../matchEngine/catalog";
 import type {
   ImportedApproachFormulaDefinition,
   ImportedApproachFormulaId,
@@ -9,9 +10,9 @@ import type {
   StartingUniverseWorkbookMetrics,
 } from "./types";
 
-export const APPROACH_FORMULA_CATALOG_VERSION = "match-system-2026-01-31-all-16";
+export const APPROACH_FORMULA_CATALOG_VERSION = "match-system-6b10a-canonical-16-v1";
 
-export const IMPORTED_APPROACH_FORMULAS: ImportedApproachFormulaDefinition[] = [
+const IMPORTED_APPROACH_FORMULA_SOURCE: ImportedApproachFormulaDefinition[] = [
   {
     id: "aerial-specialist",
     name: "Aerial Specialist",
@@ -55,7 +56,7 @@ export const IMPORTED_APPROACH_FORMULAS: ImportedApproachFormulaDefinition[] = [
     id: "counter-specialist",
     name: "Counter Specialist",
     workbookName: "Counter Specialist",
-    currentMatchEngineId: null,
+    currentMatchEngineId: "counter-specialist",
     terms: [
       { source: "Basics", weight: 0.35 },
       { source: "Psychology", weight: 0.25 },
@@ -224,6 +225,38 @@ export const IMPORTED_APPROACH_FORMULAS: ImportedApproachFormulaDefinition[] = [
   },
 ];
 
+const MATCH_ENGINE_ID_BY_IMPORTED_ID: Record<ImportedApproachFormulaId, NonNullable<ImportedApproachFormulaDefinition["currentMatchEngineId"]>> = {
+  "aerial-specialist": "aerial-showstopper",
+  "big-match-performer": "big-match-performer",
+  "chain-technician": "chain-technician",
+  "counter-specialist": "counter-specialist",
+  "dirty-rulebreaker": "dirty-rulebreaker",
+  "hardcore-daredevil": "hardcore-daredevil",
+  "heavy-striker-brawler": "heavy-striker-brawler",
+  "high-tempo-hybrid": "high-tempo-hybrid",
+  "opportunistic-schemer": "opportunistic-schemer",
+  "power-dominance": "power-dominance",
+  "psychological-manipulator": "psychological-manipulator",
+  "resilient-underdog": "resilient-underdog",
+  "ring-general-pace-controller": "pace-controller",
+  "showman": "showman",
+  "strong-style-specialist": "strong-style-specialist",
+  "submission-specialist": "submission-specialist",
+};
+
+// Runtime formulas come from MATCH_APPROACHES. The workbook rows above retain only
+// source names/notes for auditability, preventing booking and import math from drifting.
+export const IMPORTED_APPROACH_FORMULAS: ImportedApproachFormulaDefinition[] = IMPORTED_APPROACH_FORMULA_SOURCE.map((source) => {
+  const currentMatchEngineId = MATCH_ENGINE_ID_BY_IMPORTED_ID[source.id];
+  const canonical = MATCH_APPROACHES.find((approach) => approach.id === currentMatchEngineId);
+  if (!canonical) throw new Error(`Missing canonical approach ${currentMatchEngineId}.`);
+  return {
+    ...source,
+    currentMatchEngineId,
+    terms: canonical.formula.map((term) => ({ source: term.skill, weight: term.weight })),
+  };
+});
+
 const WORKBOOK_US_POPULARITY_FIELDS = [
   "Great_Lakes",
   "Mid_Atlantic",
@@ -309,7 +342,7 @@ function popularityRating(worker: StartingUniverseWorker, contract: StartingUniv
     worker.experience * 0.25 +
     gimmick * 0.25 +
     worker.looks * 0.1
-  ) / 11.6));
+  ) / 12.6));
 }
 
 export function calculateImportedApproachRatings(

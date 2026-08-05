@@ -26,7 +26,7 @@ export const WRESTLER_STYLES: WrestlerStyleDefinition[] = [
     id: "all-rounder",
     name: "All-Rounder",
     summary: "Balanced fundamentals, moderate athleticism, and adaptable psychology.",
-    approachBoosts: ["pace-controller"],
+    approachBoosts: ["pace-controller", "counter-specialist"],
     aimBoosts: ["technical-showcase", "competitive-tv-match"],
     aimStyleNames: ["Regular"],
   },
@@ -122,7 +122,7 @@ export const WRESTLER_STYLES: WrestlerStyleDefinition[] = [
     id: "pure-technician",
     name: "Pure Technician",
     summary: "Chain wrestling, grappling, limb work, and submissions.",
-    approachBoosts: ["chain-technician", "submission-specialist"],
+    approachBoosts: ["chain-technician", "counter-specialist", "submission-specialist"],
     aimBoosts: ["technical-showcase", "call-it-in-the-ring"],
     aimStyleNames: ["Technician"],
   },
@@ -147,9 +147,9 @@ export const WRESTLER_STYLES: WrestlerStyleDefinition[] = [
 // Transparent Phase 4C2 AI hints. These connect the source approach descriptions
 // to the selected match aim, but are not presented as workbook formulas.
 export const AIM_APPROACH_HINTS: Record<MatchAimId, MatchApproachId[]> = {
-  "call-it-in-the-ring": ["pace-controller", "chain-technician", "opportunistic-schemer", "big-match-performer"],
+  "call-it-in-the-ring": ["pace-controller", "counter-specialist", "chain-technician", "opportunistic-schemer", "big-match-performer"],
   "comedy-entertainment": ["showman", "psychological-manipulator", "dirty-rulebreaker"],
-  "competitive-tv-match": ["high-tempo-hybrid", "chain-technician", "strong-style-specialist", "aerial-showstopper"],
+  "competitive-tv-match": ["high-tempo-hybrid", "counter-specialist", "chain-technician", "strong-style-specialist", "aerial-showstopper"],
   "crowd-work-showcase": ["showman", "psychological-manipulator", "big-match-performer"],
   "epic-main-event-slow-burn": ["big-match-performer", "pace-controller", "resilient-underdog", "power-dominance"],
   elimination: ["opportunistic-schemer", "resilient-underdog", "power-dominance", "high-tempo-hybrid"],
@@ -163,7 +163,7 @@ export const AIM_APPROACH_HINTS: Record<MatchAimId, MatchApproachId[]> = {
   "storytelling-match": ["big-match-performer", "pace-controller", "resilient-underdog", "psychological-manipulator"],
   "strong-style-duel": ["strong-style-specialist", "heavy-striker-brawler", "resilient-underdog"],
   "survival-chaos": ["resilient-underdog", "opportunistic-schemer", "hardcore-daredevil"],
-  "technical-showcase": ["chain-technician", "submission-specialist", "pace-controller"],
+  "technical-showcase": ["chain-technician", "counter-specialist", "submission-specialist", "pace-controller"],
   "underdog-drama": ["resilient-underdog", "big-match-performer", "psychological-manipulator"],
   "wild-brawl": ["heavy-striker-brawler", "hardcore-daredevil", "dirty-rulebreaker"],
 };

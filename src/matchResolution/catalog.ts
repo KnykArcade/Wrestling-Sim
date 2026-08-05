@@ -1,4 +1,4 @@
-import { MATCH_AIMS } from "../matchEngine/catalog";
+import { MATCH_AIMS, MATCH_APPROACHES } from "../matchEngine/catalog";
 import { IMPORTED_APPROACH_FORMULAS } from "../startingUniverse/formulas";
 import type { ImportedApproachFormulaId } from "../startingUniverse/types";
 import type { MatchAimId } from "../matchEngine/types";
@@ -23,14 +23,21 @@ const META: Record<ResolutionApproachId, Omit<ResolutionApproachDefinition, "id"
   "submission-specialist": { pace: 1, staminaCost: 2, paceSource: "Workbook", summary: "Limb targeting, holds, and submission control." },
 };
 
-export const RESOLUTION_APPROACHES: ResolutionApproachDefinition[] = IMPORTED_APPROACH_FORMULAS.map((formula) => ({
-  id: formula.id,
-  name: formula.name,
-  workbookName: formula.workbookName,
-  ...META[formula.id],
-}));
+export const RESOLUTION_APPROACHES: ResolutionApproachDefinition[] = IMPORTED_APPROACH_FORMULAS.map((formula) => {
+  const canonical = MATCH_APPROACHES.find((approach) => approach.id === formula.currentMatchEngineId);
+  if (!canonical) throw new Error(`Missing canonical match approach for ${formula.id}.`);
+  return {
+    id: formula.id,
+    name: canonical.name,
+    workbookName: formula.workbookName,
+    pace: canonical.pace || META[formula.id].pace,
+    staminaCost: canonical.staminaCost,
+    paceSource: META[formula.id].paceSource,
+    summary: canonical.summary,
+  };
+});
 
-export const RESOLUTION_CALCULATION_VERSION = "wrestling-sim-match-resolution-v2";
+export { CALCULATION_SYSTEM_VERSION as RESOLUTION_CALCULATION_VERSION } from "../calculations/foundation";
 
 export const IMPORTANCE_MODIFIERS = {
   Television: { performance: 0, pressure: 0, durationVariance: 0.08 },

@@ -7,7 +7,9 @@ import {
   getApproach,
   mentalSwingProbability,
   normalizeApproachName,
+  profileApproachRatingInputs,
 } from "./model";
+import { CALCULATION_SYSTEM_VERSION } from "../calculations/foundation";
 import type {
   MatchEngineProfile,
   MatchPerformancePreview,
@@ -116,7 +118,7 @@ function workerResult(
   const ratings = plan.selectedApproachIds
     .map((id) => getApproach(id))
     .filter((approach) => approach !== null)
-    .map((approach) => calculateApproachRating(approach, profile.skills));
+    .map((approach) => calculateApproachRating(approach, profileApproachRatingInputs(profile)));
   const averageApproachRating = ratings.length > 0 ? average(ratings) : profile.overall * 0.6;
   const mental = mentalStateForWorker(profile, random);
   const consistencyRange = ((100 - profile.skills.Consistency) / 100) * settings.volatility * 1.5;
@@ -219,6 +221,7 @@ export function generateMatchPerformancePreview(input: GenerateMatchPerformanceI
     generatedAt: new Date().toISOString(),
     seed,
     authority: input.settings.authority,
+    calculationVersion: CALCULATION_SYSTEM_VERSION,
     matchScore: round(matchScore),
     starRating,
     performanceLeaderKey: performanceLeader.workerKey,

@@ -17,6 +17,7 @@ export interface AngleEvaluation {
   segmentId: string;
   segmentTitle: string;
   status: AngleEvaluationStatus;
+  calculationVersion: string;
   calculatedScore: number;
   finalScore: number;
   overrideReason: string;
@@ -43,6 +44,7 @@ export interface ShowEvaluationReport {
   showId: string;
   showName: string;
   showDate: string;
+  calculationVersion: string;
   overallScore: number;
   audienceReaction: string;
   estimatedAttendance: number;
