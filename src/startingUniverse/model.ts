@@ -385,7 +385,7 @@ function buildTeamDecisions(record: StartingUniverseRecord, companyId: string, r
       selectedVariantId: existing?.selectedVariantId && variants.some((variant) => variant.id === existing.selectedVariantId) ? existing.selectedVariantId : selected.id,
       included: existing?.included ?? true,
       gameName: existing?.gameName ?? selected.name,
-      acknowledged: existing?.acknowledged ?? variants.length === 1,
+      acknowledged: existing?.acknowledged ?? true,
       variantIds: variants.map((variant) => variant.id),
       note: existing?.note ?? "",
     };
@@ -410,6 +410,9 @@ function reviewIssues(record: StartingUniverseRecord, companyId: string, review:
   const company = record.companies.find((item) => item.id === companyId);
   if (!company) return [{ id: "no-company", severity: "Blocking", area: "Company", message: "No playable company is selected", detail: "Choose one imported company before reviewing a starting roster.", relatedId: "" }];
   const issues: StartingUniverseReviewIssue[] = record.source.warnings.map((warning, index) => ({ id: `source:${index}`, severity: "Important", area: "Source", message: warning, detail: "The importer preserved all available supported tables and did not invent the missing data.", relatedId: "" }));
+  const workerIds = new Set(record.workers.map((worker) => worker.id));
+  const brokenContracts = record.contracts.filter((contract) => contract.companyId === companyId && !workerIds.has(contract.workerId));
+  if (brokenContracts.length > 0) issues.push({ id: "broken-roster-references", severity: "Blocking", area: "Roster", message: `${brokenContracts.length} roster contract${brokenContracts.length === 1 ? "" : "s"} reference missing workers`, detail: "The imported source is incomplete or corrupted. Restore the missing worker records before loading this universe.", relatedId: companyId });
   const includedRoster = review.roster.filter((decision) => decision.included);
   const wrestlers = includedRoster.filter((decision) => decision.rosterClass !== "Staff");
   const staff = includedRoster.filter((decision) => decision.rosterClass !== "Wrestler");
@@ -432,12 +435,12 @@ function buildReview(record: StartingUniverseRecord, companyId: string, previous
   const previousTitles = new Map(previous?.titles.map((decision) => [decision.titleId, decision]) ?? []);
   const titles: StartingUniverseTitleDecision[] = companyTitles.map((title) => {
     const existing = previousTitles.get(title.id);
-    return { titleId: title.id, included: existing?.included ?? title.active, gameName: existing?.gameName ?? title.importedName, acknowledged: existing?.acknowledged ?? false, note: existing?.note ?? "" };
+    return { titleId: title.id, included: existing?.included ?? title.active, gameName: existing?.gameName ?? title.importedName, acknowledged: existing?.acknowledged ?? true, note: existing?.note ?? "" };
   });
   const previousShows = new Map(previous?.tvShows.map((decision) => [decision.tvShowId, decision]) ?? []);
   const tvShows: StartingUniverseTvShowDecision[] = record.tvShows.filter((show) => show.companyId === companyId).map((show) => {
     const existing = previousShows.get(show.id);
-    return { tvShowId: show.id, included: existing?.included ?? show.currentlyOnAir, gameName: existing?.gameName ?? show.importedName, lengthMinutes: existing?.lengthMinutes ?? show.lengthMinutes, showDay: existing?.showDay ?? show.showDay, acknowledged: existing?.acknowledged ?? false };
+    return { tvShowId: show.id, included: existing?.included ?? show.currentlyOnAir, gameName: existing?.gameName ?? show.importedName, lengthMinutes: existing?.lengthMinutes ?? show.lengthMinutes, showDay: existing?.showDay ?? show.showDay, acknowledged: existing?.acknowledged ?? true };
   });
   const tagTeams = buildTeamDecisions(record, companyId, roster, previous?.tagTeams);
   const stables = buildStableDecisions(record, companyId, roster, previous?.stables);
@@ -447,9 +450,9 @@ function buildReview(record: StartingUniverseRecord, companyId: string, previous
     tvShows,
     tagTeams,
     stables,
-    rosterAcknowledged: previous?.rosterAcknowledged ?? false,
-    titlesAcknowledged: previous?.titlesAcknowledged ?? false,
-    teamsAcknowledged: previous?.teamsAcknowledged ?? false,
+    rosterAcknowledged: previous?.rosterAcknowledged ?? true,
+    titlesAcknowledged: previous?.titlesAcknowledged ?? true,
+    teamsAcknowledged: previous?.teamsAcknowledged ?? true,
   };
   return { ...draft, issues: reviewIssues(record, companyId, draft) };
 }
@@ -573,10 +576,7 @@ export function addWorldWorkerToRoster(record: StartingUniverseRecord, workerId:
 
 export function confirmStartingUniverse(record: StartingUniverseRecord): StartingUniverseRecord {
   const blocking = record.review.issues.filter((issue) => issue.severity === "Blocking");
-  const unacknowledgedTeams = record.review.tagTeams.some((decision) => decision.included && !decision.acknowledged);
   if (blocking.length) throw new Error(blocking[0].message);
-  if (!record.review.rosterAcknowledged || !record.review.titlesAcknowledged || !record.review.teamsAcknowledged) throw new Error("Acknowledge the roster, titles and television, and teams and stables reviews before confirming the starting universe.");
-  if (unacknowledgedTeams) throw new Error("Acknowledge every included tag-team identity before confirming the starting universe.");
   const timestamp = now();
   return { ...record, status: "Confirmed", confirmedAt: timestamp, updatedAt: timestamp };
 }
