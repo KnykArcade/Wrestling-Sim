@@ -1,6 +1,7 @@
 import type { HandoffUniverse, HandoffVersion, ShowHandoffRecord } from "../handoff/types";
 import { MATCH_AIMS, MATCH_APPROACHES } from "../matchEngine/catalog";
-import { approachSlotsForDuration, evaluatePace } from "../matchEngine/model";
+import { approachLimitForSetup, evaluatePace, profileStaminaCapacity } from "../matchEngine/model";
+import type { MatchEngineProfile } from "../matchEngine/types";
 import type { ActualMatchSnapshot, PlannedSegment, PlannedShow } from "../planner/types";
 import type { MatchRecord, ShowRecord, TewSnapshot } from "../tew/types";
 import type { TransferPackage, TransferRecord, TransferUniverse } from "../transfer/types";
@@ -108,7 +109,7 @@ function averageApproachPace(segment: PlannedSegment): number {
     .flatMap((plan) => plan.selectedApproachIds)
     .map((approachId) => Number(MATCH_APPROACHES.find((approach) => approach.id === approachId)?.pace ?? 0));
   if (!paces.length) return 0;
-  return Math.round((paces.reduce((total: number, value: number) => total + value, 0) / paces.length) * 10) / 10;
+  return Math.round((paces.reduce((total: number, value: number) => total + value, 0) / paces.length) * 20) / 10;
 }
 
 function staminaCost(segment: PlannedSegment, workerKey: string): number {
@@ -121,6 +122,7 @@ export function buildShowPreflight(
   handoff: HandoffUniverse,
   transfer: TransferUniverse,
   acknowledgedIssueIds: string[] = [],
+  profiles: MatchEngineProfile[] = [],
 ): ShowPreflightReport {
   const acknowledged = new Set(acknowledgedIssueIds);
   const issues: ShowPreflightIssue[] = [];
@@ -175,13 +177,16 @@ export function buildShowPreflight(
       if (authority === "booker-selected" && !segment.plannedFinish.trim()) add("finish", "Important", "Match", `${prefix} needs a planned finish`, "Set the finish that should be entered in TEW.", "Open Match Story", "match-story", segment.id);
       if (!segment.matchStory.trim()) add("story", "Important", "Match", `${prefix} has no Match Story`, "Generate or write the opening, middle, turning point, finish, and aftermath.", "Open Match Story", "match-story", segment.id);
 
-      const requiredSlots = approachSlotsForDuration(segment.durationMinutes);
+      const requiredSlots = approachLimitForSetup(segment.durationMinutes, segment.matchApproachSetup.approachLimit);
       segment.workers.forEach((worker) => {
         const key = `${worker.source}:${worker.id}`;
         const plan = segment.matchApproachSetup.workerPlans.find((item) => item.workerKey === key || normalize(item.workerName) === normalize(worker.name));
         if (!plan?.selectedApproachIds.length) add(`approach-${key}`, "Important", "Match", `${worker.name} has no selected approach in ${prefix}`, `${requiredSlots} approach slot${requiredSlots === 1 ? " is" : "s are"} available at ${segment.durationMinutes} minutes.`, "Open Match Setup", "match-setup", segment.id);
         else if (plan.selectedApproachIds.length !== requiredSlots) add(`approach-count-${key}`, "Important", "Match", `${worker.name} has the wrong number of approaches in ${prefix}`, `${plan.selectedApproachIds.length} selected; ${requiredSlots} required by the duration rule.`, "Open Match Setup", "match-setup", segment.id);
-        if (staminaCost(segment, plan?.workerKey ?? key) > 9) add(`stamina-${key}`, "Important", "Match", `${worker.name} exceeds the maximum approach stamina budget in ${prefix}`, "Reduce high-cost approaches or acknowledge the fatigue risk.", "Open Match Setup", "match-setup", segment.id);
+        const profile = profiles.find((item) => item.workerKey === key || normalize(item.workerName) === normalize(worker.name));
+        const staminaAvailable = profile ? profileStaminaCapacity(profile) : null;
+        const staminaUsed = staminaCost(segment, plan?.workerKey ?? key);
+        if (staminaAvailable !== null && staminaUsed > staminaAvailable) add(`stamina-${key}`, "Important", "Match", `${worker.name} exceeds their approach stamina budget in ${prefix}`, `${staminaUsed}/${staminaAvailable} stamina is planned. Reduce high-cost approaches or acknowledge the fatigue risk.`, "Open Match Setup", "match-setup", segment.id);
       });
 
       const aim = MATCH_AIMS.find((item) => item.id === segment.matchApproachSetup.matchAimId);
@@ -230,7 +235,7 @@ export function buildShowPreflight(
 function completionCounts(show: PlannedShow): Pick<ShowOperationsSummary, "approachesComplete" | "approachesTotal" | "narrativesComplete" | "narrativesTotal"> {
   const matches = show.segments.filter((segment) => segment.type === "match");
   return {
-    approachesComplete: matches.filter((segment) => segment.workers.length > 0 && segment.workers.every((worker) => segment.matchApproachSetup.workerPlans.some((plan) => normalize(plan.workerName) === normalize(worker.name) && plan.selectedApproachIds.length === approachSlotsForDuration(segment.durationMinutes)))).length,
+    approachesComplete: matches.filter((segment) => segment.workers.length > 0 && segment.workers.every((worker) => segment.matchApproachSetup.workerPlans.some((plan) => normalize(plan.workerName) === normalize(worker.name) && plan.selectedApproachIds.length === approachLimitForSetup(segment.durationMinutes, segment.matchApproachSetup.approachLimit)))).length,
     approachesTotal: matches.length,
     narrativesComplete: show.segments.filter((segment) => segment.type === "match" ? Boolean(segment.matchStory.trim()) : Boolean(segment.segmentOutput.trim())).length,
     narrativesTotal: show.segments.length,

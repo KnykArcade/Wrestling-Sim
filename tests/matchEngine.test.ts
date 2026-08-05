@@ -124,7 +124,7 @@ describe("native match engine data foundation", () => {
     expect(normalizeRating(-4)).toBe(0);
     expect(calculationQualityLabel(85)).toBe("Elite");
     expect(calculationQualityLabel(49.99)).toBe("Weak");
-    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b10a-v1");
+    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b10b-v1");
   });
 
   test("migrates saved resolver IDs without losing selected or locked approaches", () => {
@@ -178,7 +178,7 @@ describe("native match engine data foundation", () => {
   });
 
   test("preserves combined aim and legacy importance data with explicit conflicts", () => {
-    expect(MATCH_AIMS).toHaveLength(19);
+    expect(MATCH_AIMS).toHaveLength(20);
     expect(MATCH_AIMS.find((aim) => aim.name === "High Spots Spectacle")?.idealPace).toBe(6);
     expect(MATCH_AIMS.find((aim) => aim.name === "Open Match")?.idealPace).toBe(0);
     expect(MATCH_IMPORTANCE_PROFILES).toHaveLength(14);
@@ -249,6 +249,15 @@ describe("Phase 4C2 match setup and approach AI", () => {
       expect.stringContaining("weighted approach rating"),
       expect.stringContaining("stamina"),
     ]));
+    expect(candidate.total).toBeGreaterThanOrEqual(0);
+    expect(candidate.total).toBeLessThanOrEqual(100);
+    expect(candidate.opponentCompatibility).toBe(0);
+  });
+
+  test("uses the manually configured approach limit instead of the duration recommendation", () => {
+    const profile = testProfile();
+    expect(chooseApproachPlan(profile, "competitive-tv-match", 25, [], 2).selectedApproachIds).toHaveLength(2);
+    expect(chooseApproachPlan(profile, "competitive-tv-match", 5, [], 4).selectedApproachIds).toHaveLength(4);
   });
 
   test("persists tracker-side wrestler profiles without modifying TEW data", () => {

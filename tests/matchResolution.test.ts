@@ -149,6 +149,34 @@ describe("Phase 6B1 official singles match resolution", () => {
     expect(first.engineResult.starRating).toBeGreaterThanOrEqual(0);
   });
 
+  test("preserves booked manual approaches and makes the custom limit authoritative", () => {
+    const custom = setup();
+    custom.approachLimit = 2;
+    custom.workers[0].approachMode = "Manual";
+    custom.workers[0].manualApproachIds = ["dirty-rulebreaker", "counter-specialist"];
+    custom.workers[1].approachMode = "Manual";
+    custom.workers[1].manualApproachIds = ["aerial-specialist", "high-tempo-hybrid"];
+    const attempt = resolveSinglesMatch({ setup: custom, workers: sources(), seed: "booked-approaches" });
+    expect(attempt.workerResults[0].selectedApproachIds).toEqual(custom.workers[0].manualApproachIds);
+    expect(attempt.workerResults[1].selectedApproachIds).toEqual(custom.workers[1].manualApproachIds);
+  });
+
+  test("normalizes finishing ability and exposes components that reconstruct the competitive score", () => {
+    const custom = setup();
+    custom.approachLimit = 1;
+    custom.workers.forEach((worker) => {
+      worker.approachMode = "Manual";
+      worker.manualApproachIds = ["counter-specialist"];
+    });
+    const attempt = resolveSinglesMatch({ setup: custom, workers: sources(), seed: "finishing-normalization" });
+    attempt.workerResults.forEach((worker) => {
+      const finishing = worker.decisiveComponents.find((component) => component.label === "Finishing ability");
+      expect(finishing?.value).toBe(7);
+      const reconstructed = worker.decisiveComponents.reduce((total, component) => total + component.value, 0);
+      expect(reconstructed).toBeCloseTo(worker.competitiveScore, 1);
+    });
+  });
+
   test("can award the competitive result to a wrestler other than the performance leader", () => {
     let found = false;
     for (let index = 0; index < 500; index += 1) {
@@ -160,6 +188,28 @@ describe("Phase 6B1 official singles match resolution", () => {
       }
     }
     expect(found).toBe(true);
+  });
+
+  test("keeps probabilities normalized and all outputs in range across two thousand seeded matches", () => {
+    let pacWins = 0;
+    for (let index = 0; index < 2000; index += 1) {
+      const attempt = resolveSinglesMatch({ setup: setup(), workers: sources(), seed: `integrity-simulation-${index}` });
+      const probabilityTotal = attempt.workerResults.reduce((total, worker) => total + worker.winProbability, 0);
+      expect(probabilityTotal).toBeCloseTo(1, 12);
+      expect(attempt.engineResult.matchScore).toBeGreaterThanOrEqual(0);
+      expect(attempt.engineResult.matchScore).toBeLessThanOrEqual(100);
+      expect(attempt.engineResult.actualDurationMinutes).toBeGreaterThan(0);
+      attempt.workerResults.forEach((worker) => {
+        expect(worker.performanceScore).toBeGreaterThanOrEqual(0);
+        expect(worker.performanceScore).toBeLessThanOrEqual(100);
+        expect(worker.competitiveScore).toBeGreaterThanOrEqual(0);
+        expect(worker.competitiveScore).toBeLessThanOrEqual(120);
+        expect(worker.approachScores.every((approach) => approach.total >= 0 && approach.total <= 100)).toBe(true);
+      });
+      if (attempt.engineResult.winnerName === "PAC") pacWins += 1;
+    }
+    expect(pacWins).toBeGreaterThan(1000);
+    expect(pacWins).toBeLessThan(1800);
   });
 
   test("accepts the official result without altering the engine calculation", () => {
@@ -278,6 +328,18 @@ describe("Phase 6B4 team and multi-person match resolution", () => {
     expect(attempt.engineResult.loserKeys).toHaveLength(2);
   });
 
+  test("averages approach interactions across every opponent in a multi-person match", () => {
+    const names = ["PAC", "Jay White", "Brian Cage"];
+    const matchSetup = multiSetup("Multi Person", names);
+    matchSetup.approachLimit = 1;
+    matchSetup.workers.forEach((worker, index) => {
+      worker.approachMode = "Manual";
+      worker.manualApproachIds = [["counter-specialist"], ["aerial-specialist"], ["ring-general-pace-controller"]][index] as ResolutionApproachId[];
+    });
+    const attempt = resolveMatch({ setup: matchSetup, workers: multiSources(names), seed: "all-opponent-interactions" });
+    expect(attempt.workerResults[0].interactionModifier).toBe(2);
+  });
+
   test("records a complete elimination order for elimination matches and battle royals", () => {
     const names = ["PAC", "Jay White", "Brian Cage", "Bobby Lashley", "Bandido"];
     for (const format of ["Elimination", "Battle Royal"] as const) {
@@ -286,6 +348,7 @@ describe("Phase 6B4 team and multi-person match resolution", () => {
       expect(attempt.engineResult.eliminationOrder!.map((item) => item.order)).toEqual([1, 2, 3, 4]);
       expect(new Set(attempt.engineResult.eliminationOrder!.map((item) => item.eliminatedWorkerKey)).size).toBe(4);
       expect(attempt.engineResult.eliminationOrder!.some((item) => item.eliminatedWorkerKey === attempt.engineResult.winnerKey)).toBe(false);
+      expect(attempt.engineResult.eliminationOrder!.at(-1)?.eliminatedWorkerKey).toBe(attempt.engineResult.fallLoserKey);
     }
   });
 

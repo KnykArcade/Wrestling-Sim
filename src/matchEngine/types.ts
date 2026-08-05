@@ -76,6 +76,7 @@ export type MatchAimId =
   | "monster-fight-hoss-battle"
   | "open-match"
   | "sprint"
+  | "squash-dominant-showcase"
   | "storytelling-match"
   | "strong-style-duel"
   | "survival-chaos"
@@ -277,6 +278,7 @@ export interface ApproachCandidateScore {
   aimCompatibility: number;
   paceBonus: number;
   staminaEfficiency: number;
+  opponentCompatibility: number;
   total: number;
   reasons: string[];
 }

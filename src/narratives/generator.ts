@@ -108,7 +108,7 @@ export function generateMatchNarrative(
     const key = workerProfileKey(worker);
     const profile = universe.profiles.find((item) => item.workerKey === key) ?? null;
     const plan = segment.matchApproachSetup.workerPlans.find((item) => item.workerKey === key) ?? null;
-    const evaluation = profile && plan ? evaluateApproachPlan(profile, aim.id, segment.durationMinutes, plan.selectedApproachIds) : null;
+    const evaluation = profile && plan ? evaluateApproachPlan(profile, aim.id, segment.durationMinutes, plan.selectedApproachIds, segment.matchApproachSetup.approachLimit) : null;
     const style = approachPhrase(segment, worker, "style");
     const offense = approachPhrase(segment, worker, "offense");
     const selling = approachPhrase(segment, worker, "selling");

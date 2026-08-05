@@ -1,18 +1,18 @@
-import { AIM_APPROACH_HINTS } from "../matchEngine/profileCatalog";
 import {
-  approachSlotsForDuration,
+  approachLimitForSetup,
   calculateMentalStateScore,
   classifyMentalState,
   createMatchEngineId,
   evaluatePace,
   evaluateStamina,
-  getWrestlerStyle,
   mentalSwingProbability,
   profileStaminaCapacity,
+  scoreApproachCandidate,
 } from "../matchEngine/model";
-import { advisoryStarRating } from "../matchEngine/performance";
+import { MATCH_APPROACHES } from "../matchEngine/catalog";
+import { calculateStarRating } from "../calculations/foundation";
 import type { MatchEngineProfile } from "../matchEngine/types";
-import { IMPORTED_APPROACH_FORMULAS } from "../startingUniverse/formulas";
+import { IMPORTED_APPROACH_FORMULAS, matchEngineIdForImportedApproachId } from "../startingUniverse/formulas";
 import type { ImportedApproachFormulaId, ImportedApproachFormulaSource, StartingUniverseWorkbookMetrics } from "../startingUniverse/types";
 import {
   APPROACH_INTERACTIONS,
@@ -130,42 +130,6 @@ export function resolutionApproachRating(
   return round(formula.terms.reduce((total, term) => total + formulaInput(profile, term.source) * term.weight, 0));
 }
 
-function paceSelectionScore(idealPace: number, approachPace: number): number {
-  if (idealPace === 0) return 2;
-  const difference = Math.abs(idealPace - approachPace * 2);
-  if (difference === 0) return 8;
-  if (difference === 1) return 5;
-  if (difference === 2) return 2;
-  if (difference === 3) return -2;
-  return -6;
-}
-
-function aimFitScore(aimId: MatchResolutionSetup["aimId"], approachId: ResolutionApproachId): number {
-  const formula = formulaForApproach(approachId);
-  const currentId = formula.currentMatchEngineId;
-  if (currentId && AIM_APPROACH_HINTS[aimId]?.includes(currentId)) return 7;
-  const custom: Partial<Record<MatchResolutionSetup["aimId"], ResolutionApproachId[]>> = {
-    "technical-showcase": ["counter-specialist", "chain-technician", "submission-specialist", "ring-general-pace-controller"],
-    "competitive-tv-match": ["counter-specialist", "high-tempo-hybrid", "big-match-performer"],
-    "epic-main-event-slow-burn": ["big-match-performer", "ring-general-pace-controller", "psychological-manipulator"],
-    "storytelling-match": ["ring-general-pace-controller", "psychological-manipulator", "resilient-underdog"],
-    "strong-style-duel": ["strong-style-specialist", "counter-specialist", "heavy-striker-brawler"],
-    "underdog-drama": ["resilient-underdog", "psychological-manipulator", "counter-specialist"],
-    "high-spots-spectacle": ["aerial-specialist", "high-tempo-hybrid", "counter-specialist"],
-    "hardcore-war": ["hardcore-daredevil", "heavy-striker-brawler", "resilient-underdog"],
-    "monster-fight-hoss-battle": ["power-dominance", "heavy-striker-brawler", "strong-style-specialist"],
-    "wild-brawl": ["heavy-striker-brawler", "hardcore-daredevil", "dirty-rulebreaker"],
-    "comedy-entertainment": ["showman", "dirty-rulebreaker", "opportunistic-schemer"],
-    "crowd-work-showcase": ["showman", "psychological-manipulator", "big-match-performer"],
-  };
-  return custom[aimId]?.includes(approachId) ? 7 : 0;
-}
-
-function styleFitScore(profile: MatchEngineProfile, approachId: ResolutionApproachId): number {
-  const currentId = formulaForApproach(approachId).currentMatchEngineId;
-  return currentId && getWrestlerStyle(profile).approachBoosts.includes(currentId) ? 7 : 0;
-}
-
 function opponentProfileFit(approachId: ResolutionApproachId, opponent: MatchEngineProfile): number {
   if (approachId === "counter-specialist") return round(Math.max(opponent.skills.Aerial, opponent.skills.Athleticism, opponent.skills.Power) / 20, 2);
   if (approachId === "submission-specialist") return round((opponent.skills.Power + opponent.skills.Toughness) / 50, 2);
@@ -178,34 +142,29 @@ function opponentProfileFit(approachId: ResolutionApproachId, opponent: MatchEng
 
 function scoreApproach(
   source: MatchResolutionWorkerSource,
-  opponent: MatchResolutionWorkerSource,
+  opponents: MatchResolutionWorkerSource[],
   setup: MatchResolutionSetup,
   approachId: ResolutionApproachId,
 ): MatchResolutionApproachScore {
   const approach = resolutionApproach(approachId);
   const rating = resolutionApproachRating(source.profile, source.workbookMetrics, approachId);
-  const aimFit = aimFitScore(setup.aimId, approachId);
-  const styleFit = styleFitScore(source.profile, approachId);
-  const opponentFit = opponentProfileFit(approachId, opponent.profile);
-  const paceFit = paceSelectionScore(idealPaceForAim(setup.aimId), approach.pace);
-  const staminaEfficiency = (4 - approach.staminaCost) * 1.5;
-  const total = round(rating + aimFit + styleFit + opponentFit + paceFit + staminaEfficiency);
+  const opponentFit = average(opponents.map((opponent) => opponentProfileFit(approachId, opponent.profile)));
+  const canonicalId = matchEngineIdForImportedApproachId(approachId);
+  const canonical = MATCH_APPROACHES.find((item) => item.id === canonicalId)!;
+  const candidate = scoreApproachCandidate(source.profile, setup.aimId, canonical, { ratingOverride: rating, opponentCompatibility: opponentFit });
   return {
     approachId,
     approachName: approach.name,
     rating,
-    aimFit,
-    styleFit,
+    aimFit: candidate.aimCompatibility,
+    styleFit: candidate.styleBonus,
     opponentFit,
-    paceFit,
-    staminaEfficiency,
-    total,
+    paceFit: candidate.paceBonus,
+    staminaEfficiency: candidate.staminaEfficiency,
+    total: candidate.total,
     reasons: [
-      `${rating.toFixed(1)} ${source.workbookMetrics ? "workbook-derived" : "profile-derived"} rating`,
-      aimFit ? `${setup.aimId} match-aim fit` : "No direct match-aim bonus",
-      styleFit ? `${getWrestlerStyle(source.profile).name} style fit` : "No wrestler-style bonus",
-      opponentFit ? `${opponentFit.toFixed(1)} opponent interaction fit` : "No opponent-specific bonus",
-      `Pace ${approach.pace}; stamina cost ${approach.staminaCost}`,
+      ...candidate.reasons,
+      `${rating.toFixed(1)} ${source.workbookMetrics ? "workbook-derived" : "profile-derived"} rating source`,
       approach.paceSource === "Wrestling Sim Extension" ? "Counter Specialist pace and stamina are a documented Wrestling Sim extension because the workbook stores its rating formula but omits it from the pace table." : "Pace and stamina come from the workbook lookup table.",
     ],
   };
@@ -228,20 +187,20 @@ function uniqueApproaches(values: ResolutionApproachId[]): ResolutionApproachId[
 function selectedApproaches(
   worker: MatchResolutionWorkerSettings,
   source: MatchResolutionWorkerSource,
-  opponent: MatchResolutionWorkerSource,
+  opponents: MatchResolutionWorkerSource[],
   setup: MatchResolutionSetup,
 ): { ids: ResolutionApproachId[]; scores: MatchResolutionApproachScore[] } {
-  const slots = approachSlotsForDuration(setup.durationMinutes);
-  const locked = uniqueApproaches(worker.lockedApproachIds).slice(0, slots);
+  const slots = approachLimitForSetup(setup.durationMinutes, setup.approachLimit);
+  const locked = worker.approachMode === "AI" ? uniqueApproaches(worker.lockedApproachIds).slice(0, slots) : [];
   const manual = uniqueApproaches(worker.manualApproachIds).filter((id) => !locked.includes(id));
   const fixed = uniqueApproaches([...locked, ...(worker.approachMode === "Manual" ? manual : [])]).slice(0, slots);
   const candidates = RESOLUTION_APPROACHES.map((approach) => approach.id).filter((id) => !fixed.includes(id));
   const candidateSets = combinations(candidates, Math.max(0, slots - fixed.length)).map((values) => [...fixed, ...values]);
   let bestIds = fixed;
   let bestScore = Number.NEGATIVE_INFINITY;
-  let bestScores: MatchResolutionApproachScore[] = fixed.map((id) => scoreApproach(source, opponent, setup, id));
+  let bestScores: MatchResolutionApproachScore[] = fixed.map((id) => scoreApproach(source, opponents, setup, id));
   for (const ids of candidateSets.length ? candidateSets : [fixed]) {
-    const scores = ids.map((id) => scoreApproach(source, opponent, setup, id));
+    const scores = ids.map((id) => scoreApproach(source, opponents, setup, id));
     const staminaUsed = ids.reduce((total, id) => total + resolutionApproach(id).staminaCost, 0);
     const staminaAvailable = source.workbookMetrics?.staminaCapacity ?? profileStaminaCapacity(source.profile);
     const stamina = evaluateStamina(staminaUsed, staminaAvailable);
@@ -316,11 +275,10 @@ function incidentForWorker(risk: number, random: () => number): { label: string;
 
 function workerResult(
   source: MatchResolutionWorkerSource,
-  opponent: MatchResolutionWorkerSource,
   settings: MatchResolutionWorkerSettings,
   setup: MatchResolutionSetup,
   approaches: { ids: ResolutionApproachId[]; scores: MatchResolutionApproachScore[] },
-  opponentApproaches: ResolutionApproachId[],
+  opponentApproaches: ResolutionApproachId[][],
   random: () => number,
 ): MatchResolutionWorkerResult {
   const profile = source.profile;
@@ -333,7 +291,7 @@ function workerResult(
   const stamina = evaluateStamina(staminaUsed, staminaAvailable);
   const actualPace = approaches.ids.length ? round(average(approaches.ids.map((id) => resolutionApproach(id).pace)) * 2) : 0;
   const pace = evaluatePace(idealPaceForAim(setup.aimId), actualPace);
-  const interactionModifier = pairInteraction(approaches.ids, opponentApproaches);
+  const interactionModifier = average(opponentApproaches.map((ids) => pairInteraction(approaches.ids, ids)));
   const risk = botchRisk(profile, source.workbookMetrics);
   const incident = incidentForWorker(risk, random);
   const averageApproachRating = approaches.scores.length ? average(approaches.scores.map((score) => score.rating)) : profile.overall * 0.6;
@@ -359,13 +317,18 @@ function workerResult(
     if (["power-dominance", "strong-style-specialist", "heavy-striker-brawler"].includes(id)) return 3;
     return 1;
   }));
+  const finishingRating = finishingEdge * 25;
+  const performanceComponent = performanceScore * 0.55;
+  const psychologyExperienceComponent = profile.skills.Psychology * 0.12 + profile.experience * 0.08;
+  const resilienceComponent = average([profile.skills.Resilience, profile.skills.Toughness]) * 0.08;
+  const finishingComponent = finishingRating * 0.07;
+  const healthComponent = profile.health * 0.1;
   const competitiveScore = clamp(
-    performanceScore * 0.55 +
-    profile.skills.Psychology * 0.12 +
-    profile.experience * 0.08 +
-    average([profile.skills.Resilience, profile.skills.Toughness]) * 0.08 +
-    finishingEdge * 0.07 +
-    profile.health * 0.1 +
+    performanceComponent +
+    psychologyExperienceComponent +
+    resilienceComponent +
+    finishingComponent +
+    healthComponent +
     interactionModifier +
     storyNeedModifier +
     momentumModifier +
@@ -409,14 +372,15 @@ function workerResult(
     botchRisk: risk,
     incident: incident.label,
     decisiveComponents: [
-      { label: "Approach execution", value: round(approachExecution * 0.55) },
-      { label: "Psychology and experience", value: round(profile.skills.Psychology * 0.12 + profile.experience * 0.08) },
-      { label: "Health and resilience", value: round(profile.health * 0.1 + average([profile.skills.Resilience, profile.skills.Toughness]) * 0.08) },
+      { label: "Performance", value: round(performanceComponent) },
+      { label: "Psychology and experience", value: round(psychologyExperienceComponent) },
+      { label: "Health and resilience", value: round(healthComponent + resilienceComponent) },
+      { label: "Finishing ability", value: round(finishingComponent) },
       { label: "Opponent interaction", value: interactionModifier },
       { label: "Story need", value: round(storyNeedModifier) },
       { label: "Momentum", value: round(momentumModifier) },
       { label: "Booker influence", value: round(bookingModifier) },
-      { label: "Night variance", value: round(mental.state.modifier + consistencyVariance + volatilityNoise + mental.luck) },
+      { label: "Competitive volatility", value: round(volatilityNoise) },
     ],
   };
 }
@@ -426,7 +390,7 @@ function applyProbabilities(results: MatchResolutionWorkerResult[], volatility: 
   const minimum = Math.min(...results.map((result) => result.competitiveScore));
   const weights = results.map((result) => Math.exp((result.competitiveScore - minimum) / temperature));
   const total = weights.reduce((sum, value) => sum + value, 0) || 1;
-  return results.map((result, index) => ({ ...result, winProbability: round(weights[index] / total, 4) }));
+  return results.map((result, index) => ({ ...result, winProbability: weights[index] / total }));
 }
 
 function inferredFormat(setup: MatchResolutionSetup): NonNullable<MatchResolutionSetup["format"]> {
@@ -472,7 +436,7 @@ function teamResultsFor(
   const temperature = 8 + setup.volatility * 0.8;
   const weights = teams.map((team) => Math.exp((team.competitiveScore - minimum) / temperature));
   const total = weights.reduce((sum, value) => sum + value, 0) || 1;
-  return teams.map((team, index) => ({ ...team, winProbability: round(weights[index] / total, 4) }));
+  return teams.map((team, index) => ({ ...team, winProbability: weights[index] / total }));
 }
 
 function selectByProbability<T extends { winProbability: number }>(items: T[], roll: number): T {
@@ -486,19 +450,17 @@ function selectByProbability<T extends { winProbability: number }>(items: T[], r
 
 function eliminationOrder(
   results: MatchResolutionWorkerResult[],
-  winner: MatchResolutionWorkerResult,
+  winners: MatchResolutionWorkerResult[],
   setup: MatchResolutionSetup,
   random: () => number,
 ) {
-  const remaining = results.filter((item) => item.workerKey !== winner.workerKey);
-  const ordered = [...remaining].sort((left, right) => {
-    const leftSurvival = left.competitiveScore + random() * (10 + setup.volatility);
-    const rightSurvival = right.competitiveScore + random() * (10 + setup.volatility);
-    return leftSurvival - rightSurvival;
-  });
+  const winnerKeys = new Set(winners.map((winner) => winner.workerKey));
+  const remaining = results.filter((item) => !winnerKeys.has(item.workerKey));
+  const survivalScores = new Map(remaining.map((item) => [item.workerKey, item.competitiveScore + random() * (10 + setup.volatility)]));
+  const ordered = [...remaining].sort((left, right) => (survivalScores.get(left.workerKey) ?? 0) - (survivalScores.get(right.workerKey) ?? 0));
   return ordered.map((eliminated, index) => {
-    const survivors = [...ordered.slice(index + 1), winner];
-    const eliminator = survivors[Math.floor(random() * survivors.length)] ?? winner;
+    const survivors = [...ordered.slice(index + 1), ...winners];
+    const eliminator = survivors[Math.floor(random() * survivors.length)] ?? winners[0];
     const eliminatedSettings = setup.workers.find((item) => item.workerKey === eliminated.workerKey);
     return {
       order: index + 1,
@@ -561,17 +523,24 @@ function decisiveFactors(winner: MatchResolutionWorkerResult, loser: MatchResolu
   return factors.slice(0, 5);
 }
 
-function actualDuration(setup: MatchResolutionSetup, winner: MatchResolutionWorkerResult, random: () => number): number {
+function actualDuration(setup: MatchResolutionSetup, results: MatchResolutionWorkerResult[], random: () => number): number {
   const variance = IMPORTANCE_MODIFIERS[setup.importance].durationVariance;
-  const paceAdjustment = (winner.actualPace - idealPaceForAim(setup.aimId)) * 0.01;
+  const matchPace = average(results.map((result) => result.actualPace));
+  const idealPace = idealPaceForAim(setup.aimId);
+  const paceAdjustment = idealPace === 0 ? 0 : (matchPace - idealPace) * 0.01;
   return round(Math.max(1, setup.durationMinutes * (1 + (random() * 2 - 1) * variance + paceAdjustment)), 2);
 }
 
 function matchScore(results: MatchResolutionWorkerResult[], setup: MatchResolutionSetup): number {
   const performanceAverage = average(results.map((result) => result.performanceScore));
   const structure = average(results.map((result) => clamp(72 + result.paceModifier * 1.2 + result.staminaModifier * 2)));
+  const meanPerformance = average(results.map((result) => result.performanceScore));
+  const meanDeviation = average(results.map((result) => Math.abs(result.performanceScore - meanPerformance)));
   const ordered = [...results].sort((left, right) => right.performanceScore - left.performanceScore);
-  const closeness = clamp(100 - Math.abs(ordered[0].performanceScore - (ordered[1]?.performanceScore ?? ordered[0].performanceScore)) * 2);
+  const dominanceGap = ordered[0].performanceScore - average(ordered.slice(1).map((result) => result.performanceScore));
+  const closeness = setup.aimId === "squash-dominant-showcase" || normalize(setup.matchType).includes("squash")
+    ? clamp(60 + dominanceGap * 2)
+    : clamp(100 - meanDeviation * 2);
   const incidentPenalty = results.reduce((total, result) => total + (result.incident ? 3 : 0), 0);
   return round(clamp(performanceAverage * 0.8 + structure * 0.12 + closeness * 0.08 + setup.chemistry * 0.5 - incidentPenalty));
 }
@@ -588,24 +557,23 @@ export function resolveMatch(input: ResolveMatchInput): MatchResolutionAttempt {
 
   const seed = input.seed || createMatchEngineId();
   const random = seededRandom(seed);
-  const opponentIndexes = input.setup.workers.map((worker, index) => {
+  const opponentIndexGroups = input.setup.workers.map((worker, index) => {
     const ownTeam = workerTeamId(worker);
-    const opponent = input.setup.workers.findIndex((candidate, candidateIndex) => candidateIndex !== index && workerTeamId(candidate) !== ownTeam);
-    return opponent >= 0 ? opponent : (index + 1) % input.workers.length;
+    const opponents = input.setup.workers.flatMap((candidate, candidateIndex) => candidateIndex !== index && workerTeamId(candidate) !== ownTeam ? [candidateIndex] : []);
+    return opponents.length ? opponents : input.setup.workers.flatMap((_, candidateIndex) => candidateIndex !== index ? [candidateIndex] : []);
   });
   const approaches = input.workers.map((source, index) => selectedApproaches(
     input.setup.workers[index],
     source,
-    input.workers[opponentIndexes[index]],
+    opponentIndexGroups[index].map((opponentIndex) => input.workers[opponentIndex]),
     input.setup,
   ));
   let workerResults = input.workers.map((source, index) => workerResult(
     source,
-    input.workers[opponentIndexes[index]],
     input.setup.workers[index],
     input.setup,
     approaches[index],
-    approaches[opponentIndexes[index]].ids,
+    opponentIndexGroups[index].map((opponentIndex) => approaches[opponentIndex].ids),
     random,
   ));
   const roll = round(random(), 6);
@@ -632,14 +600,16 @@ export function resolveMatch(input: ResolveMatchInput): MatchResolutionAttempt {
   const winningMembers = workerResults.filter((item) => winningTeam.memberKeys.includes(item.workerKey));
   const losingMembers = workerResults.filter((item) => !winningTeam.memberKeys.includes(item.workerKey));
   const fallWinner = [...winningMembers].sort((left, right) => right.competitiveScore - left.competitiveScore)[0];
-  const fallLoser = [...losingMembers].sort((left, right) => left.competitiveScore - right.competitiveScore)[0];
+  const eliminations = format === "Elimination" || format === "Battle Royal"
+    ? eliminationOrder(workerResults, winningMembers, input.setup, random)
+    : [];
+  const finalEliminatedKey = eliminations.at(-1)?.eliminatedWorkerKey;
+  const fallLoser = losingMembers.find((item) => item.workerKey === finalEliminatedKey)
+    ?? [...losingMembers].sort((left, right) => left.competitiveScore - right.competitiveScore)[0];
   const finishType = finishTypeForWinner(fallWinner, random);
   const score = matchScore(workerResults, input.setup);
-  const duration = actualDuration(input.setup, fallWinner, random);
+  const duration = actualDuration(input.setup, workerResults, random);
   const performanceLeader = [...workerResults].sort((left, right) => right.performanceScore - left.performanceScore)[0];
-  const eliminations = format === "Elimination" || format === "Battle Royal"
-    ? eliminationOrder(workerResults, fallWinner, input.setup, random)
-    : [];
   const winnerName = teamOutcome ? winningTeam.name : fallWinner.workerName;
   const loserName = teamOutcome
     ? teams.filter((team) => team.id !== winningTeam.id).map((team) => team.name).join(" & ")
@@ -671,7 +641,7 @@ export function resolveMatch(input: ResolveMatchInput): MatchResolutionAttempt {
           : finishDescription(finishType, fallWinner, fallLoser),
     actualDurationMinutes: duration,
     matchScore: score,
-    starRating: advisoryStarRating(score),
+    starRating: calculateStarRating(score),
     performanceLeaderKey: performanceLeader.workerKey,
     performanceLeaderName: performanceLeader.workerName,
     winnerProbability: winningTeam.winProbability,
@@ -702,17 +672,17 @@ export function resolveSinglesMatch(input: ResolveSinglesMatchInput): MatchResol
   if (input.setup.workers.length !== 2) throw new Error("The match setup must contain exactly two wrestler settings.");
   const seed = input.seed || createMatchEngineId();
   const random = seededRandom(seed);
-  const firstApproaches = selectedApproaches(input.setup.workers[0], input.workers[0], input.workers[1], input.setup);
-  const secondApproaches = selectedApproaches(input.setup.workers[1], input.workers[1], input.workers[0], input.setup);
-  const first = workerResult(input.workers[0], input.workers[1], input.setup.workers[0], input.setup, firstApproaches, secondApproaches.ids, random);
-  const second = workerResult(input.workers[1], input.workers[0], input.setup.workers[1], input.setup, secondApproaches, firstApproaches.ids, random);
+  const firstApproaches = selectedApproaches(input.setup.workers[0], input.workers[0], [input.workers[1]], input.setup);
+  const secondApproaches = selectedApproaches(input.setup.workers[1], input.workers[1], [input.workers[0]], input.setup);
+  const first = workerResult(input.workers[0], input.setup.workers[0], input.setup, firstApproaches, [secondApproaches.ids], random);
+  const second = workerResult(input.workers[1], input.setup.workers[1], input.setup, secondApproaches, [firstApproaches.ids], random);
   const workerResults = applyProbabilities([first, second], input.setup.volatility);
   const roll = round(random(), 6);
   const winner = roll <= workerResults[0].winProbability ? workerResults[0] : workerResults[1];
   const loser = winner.workerKey === workerResults[0].workerKey ? workerResults[1] : workerResults[0];
   const finishType = finishTypeForWinner(winner, random);
   const score = matchScore(workerResults, input.setup);
-  const duration = actualDuration(input.setup, winner, random);
+  const duration = actualDuration(input.setup, workerResults, random);
   const performanceLeader = [...workerResults].sort((left, right) => right.performanceScore - left.performanceScore)[0];
   const result: MatchResolutionEngineResult = {
     winnerKey: winner.workerKey,
@@ -723,7 +693,7 @@ export function resolveSinglesMatch(input: ResolveSinglesMatchInput): MatchResol
     finishDescription: finishDescription(finishType, winner, loser),
     actualDurationMinutes: duration,
     matchScore: score,
-    starRating: advisoryStarRating(score),
+    starRating: calculateStarRating(score),
     performanceLeaderKey: performanceLeader.workerKey,
     performanceLeaderName: performanceLeader.workerName,
     winnerProbability: winner.winProbability,

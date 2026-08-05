@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { MATCH_AIMS } from "../matchEngine/catalog";
-import { approachSlotsForDuration, normalizeApproachName, workerProfileKey } from "../matchEngine/model";
+import { approachLimitForSetup, normalizeApproachName, workerProfileKey } from "../matchEngine/model";
 import { loadMatchEngineUniverse } from "../matchEngine/storage";
 import type { MatchEngineProfile } from "../matchEngine/types";
 import { loadPlannedShows } from "../planner/storage";
 import type { PlannedSegment, PlannedShow, PlannedWorkerReference } from "../planner/types";
 import { loadActiveStartingUniverse, loadStartingUniverseState } from "../startingUniverse/storage";
 import type { StartingUniverseRecord, StartingUniverseWorkbookMetrics } from "../startingUniverse/types";
+import { importedApproachIdForMatchEngineId } from "../startingUniverse/formulas";
 import { RESOLUTION_APPROACHES, resolutionApproach } from "./catalog";
 import {
   acceptEngineResult,
@@ -87,13 +88,17 @@ function defaultImportance(show: PlannedShow, segment: PlannedSegment): MatchRes
 function createWorkerSettings(worker: PlannedWorkerReference, segment: PlannedSegment): MatchResolutionWorkerSettings {
   const side = normalizeApproachName(worker.side);
   const teammates = side ? segment.workers.filter((candidate) => normalizeApproachName(candidate.side) === side) : [worker];
+  const bookedPlan = segment.matchApproachSetup.workerPlans.find((plan) => plan.workerKey === workerProfileKey(worker) || normalizeApproachName(plan.workerName) === normalizeApproachName(worker.name));
+  const bookedApproaches = bookedPlan?.selectedApproachIds
+    .map((id) => importedApproachIdForMatchEngineId(id))
+    .filter((id): id is ResolutionApproachId => id !== null) ?? [];
   return {
     workerKey: workerProfileKey({ id: worker.id, name: worker.name, source: worker.source }),
     workerId: worker.id,
     workerName: worker.name,
-    approachMode: "AI",
+    approachMode: bookedApproaches.length ? "Manual" : "AI",
     lockedApproachIds: [],
-    manualApproachIds: [],
+    manualApproachIds: bookedApproaches,
     storyNeed: 0,
     momentum: 0,
     bookingBias: 0,
@@ -111,6 +116,7 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, existing?: Match
       segmentTitle: segment.title,
       matchType: segment.matchType,
       durationMinutes: segment.durationMinutes,
+      approachLimit: segment.matchApproachSetup.approachLimit,
       aimId: segment.matchApproachSetup.matchAimId,
       championship: segment.championship,
       competitionRound: segment.competitionRoundLabel,
@@ -119,7 +125,14 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, existing?: Match
       workers: segment.workers.map((worker) => {
         const derived = createWorkerSettings(worker, segment);
         const saved = existing.setup.workers.find((item) => item.workerId === worker.id || normalizeApproachName(item.workerName) === normalizeApproachName(worker.name));
-        return saved ? { ...derived, ...saved, teamId: saved.teamId || derived.teamId, teamName: saved.teamName || derived.teamName } : derived;
+        return saved ? {
+          ...derived,
+          ...saved,
+          approachMode: derived.manualApproachIds.length ? "Manual" : saved.approachMode,
+          manualApproachIds: derived.manualApproachIds.length ? derived.manualApproachIds : saved.manualApproachIds,
+          teamId: saved.teamId || derived.teamId,
+          teamName: saved.teamName || derived.teamName,
+        } : derived;
       }),
     };
   }
@@ -131,6 +144,7 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, existing?: Match
     segmentTitle: segment.title,
     matchType: segment.matchType,
     durationMinutes: segment.durationMinutes,
+    approachLimit: segment.matchApproachSetup.approachLimit,
     aimId: segment.matchApproachSetup.matchAimId,
     importance: defaultImportance(show, segment),
     championship: segment.championship,
@@ -211,7 +225,7 @@ export default function MatchResolutionWorkspace({ onReturnToShow }: { onReturnT
   const activeAttempt = activeResolutionAttempt(existingRecord);
   const currentFingerprint = setup && sources.length >= 2 ? matchResolutionSetupFingerprint(setup, sources) : "";
   const setupChanged = Boolean(activeAttempt && currentFingerprint && activeAttempt.setupFingerprint !== currentFingerprint);
-  const slots = setup ? approachSlotsForDuration(setup.durationMinutes) : 0;
+  const slots = setup ? approachLimitForSetup(setup.durationMinutes, setup.approachLimit) : 0;
 
   function selectShow(showId: string): void {
     setSelectedShowId(showId);

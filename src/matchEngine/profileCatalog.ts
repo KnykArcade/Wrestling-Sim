@@ -160,6 +160,7 @@ export const AIM_APPROACH_HINTS: Record<MatchAimId, MatchApproachId[]> = {
   "monster-fight-hoss-battle": ["power-dominance", "heavy-striker-brawler", "resilient-underdog"],
   "open-match": [],
   sprint: ["high-tempo-hybrid", "aerial-showstopper", "strong-style-specialist"],
+  "squash-dominant-showcase": ["power-dominance", "heavy-striker-brawler", "opportunistic-schemer", "showman"],
   "storytelling-match": ["big-match-performer", "pace-controller", "resilient-underdog", "psychological-manipulator"],
   "strong-style-duel": ["strong-style-specialist", "heavy-striker-brawler", "resilient-underdog"],
   "survival-chaos": ["resilient-underdog", "opportunistic-schemer", "hardcore-daredevil"],
