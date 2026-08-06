@@ -62,20 +62,29 @@ test("quick load keeps the activation report visible until continuing", async ({
     titles: JSON.parse(localStorage.getItem("tew-story-tracker:championships:v1") || "{}"),
     schedule: JSON.parse(localStorage.getItem("tew-story-tracker:promotion-schedule:v1") || "{}"),
     active: JSON.parse(localStorage.getItem("wrestling-sim:starting-universe-activation:v1") || "{}"),
+    shows: JSON.parse(localStorage.getItem("tew-story-tracker:planned-shows:v1") || "[]"),
   }));
   expect(activated.workers.profiles).toHaveLength(2);
   expect(activated.workers.relationships).toHaveLength(1);
   expect(activated.titles.championships).toHaveLength(1);
   expect(activated.schedule.series).toHaveLength(1);
   expect(activated.active).toMatchObject({ activeCompanyName: "Pro Wrestling League", gameDate: "2019-01-02" });
+  expect(activated.shows).toHaveLength(1);
+  expect(activated.shows[0]).toMatchObject({ name: "PWL Power Hour #1", date: "2019-01-02", company: "Pro Wrestling League", expectedMinutes: 60, segments: [] });
 
   await page.getByRole("button", { name: "Activate Universe Again" }).click();
-  const afterRepeat = await page.evaluate(() => ({ workers: JSON.parse(localStorage.getItem("tew-story-tracker:workers:v1") || "{}"), titles: JSON.parse(localStorage.getItem("tew-story-tracker:championships:v1") || "{}"), schedule: JSON.parse(localStorage.getItem("tew-story-tracker:promotion-schedule:v1") || "{}") }));
+  const afterRepeat = await page.evaluate(() => ({ workers: JSON.parse(localStorage.getItem("tew-story-tracker:workers:v1") || "{}"), titles: JSON.parse(localStorage.getItem("tew-story-tracker:championships:v1") || "{}"), schedule: JSON.parse(localStorage.getItem("tew-story-tracker:promotion-schedule:v1") || "{}"), shows: JSON.parse(localStorage.getItem("tew-story-tracker:planned-shows:v1") || "[]") }));
   expect(afterRepeat.workers.profiles).toHaveLength(2);
   expect(afterRepeat.workers.relationships).toHaveLength(1);
   expect(afterRepeat.titles.championships).toHaveLength(1);
   expect(afterRepeat.schedule.series).toHaveLength(1);
+  expect(afterRepeat.shows).toHaveLength(1);
 
   await page.getByRole("button", { name: "Continue to Main Game" }).click();
-  await expect(page.getByRole("heading", { name: /Your current TEW snapshot/ })).toBeVisible();
+  await expect(page.getByLabel("Game Home")).toContainText("Pro Wrestling League");
+  await expect(page.getByLabel("Game Home")).toContainText("January 2, 2019");
+  await expect(page.getByLabel("Next show quick start")).toContainText("PWL Power Hour #1");
+  await expect(page.getByLabel("Next show quick start")).toContainText("Add at least one match or angle to the card.");
+  await page.getByRole("button", { name: "Book Next Show" }).click();
+  await expect(page.getByRole("heading", { name: "PWL Power Hour #1", exact: true })).toBeVisible();
 });

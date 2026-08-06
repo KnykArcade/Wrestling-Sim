@@ -15,6 +15,7 @@ import { createWorkerProfile, createWorkerRelationship } from "../workers/model"
 import { loadWorkerUniverse, saveWorkerUniverse } from "../workers/storage";
 import type { WorkerAlignment, WorkerProfile, WorkerRelationship, WorkerRelationshipType, WorkerUniverse } from "../workers/types";
 import { applyStartingRosterToMatchEngine } from "./model";
+import { ensurePlayableFirstDayInStorage } from "./quickStart";
 import type { StartingUniverseContract, StartingUniverseRecord, StartingUniverseRelationship, StartingUniverseTitle } from "./types";
 
 export const STARTING_UNIVERSE_ACTIVATION_KEY = "wrestling-sim:starting-universe-activation:v1";
@@ -49,6 +50,7 @@ export interface StartingUniverseActivationState {
   activeCompanyName: string;
   gameDate: string;
   activatedAt: string;
+  nextShowId: string;
   ledger: Record<string, ActivationLedgerEntry>;
   lastReport: StartingUniverseActivationReport | null;
 }
@@ -89,7 +91,7 @@ function emptyReport(record: StartingUniverseRecord, timestamp: string): Startin
 }
 
 export function emptyStartingUniverseActivationState(): StartingUniverseActivationState {
-  return { activeUniverseId: "", activeCompanyId: "", activeCompanyName: "", gameDate: "", activatedAt: "", ledger: {}, lastReport: null };
+  return { activeUniverseId: "", activeCompanyId: "", activeCompanyName: "", gameDate: "", activatedAt: "", nextShowId: "", ledger: {}, lastReport: null };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -111,6 +113,7 @@ export function loadStartingUniverseActivationState(storage: Pick<Storage, "getI
       activeCompanyName: typeof value.activeCompanyName === "string" ? value.activeCompanyName : "",
       gameDate: typeof value.gameDate === "string" ? value.gameDate : "",
       activatedAt: typeof value.activatedAt === "string" ? value.activatedAt : "",
+      nextShowId: typeof value.nextShowId === "string" ? value.nextShowId : "",
       ledger,
       lastReport: isRecord(value.lastReport) ? value.lastReport as unknown as StartingUniverseActivationReport : null,
     };
@@ -371,7 +374,7 @@ export function activateStartingUniverseData(
   count(report, "Game", promotionResult.disposition);
   const vault = { ...current.vault, promotion: promotionResult.value };
 
-  const activation: StartingUniverseActivationState = { activeUniverseId: record.id, activeCompanyId: company.id, activeCompanyName: company.name, gameDate: dateValue(record.source.gameDate), activatedAt: timestamp, ledger, lastReport: report };
+  const activation: StartingUniverseActivationState = { activeUniverseId: record.id, activeCompanyId: company.id, activeCompanyName: company.name, gameDate: dateValue(record.source.gameDate), activatedAt: timestamp, nextShowId: current.activation.nextShowId, ledger, lastReport: report };
   return { matchEngine, workers, profiles: profileLibrary, championships, schedule, vault, activation, report };
 }
 
@@ -391,6 +394,7 @@ export function activateStartingUniverseInStorage(record: StartingUniverseRecord
   saveChampionshipUniverse(storage, result.championships);
   savePromotionScheduleUniverse(storage, result.schedule);
   saveSnapshotVaultUniverse(storage, result.vault);
-  saveStartingUniverseActivationState(storage, result.activation);
+  const quickStart = ensurePlayableFirstDayInStorage(storage, result.activation);
+  saveStartingUniverseActivationState(storage, { ...result.activation, nextShowId: quickStart.nextShow?.id ?? result.activation.nextShowId });
   return result.report;
 }
