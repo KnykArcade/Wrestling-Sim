@@ -188,9 +188,9 @@ export default function MatchApproachSetupEditor({
     });
   }
 
-  function updateProfileNumber(profile: MatchEngineProfile, field: "overall" | "health" | "popularity" | "experience" | "fanReaction" | "gimmick", value: number): void {
+  function updateProfileNumber(profile: MatchEngineProfile, field: "overall" | "health" | "popularity" | "momentum" | "experience" | "fanReaction" | "gimmick", value: number): void {
     const max = field === "fanReaction" || field === "gimmick" ? 5 : 100;
-    const min = field === "fanReaction" || field === "gimmick" ? 1 : 0;
+    const min = field === "momentum" ? -20 : field === "fanReaction" || field === "gimmick" ? 1 : 0;
     upsertProfile({ ...profile, [field]: Math.max(min, Math.min(max, Number.isFinite(value) ? value : min)) });
   }
 
@@ -259,6 +259,7 @@ export default function MatchApproachSetupEditor({
               <label className="field"><span>Overall</span><input aria-label={`${worker.name} overall rating`} type="number" min={0} max={100} value={profile.overall} onChange={(event) => updateProfileNumber(profile, "overall", Number(event.target.value))} /></label>
               <label className="field"><span>Health</span><input aria-label={`${worker.name} health rating`} type="number" min={0} max={100} value={profile.health} onChange={(event) => updateProfileNumber(profile, "health", Number(event.target.value))} /></label>
               <label className="field"><span>Popularity</span><input aria-label={`${worker.name} popularity rating`} type="number" min={0} max={100} value={profile.popularity} onChange={(event) => updateProfileNumber(profile, "popularity", Number(event.target.value))} /></label>
+              <label className="field"><span>Momentum</span><input aria-label={`${worker.name} momentum rating`} type="number" min={-20} max={20} value={profile.momentum} onChange={(event) => updateProfileNumber(profile, "momentum", Number(event.target.value))} /></label>
               <label className="field"><span>Experience</span><input aria-label={`${worker.name} experience rating`} type="number" min={0} max={100} value={profile.experience} onChange={(event) => updateProfileNumber(profile, "experience", Number(event.target.value))} /></label>
               <label className="field"><span>Fan reaction (1–5)</span><input aria-label={`${worker.name} fan reaction`} type="number" min={1} max={5} value={profile.fanReaction} onChange={(event) => updateProfileNumber(profile, "fanReaction", Number(event.target.value))} /></label>
               <label className="field"><span>Gimmick (1–5)</span><input aria-label={`${worker.name} gimmick rating`} type="number" min={1} max={5} value={profile.gimmick} onChange={(event) => updateProfileNumber(profile, "gimmick", Number(event.target.value))} /></label>

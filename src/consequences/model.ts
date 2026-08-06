@@ -7,6 +7,7 @@ import type { MatchResolutionRecord } from "../matchResolution/types";
 import { createPlannerId, touchShow } from "../planner/model";
 import type { PlannedSegment, PlannedShow } from "../planner/types";
 import type { MatchEngineProfile } from "../matchEngine/types";
+import { CALCULATION_SYSTEM_VERSION } from "../calculations/foundation";
 import type {
   ChampionshipConsequenceProposal,
   CompetitionConsequenceProposal,
@@ -63,6 +64,17 @@ export function emptyResultConsequenceUniverse(): ResultConsequenceUniverse {
   };
 }
 
+export function synchronizeWorkerRecordsFromProfiles(universe: ResultConsequenceUniverse, profiles: MatchEngineProfile[]): ResultConsequenceUniverse {
+  const byKey = new Map(profiles.map((profile) => [profile.workerKey, profile]));
+  return {
+    ...universe,
+    workerRecords: universe.workerRecords.map((record) => {
+      const profile = byKey.get(record.workerKey);
+      return profile ? { ...record, momentum: profile.momentum, popularity: profile.popularity, health: profile.health, updatedAt: profile.updatedAt } : record;
+    }),
+  };
+}
+
 function defaultWorkerRecord(workerKey: string, workerId: string, workerName: string, profile: MatchEngineProfile | null): StandaloneWorkerRecord {
   return {
     workerKey,
@@ -78,7 +90,8 @@ function defaultWorkerRecord(workerKey: string, workerId: string, workerName: st
     rankingPoints: 0,
     rankingPosition: 0,
     previousRankingPosition: 0,
-    momentum: 0,
+    momentum: profile?.momentum ?? 0,
+    popularity: profile?.popularity ?? 50,
     health: profile?.health ?? 100,
     fatigue: 0,
     injuryStatus: "Healthy",
@@ -127,13 +140,15 @@ function conditionForWorker(input: {
 }): { record: StandaloneWorkerRecord; change: ConditionChange } {
   const { existing, workerResult, resultCode, finalResult, performanceLeader, upset } = input;
   if (!finalResult) throw new Error("A finalized result is required.");
-  const fatigueGain = round(finalResult.actualDurationMinutes * 0.7 + workerResult.staminaUsed * 1.8 + Math.max(0, workerResult.actualPace - 3) * 0.8);
+  const staminaFatigue = workerResult.staminaStatus === "DEAD" ? 8 : workerResult.staminaStatus === "GASSED" ? 4 : workerResult.staminaStatus === "WINDED" ? 2 : 0;
+  const fatigueGain = round(finalResult.actualDurationMinutes * 0.7 + workerResult.staminaUsed * 1.8 + Math.max(0, workerResult.actualPace - 3) * 0.8 + staminaFatigue);
   const baseHealthLoss = finalResult.matchScore >= 90 ? 2.5 : finalResult.matchScore >= 80 ? 1.7 : finalResult.matchScore >= 70 ? 1 : 0.5;
-  const staminaPenalty = workerResult.staminaStatus === "FAIL" ? 2.5 : workerResult.staminaStatus === "WARNING" ? 1 : 0;
+  const staminaPenalty = workerResult.staminaStatus === "DEAD" ? 5 : workerResult.staminaStatus === "GASSED" ? 2.5 : workerResult.staminaStatus === "WINDED" ? 1 : 0;
   const incident = injuryFromIncident(workerResult.incident);
   const healthAfter = round(clamp(existing.health - baseHealthLoss - staminaPenalty - incident.healthPenalty, 0, 100));
   const fatigueAfter = round(clamp(existing.fatigue + fatigueGain, 0, 100));
   const momentumChange = momentumDelta(resultCode, finalResult.matchScore, performanceLeader, upset);
+  const popularityChange = round(clamp((workerResult.performanceScore - existing.popularity) / 25 + (resultCode === "W" ? 0.3 : -0.1), -2, 2));
   const rankingChange = rankingDelta(resultCode, finalResult.matchScore, workerResult.winProbability, performanceLeader);
   const streak = updateStreak(existing, resultCode);
   const next: StandaloneWorkerRecord = {
@@ -146,7 +161,8 @@ function conditionForWorker(input: {
     currentStreakCount: streak.count,
     lastFive: [resultCode, ...existing.lastFive].slice(0, 5),
     rankingPoints: round(existing.rankingPoints + rankingChange),
-    momentum: round(clamp(existing.momentum + momentumChange, -100, 100)),
+    momentum: round(clamp(existing.momentum + momentumChange, -20, 20)),
+    popularity: round(clamp(existing.popularity + popularityChange, 0, 100)),
     health: healthAfter,
     fatigue: fatigueAfter,
     injuryStatus: incident.status === "Healthy" ? existing.injuryStatus === "Injured" ? "Injured" : healthAfter < 65 ? "Minor Concern" : "Healthy" : incident.status,
@@ -162,11 +178,14 @@ function conditionForWorker(input: {
     fatigueAfter,
     momentumBefore: existing.momentum,
     momentumAfter: next.momentum,
+    popularityBefore: existing.popularity,
+    popularityAfter: next.popularity,
     rankingPointsBefore: existing.rankingPoints,
     rankingPointsAfter: next.rankingPoints,
     injuryStatus: next.injuryStatus,
     explanation: [
       `${resultCode === "W" ? "Win" : resultCode === "L" ? "Loss" : resultCode === "D" ? "Draw" : "No contest"} changed momentum by ${momentumChange >= 0 ? "+" : ""}${momentumChange}.`,
+      `Individual performance against current popularity changed popularity by ${popularityChange >= 0 ? "+" : ""}${popularityChange}.`,
       `Match quality changed ranking points by ${rankingChange >= 0 ? "+" : ""}${rankingChange}.`,
       `${finalResult.actualDurationMinutes.toFixed(2)} minutes and ${workerResult.staminaUsed} stamina cost added ${fatigueGain.toFixed(1)} fatigue.`,
       `Health changed by ${(healthAfter - existing.health).toFixed(1)}.`,
@@ -422,10 +441,11 @@ export function applyCoreResultConsequences(input: {
   profiles: MatchEngineProfile[];
   championships: ChampionshipUniverse;
   competitions: CompetitionUniverse;
-}): { universe: ResultConsequenceUniverse; shows: PlannedShow[] } {
+}): { universe: ResultConsequenceUniverse; shows: PlannedShow[]; profiles: MatchEngineProfile[] } {
   const attempt = activeResolutionAttempt(input.resolution);
   if (!attempt?.finalResult || (attempt.status !== "Accepted" && attempt.status !== "Overridden")) throw new Error("Accept or override the official match result before applying consequences.");
-  if (input.universe.applications.some((application) => application.resolutionAttemptId === attempt.id && application.status === "Applied")) throw new Error("This official result has already been applied. Consequence application is idempotent.");
+  const idempotencyKey = `${input.resolution.id}:${attempt.id}:match-consequences`;
+  if (input.universe.applications.some((application) => (application.idempotencyKey === idempotencyKey || application.resolutionAttemptId === attempt.id) && application.status === "Applied")) throw new Error("This official result has already been applied. Consequence application is idempotent.");
   const show = input.shows.find((item) => item.id === input.resolution.showId);
   const segment = show?.segments.find((item) => item.id === input.resolution.segmentId);
   if (!show || !segment) throw new Error("The planned show or segment linked to this result could not be found.");
@@ -436,14 +456,19 @@ export function applyCoreResultConsequences(input: {
     shows: structuredClone(input.shows),
     championships: structuredClone(input.championships),
     competitions: structuredClone(input.competitions),
+    profiles: structuredClone(input.profiles),
   };
 
   let records = [...input.universe.workerRecords];
+  let profiles = [...input.profiles];
   const changes: ConditionChange[] = [];
   const historyEntries: StandaloneMatchHistoryEntry[] = [];
   for (const workerResult of attempt.workerResults) {
     const profile = input.profiles.find((item) => item.workerKey === workerResult.workerKey) ?? null;
-    const existing = records.find((item) => item.workerKey === workerResult.workerKey) ?? defaultWorkerRecord(workerResult.workerKey, workerResult.workerId, workerResult.workerName, profile);
+    const savedRecord = records.find((item) => item.workerKey === workerResult.workerKey);
+    const existing = savedRecord
+      ? { ...savedRecord, momentum: profile?.momentum ?? savedRecord.momentum, popularity: profile?.popularity ?? savedRecord.popularity ?? 50 }
+      : defaultWorkerRecord(workerResult.workerKey, workerResult.workerId, workerResult.workerName, profile);
     const winningKeys = attempt.finalResult.winnerMemberKeys?.length ? attempt.finalResult.winnerMemberKeys : [attempt.finalResult.winnerKey];
     const resultCode: "W" | "L" = winningKeys.includes(workerResult.workerKey) ? "W" : "L";
     const isLeader = workerResult.workerKey === attempt.engineResult.performanceLeaderKey;
@@ -476,6 +501,7 @@ export function applyCoreResultConsequences(input: {
     };
     const nextRecord = { ...condition.record, matchHistory: [history, ...condition.record.matchHistory] };
     records = records.some((item) => item.workerKey === nextRecord.workerKey) ? records.map((item) => item.workerKey === nextRecord.workerKey ? nextRecord : item) : [...records, nextRecord];
+    profiles = profiles.map((item) => item.workerKey === nextRecord.workerKey ? { ...item, momentum: nextRecord.momentum, popularity: nextRecord.popularity, health: nextRecord.health, updatedAt: now() } : item);
     changes.push(condition.change);
     historyEntries.push(history);
   }
@@ -495,6 +521,8 @@ export function applyCoreResultConsequences(input: {
     id: applicationId,
     resolutionRecordId: input.resolution.id,
     resolutionAttemptId: attempt.id,
+    calculationVersion: CALCULATION_SYSTEM_VERSION,
+    idempotencyKey,
     showId: show.id,
     showName: show.name,
     segmentId: segment.id,
@@ -514,6 +542,7 @@ export function applyCoreResultConsequences(input: {
   };
   return {
     shows,
+    profiles,
     universe: {
       ...input.universe,
       workerRecords: records,
@@ -529,7 +558,7 @@ export function applyCoreResultConsequences(input: {
   };
 }
 
-export function rollbackCoreResultConsequences(universe: ResultConsequenceUniverse, applicationId: string, reason: string): { universe: ResultConsequenceUniverse; shows: PlannedShow[]; championships: ChampionshipUniverse; competitions: CompetitionUniverse } {
+export function rollbackCoreResultConsequences(universe: ResultConsequenceUniverse, applicationId: string, reason: string, currentProfiles: MatchEngineProfile[] = []): { universe: ResultConsequenceUniverse; shows: PlannedShow[]; championships: ChampionshipUniverse; competitions: CompetitionUniverse; profiles: MatchEngineProfile[] } {
   const application = universe.applications.find((item) => item.id === applicationId);
   if (!application || application.status !== "Applied") throw new Error("Choose an applied consequence record to roll back.");
   if (!reason.trim()) throw new Error("Record why the applied result consequences are being rolled back.");
@@ -541,6 +570,7 @@ export function rollbackCoreResultConsequences(universe: ResultConsequenceUniver
     shows: structuredClone(application.before.shows),
     championships: structuredClone(application.before.championships),
     competitions: structuredClone(application.before.competitions),
+    profiles: structuredClone(application.before.profiles ?? currentProfiles),
     universe: {
       ...universe,
       workerRecords: structuredClone(application.before.workerRecords),

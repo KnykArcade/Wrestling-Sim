@@ -210,6 +210,9 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(white).toMatchObject({ wins: 0, losses: 1, currentStreakType: "L", currentStreakCount: 1 });
     expect(pac.fatigue).toBeGreaterThan(0);
     expect(pac.health).toBeLessThan(95);
+    expect(result.profiles.find((profile) => profile.workerName === "PAC")?.momentum).toBe(pac.momentum);
+    expect(result.profiles.find((profile) => profile.workerName === "PAC")?.popularity).toBe(pac.popularity);
+    expect(result.universe.applications[0]).toMatchObject({ calculationVersion: "wrestling-sim-calculations-6b10c-v1", idempotencyKey: expect.stringContaining("match-consequences") });
     expect(pac.matchHistory[0].result).toBe("W");
     expect(result.shows[0].segments[0]).toMatchObject({ workflowStatus: "Reconciled", reconciliation: { actualMatch: { winner: "PAC", rating: 86 }, finalNarrative: "PAC forced Jay White to submit." } });
     expect(() => applyCoreResultConsequences({
@@ -220,6 +223,23 @@ describe("Phase 6B3 standalone result consequences", () => {
       championships: emptyChampionshipUniverse(),
       competitions: emptyCompetitionUniverse(),
     })).toThrow("already been applied");
+  });
+
+  test("applies the real stamina statuses and individual popularity performance", () => {
+    const { show, segment } = showWithMatch();
+    const exhausted = resolution(show.id, segment.id);
+    exhausted.attempts[0].workerResults[0].staminaStatus = "DEAD";
+    exhausted.attempts[0].workerResults[1].staminaStatus = "WINDED";
+    const sourceProfiles = profiles();
+    sourceProfiles[0].popularity = 40;
+    sourceProfiles[1].popularity = 90;
+    const result = applyCoreResultConsequences({ universe: emptyResultConsequenceUniverse(), resolution: exhausted, shows: [show], profiles: sourceProfiles, championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+    const pac = result.universe.workerRecords.find((record) => record.workerName === "PAC")!;
+    const white = result.universe.workerRecords.find((record) => record.workerName === "Jay White")!;
+    expect(95 - pac.health).toBeGreaterThan(94 - white.health);
+    expect(pac.popularity).toBeGreaterThan(40);
+    expect(white.popularity).toBeLessThan(90);
+    expect(result.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")?.explanation.join(" ")).toContain("popularity");
   });
 
   test("keeps a losing performance leader from being treated as a failed performance", () => {
@@ -330,18 +350,20 @@ describe("Phase 6B3 standalone result consequences", () => {
 
   test("rolls back core consequences from the stored pre-application snapshot", () => {
     const { show, segment } = showWithMatch();
+    const sourceProfiles = profiles();
     const applied = applyCoreResultConsequences({
       universe: emptyResultConsequenceUniverse(),
       resolution: resolution(show.id, segment.id),
       shows: [show],
-      profiles: profiles(),
+      profiles: sourceProfiles,
       championships: emptyChampionshipUniverse(),
       competitions: emptyCompetitionUniverse(),
     });
-    const rolled = rollbackCoreResultConsequences(applied.universe, applied.universe.applications[0].id, "The wrong match record was linked.");
+    const rolled = rollbackCoreResultConsequences(applied.universe, applied.universe.applications[0].id, "The wrong match record was linked.", applied.profiles);
     expect(rolled.universe.workerRecords).toEqual([]);
     expect(rolled.shows[0].segments[0].reconciliation.actualMatch).toBeNull();
     expect(rolled.universe.applications[0]).toMatchObject({ status: "Rolled Back", rollbackReason: "The wrong match record was linked." });
+    expect(rolled.profiles).toEqual(sourceProfiles);
   });
 
   test("round-trips consequence history", () => {

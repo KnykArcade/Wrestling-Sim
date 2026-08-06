@@ -1,6 +1,7 @@
+import { createMatchEngineProfile } from "../matchEngine/model";
 import type { MatchEngineProfile } from "../matchEngine/types";
 import { createPlannerId } from "../planner/model";
-import type { PlannedSegment, PlannedShow, PlannedWorkerReference } from "../planner/types";
+import type { AnglePerformanceRole, PlannedSegment, PlannedShow, PlannedWorkerReference } from "../planner/types";
 import type { LiveCardSession } from "../liveCard/types";
 import { CALCULATION_SYSTEM_VERSION } from "../calculations/foundation";
 import type {
@@ -40,12 +41,21 @@ function profileFor(worker: PlannedWorkerReference, profiles: MatchEngineProfile
     ?? null;
 }
 
-function roleScore(worker: PlannedWorkerReference, profile: MatchEngineProfile | null): { score: number; detail: string } {
-  if (!profile) return { score: 50, detail: "No saved performance profile; neutral 50 was used." };
-  const role = worker.role.toLowerCase();
-  if (/fight|attack|physical|enforcer/.test(role)) return { score: round(profile.skills.Menace * .35 + profile.skills.Brawling * .25 + profile.skills.Charisma * .2 + profile.popularity * .2), detail: "Physical role used menace, brawling, charisma, and popularity." };
-  if (/sell|victim|react/.test(role)) return { score: round(profile.skills.Selling * .35 + profile.skills.Charisma * .25 + profile.skills.Psychology * .2 + profile.popularity * .2), detail: "Reaction role used selling, charisma, psychology, and popularity." };
-  return { score: round(profile.skills.Charisma * .35 + profile.skills.Psychology * .25 + profile.popularity * .25 + profile.gimmick * .15), detail: "Speaking role used charisma, psychology, popularity, and gimmick." };
+export function normalizeAnglePerformanceRole(value: string): AnglePerformanceRole {
+  const role = normalized(value);
+  if (["speaking", "speaker", "promo", "talker"].includes(role)) return "Speaking";
+  if (["physical", "aggressor", "fighter", "attacker", "enforcer"].includes(role)) return "Physical";
+  if (["reaction", "reactor", "selling", "seller", "victim", "target"].includes(role)) return "Reaction";
+  return "Presence";
+}
+
+function roleScore(worker: PlannedWorkerReference, profile: MatchEngineProfile | null): { role: AnglePerformanceRole; score: number; detail: string } {
+  const role = normalizeAnglePerformanceRole(worker.role);
+  if (!profile) return { role, score: 50, detail: "No saved performance profile; neutral 50 was used." };
+  if (role === "Physical") return { role, score: round(profile.skills.Menace * .35 + profile.skills.Brawling * .25 + profile.skills.Charisma * .2 + profile.popularity * .2), detail: "Physical role used menace, brawling, charisma, and popularity." };
+  if (role === "Reaction") return { role, score: round(profile.skills.Selling * .35 + profile.skills.Charisma * .25 + profile.skills.Psychology * .2 + profile.popularity * .2), detail: "Reaction role used selling, charisma, psychology, and popularity." };
+  if (role === "Speaking") return { role, score: round(profile.skills.Charisma * .35 + profile.skills.Psychology * .25 + profile.popularity * .25 + profile.gimmick * 20 * .15), detail: "Speaking role used charisma, psychology, popularity, and normalized gimmick." };
+  return { role, score: round(profile.skills.Charisma * .25 + profile.skills.Menace * .25 + profile.popularity * .3 + profile.gimmick * 20 * .2), detail: "Presence role used charisma, menace, popularity, and normalized gimmick." };
 }
 
 function contentModifier(segment: PlannedSegment): { value: number; detail: string } {
@@ -73,15 +83,15 @@ export function calculateAngleEvaluation(show: PlannedShow, segment: PlannedSegm
     return {
       workerKey: workerKey(worker),
       workerName: worker.name,
-      role: worker.role || "Participant",
+      role: result.role,
       performanceScore: individual,
       momentumDelta: round(clamp((individual - 60) / 14, -3, 3)),
-      popularityDelta: round(clamp((calculatedScore - 68) / 28, -1.5, 1.5)),
+      popularityDelta: round(clamp((individual - 65) / 24, -1.5, 1.5)),
       explanation: [result.detail, `The ${calculatedScore.toFixed(1)} angle score shares credit or blame with every participant.`],
     };
   });
   return {
-    id: createPlannerId(), showId: show.id, showName: show.name, segmentId: segment.id, segmentTitle: segment.title,
+    id: createPlannerId(), idempotencyKey: `${show.id}:${segment.id}:angle-consequences`, showId: show.id, showName: show.name, segmentId: segment.id, segmentTitle: segment.title,
     status: "Calculated", calculationVersion: CALCULATION_SYSTEM_VERSION, calculatedScore, finalScore: calculatedScore, overrideReason: "",
     factors: [
       { label: "Participant performance", value: round(performance * .78 + 12), detail: "Role-specific skills and popularity form the foundation." },
@@ -113,27 +123,43 @@ export function finalizeAngleEvaluation(evaluation: AngleEvaluation, overrideSco
   };
 }
 
-export function applyAngleEvaluation(universe: ShowEvaluationUniverse, evaluation: AngleEvaluation): ShowEvaluationUniverse {
-  const existing = universe.angleEvaluations.find((item) => item.id === evaluation.id);
-  if (existing?.appliedAt) return universe;
+export function applyAngleEvaluation(universe: ShowEvaluationUniverse, evaluation: AngleEvaluation, profiles: MatchEngineProfile[]): { universe: ShowEvaluationUniverse; profiles: MatchEngineProfile[] } {
+  const existing = universe.angleEvaluations.find((item) => item.id === evaluation.id || (item.idempotencyKey === evaluation.idempotencyKey && item.appliedAt));
+  if (existing?.appliedAt) return { universe, profiles };
   if (evaluation.status === "Calculated") throw new Error("Accept or override the angle result before applying its consequences.");
   const timestamp = now();
   const workerImpacts = [...universe.workerImpacts];
+  const nextProfiles = [...profiles];
   evaluation.participants.forEach((participant) => {
+    let profileIndex = nextProfiles.findIndex((item) => item.workerKey === participant.workerKey);
+    if (profileIndex < 0) {
+      const [source, ...idParts] = participant.workerKey.split(":");
+      const created = createMatchEngineProfile({ id: idParts.join(":") || normalized(participant.workerName), name: participant.workerName, source: source === "tew" ? "tew" : "manual" });
+      nextProfiles.push(created);
+      profileIndex = nextProfiles.length - 1;
+    }
+    const priorProfile = nextProfiles[profileIndex];
+    const updatedProfile: MatchEngineProfile = {
+      ...priorProfile,
+      momentum: round(clamp(priorProfile.momentum + participant.momentumDelta, -20, 20)),
+      popularity: round(clamp(priorProfile.popularity + participant.popularityDelta)),
+      updatedAt: timestamp,
+    };
+    nextProfiles[profileIndex] = updatedProfile;
     const index = workerImpacts.findIndex((item) => item.workerKey === participant.workerKey);
-    const prior: AngleWorkerImpact = index >= 0 ? workerImpacts[index] : { workerKey: participant.workerKey, workerName: participant.workerName, momentum: 0, popularity: 50, angleHistory: [], updatedAt: "" };
+    const prior: AngleWorkerImpact = index >= 0 ? workerImpacts[index] : { workerKey: participant.workerKey, workerName: participant.workerName, momentum: priorProfile.momentum, popularity: priorProfile.popularity, angleHistory: [], updatedAt: "" };
     const next: AngleWorkerImpact = {
       ...prior,
       workerName: participant.workerName,
-      momentum: round(clamp(prior.momentum + participant.momentumDelta, -20, 20)),
-      popularity: round(clamp(prior.popularity + participant.popularityDelta)),
+      momentum: updatedProfile.momentum,
+      popularity: updatedProfile.popularity,
       angleHistory: [{ angleEvaluationId: evaluation.id, showId: evaluation.showId, showName: evaluation.showName, segmentId: evaluation.segmentId, segmentTitle: evaluation.segmentTitle, score: evaluation.finalScore, momentumDelta: participant.momentumDelta, popularityDelta: participant.popularityDelta, occurredAt: timestamp }, ...prior.angleHistory].slice(0, 200),
       updatedAt: timestamp,
     };
     if (index >= 0) workerImpacts[index] = next; else workerImpacts.push(next);
   });
   const applied = { ...evaluation, appliedAt: timestamp };
-  return { ...universe, workerImpacts, angleEvaluations: universe.angleEvaluations.some((item) => item.id === evaluation.id) ? universe.angleEvaluations.map((item) => item.id === evaluation.id ? applied : item) : [applied, ...universe.angleEvaluations] };
+  return { profiles: nextProfiles, universe: { ...universe, workerImpacts, angleEvaluations: universe.angleEvaluations.some((item) => item.id === evaluation.id) ? universe.angleEvaluations.map((item) => item.id === evaluation.id ? applied : item) : [applied, ...universe.angleEvaluations] } };
 }
 
 function reaction(score: number): string {

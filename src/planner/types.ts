@@ -21,6 +21,7 @@ export type PlannedSegmentType = "match" | "angle";
 export type PlannedSegmentSection = "Pre-Show" | "Main Show" | "Post-Show";
 export type PlannedShowStatus = "Draft" | "Ready" | "Completed" | "Reconciled";
 export type PlannedReferenceSource = "tew" | "manual";
+export type AnglePerformanceRole = "Speaking" | "Physical" | "Reaction" | "Presence";
 export type SegmentWorkflowStatus = "Planned" | "Entered in TEW" | "Completed" | "Reconciled";
 export type ReconciliationPlanOutcome = "Unresolved" | "Yes" | "Partially" | "No";
 

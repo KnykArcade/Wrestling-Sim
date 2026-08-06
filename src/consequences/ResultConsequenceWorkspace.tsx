@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { loadChampionshipUniverse, saveChampionshipUniverse } from "../championships/storage";
 import type { TitleResultDecision } from "../championships/types";
 import { loadCompetitionUniverse, saveCompetitionUniverse } from "../competitions/storage";
-import { loadMatchEngineUniverse } from "../matchEngine/storage";
+import { loadMatchEngineUniverse, saveMatchEngineUniverse } from "../matchEngine/storage";
 import { activeResolutionAttempt } from "../matchResolution/engine";
 import { loadMatchResolutionUniverse } from "../matchResolution/storage";
 import type { MatchResolutionRecord } from "../matchResolution/types";
@@ -52,7 +52,7 @@ export default function ResultConsequenceWorkspace({ onOpenLiveCard, onOpenPlann
   const [championships, setChampionships] = useState(() => loadChampionshipUniverse(window.localStorage));
   const [competitions, setCompetitions] = useState(() => loadCompetitionUniverse(window.localStorage));
   const resolutions = useMemo(() => loadMatchResolutionUniverse(window.localStorage), [universe.applications.length]);
-  const profiles = useMemo(() => loadMatchEngineUniverse(window.localStorage).profiles, [universe.applications.length]);
+  const [profiles, setProfiles] = useState(() => loadMatchEngineUniverse(window.localStorage).profiles);
   const [notice, setNotice] = useState("");
   const [rollbackReason, setRollbackReason] = useState("");
   const [conflictNotes, setConflictNotes] = useState<Record<string, string>>({});
@@ -83,6 +83,8 @@ export default function ResultConsequenceWorkspace({ onOpenLiveCard, onOpenPlann
       const result = applyCoreResultConsequences({ universe, resolution: record, shows, profiles, championships, competitions });
       setUniverse(result.universe);
       setShows(result.shows);
+      setProfiles(result.profiles);
+      saveMatchEngineUniverse(window.localStorage, { profiles: result.profiles });
       setNotice("The official result updated standalone records, rankings, momentum, condition, wrestler history, grounded prompts, and future-plan review. Title and competition decisions remain guarded.");
     } catch (caught) {
       setNotice(caught instanceof Error ? caught.message : "The result consequences could not be applied.");
@@ -92,11 +94,13 @@ export default function ResultConsequenceWorkspace({ onOpenLiveCard, onOpenPlann
   function rollback(): void {
     if (!selectedApplication) return;
     try {
-      const result = rollbackCoreResultConsequences(universe, selectedApplication.id, rollbackReason);
+      const result = rollbackCoreResultConsequences(universe, selectedApplication.id, rollbackReason, profiles);
       setUniverse(result.universe);
       setShows(result.shows);
       setChampionships(result.championships);
       setCompetitions(result.competitions);
+      setProfiles(result.profiles);
+      saveMatchEngineUniverse(window.localStorage, { profiles: result.profiles });
       setRollbackReason("");
       setNotice("The core consequence snapshot was restored. The original official match calculation remains in Match Resolution history.");
     } catch (caught) {

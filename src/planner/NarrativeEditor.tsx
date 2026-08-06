@@ -3,6 +3,7 @@ import { loadChampionshipUniverse } from "../championships/storage";
 import type { StorylineRecord, WorkerReference } from "../tew/types";
 import { buildTewEntrySummary, createPlannerId } from "./model";
 import type {
+  AnglePerformanceRole,
   PlannedSegment,
   PlannedStorylineReference,
   PlannedWorkerReference,
@@ -44,9 +45,10 @@ function WorkerEditor({ worker, isMatch, onChange, onDelete }: {
   onChange: (worker: PlannedWorkerReference) => void;
   onDelete: () => void;
 }) {
+  const angleRoles: AnglePerformanceRole[] = ["Speaking", "Physical", "Reaction", "Presence"];
   return <div className="narrative-person-row">
     <div className="narrative-person-name"><strong>{worker.name}</strong><small>{worker.source === "tew" ? "Imported from TEW" : "Manual entry"}</small></div>
-    <label className="field"><span>Role</span><input value={worker.role} placeholder={isMatch ? "Competitor, manager…" : "Rated on entertainment…"} onChange={(event) => onChange({ ...worker, role: event.target.value })} /></label>
+    <label className="field"><span>Role</span>{isMatch ? <input value={worker.role} placeholder="Competitor, manager…" onChange={(event) => onChange({ ...worker, role: event.target.value })} /> : <select aria-label={`${worker.name} angle performance role`} value={angleRoles.includes(worker.role as AnglePerformanceRole) ? worker.role : "Presence"} onChange={(event) => onChange({ ...worker, role: event.target.value })}>{angleRoles.map((role) => <option key={role}>{role}</option>)}</select>}</label>
     {isMatch && <label className="field"><span>Side / team</span><input value={worker.side} placeholder="Side 1, Team A…" onChange={(event) => onChange({ ...worker, side: event.target.value })} /></label>}
     <button className="danger-button compact-button" type="button" onClick={onDelete}>Remove</button>
   </div>;
@@ -71,14 +73,14 @@ export default function NarrativeEditor({ segment, availableWorkers, availableSt
     const selected = workers.find((worker) => worker.id === importedWorkerId);
     if (!selected) return;
     if (segment.workers.some((worker) => worker.source === "tew" && worker.id === selected.id)) { setImportedWorkerId(""); return; }
-    onChange({ ...segment, workers: [...segment.workers, { id: selected.id, name: selected.name, role: "", side: "", source: "tew" }] });
+    onChange({ ...segment, workers: [...segment.workers, { id: selected.id, name: selected.name, role: segment.type === "angle" ? "Presence" : "", side: "", source: "tew" }] });
     setImportedWorkerId("");
   }
 
   function addManualWorker(): void {
     const name = manualWorkerName.trim();
     if (!name) return;
-    onChange({ ...segment, workers: [...segment.workers, { id: createPlannerId(), name, role: "", side: "", source: "manual" }] });
+    onChange({ ...segment, workers: [...segment.workers, { id: createPlannerId(), name, role: segment.type === "angle" ? "Presence" : "", side: "", source: "manual" }] });
     setManualWorkerName("");
   }
 

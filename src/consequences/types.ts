@@ -1,6 +1,7 @@
 import type { ChampionshipUniverse, TitleResultDecision } from "../championships/types";
 import type { CompetitionResultType, CompetitionUniverse } from "../competitions/types";
 import type { MatchResolutionAttempt, MatchResolutionFinalResult } from "../matchResolution/types";
+import type { MatchEngineProfile } from "../matchEngine/types";
 import type { PlannedShow } from "../planner/types";
 
 export type ConsequenceApplicationStatus = "Applied" | "Rolled Back";
@@ -48,6 +49,7 @@ export interface StandaloneWorkerRecord {
   rankingPosition: number;
   previousRankingPosition: number;
   momentum: number;
+  popularity: number;
   health: number;
   fatigue: number;
   injuryStatus: "Healthy" | "Minor Concern" | "Injured";
@@ -98,6 +100,8 @@ export interface ConditionChange {
   fatigueAfter: number;
   momentumBefore: number;
   momentumAfter: number;
+  popularityBefore: number;
+  popularityAfter: number;
   rankingPointsBefore: number;
   rankingPointsAfter: number;
   injuryStatus: StandaloneWorkerRecord["injuryStatus"];
@@ -178,12 +182,15 @@ export interface ConsequenceSnapshot {
   shows: PlannedShow[];
   championships: ChampionshipUniverse;
   competitions: CompetitionUniverse;
+  profiles: MatchEngineProfile[];
 }
 
 export interface ResultConsequenceApplication {
   id: string;
   resolutionRecordId: string;
   resolutionAttemptId: string;
+  calculationVersion: string;
+  idempotencyKey: string;
   showId: string;
   showName: string;
   segmentId: string;

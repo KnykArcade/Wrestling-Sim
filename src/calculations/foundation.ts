@@ -1,4 +1,4 @@
-export const CALCULATION_SYSTEM_VERSION = "wrestling-sim-calculations-6b10b-v1";
+export const CALCULATION_SYSTEM_VERSION = "wrestling-sim-calculations-6b10c-v1";
 
 export type CalculationProvenance = "Imported" | "Manually Entered" | "Estimated Baseline";
 export type CalculationQualityLabel = "Elite" | "Strong" | "Capable" | "Developing" | "Weak";
