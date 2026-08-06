@@ -27,7 +27,7 @@ function records<T>(value: unknown): T[] {
 
 function workerRecord(value: unknown): StandaloneWorkerRecord | null {
   if (!isRecord(value) || !text(value.workerKey) || !text(value.workerName)) return null;
-  return value as unknown as StandaloneWorkerRecord;
+  return { ...value, popularity: typeof value.popularity === "number" && Number.isFinite(value.popularity) ? Math.max(0, Math.min(100, value.popularity)) : 50 } as unknown as StandaloneWorkerRecord;
 }
 
 function teamRecord(value: unknown): StandaloneTeamRecord | null {
@@ -37,7 +37,7 @@ function teamRecord(value: unknown): StandaloneTeamRecord | null {
 
 function application(value: unknown): ResultConsequenceApplication | null {
   if (!isRecord(value) || !text(value.id) || !text(value.resolutionAttemptId)) return null;
-  return value as unknown as ResultConsequenceApplication;
+  return { ...value, calculationVersion: text(value.calculationVersion, "legacy-unversioned"), idempotencyKey: text(value.idempotencyKey, `${text(value.resolutionRecordId)}:${text(value.resolutionAttemptId)}:match-consequences`) } as unknown as ResultConsequenceApplication;
 }
 
 function championshipProposal(value: unknown): ChampionshipConsequenceProposal | null {

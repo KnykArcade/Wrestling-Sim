@@ -10,7 +10,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function parseShowEvaluationUniverse(value: unknown): ShowEvaluationUniverse {
   if (!isRecord(value)) return emptyShowEvaluationUniverse();
   const angleEvaluations = Array.isArray(value.angleEvaluations)
-    ? value.angleEvaluations.map((item) => isRecord(item) ? { ...item, calculationVersion: typeof item.calculationVersion === "string" ? item.calculationVersion : "legacy-unversioned" } : item) as ShowEvaluationUniverse["angleEvaluations"]
+    ? value.angleEvaluations.map((item) => isRecord(item) ? { ...item, idempotencyKey: typeof item.idempotencyKey === "string" ? item.idempotencyKey : `${String(item.showId ?? "legacy")}:${String(item.segmentId ?? item.id ?? "angle")}:angle-consequences`, calculationVersion: typeof item.calculationVersion === "string" ? item.calculationVersion : "legacy-unversioned" } : item) as ShowEvaluationUniverse["angleEvaluations"]
     : [];
   const showReports = Array.isArray(value.showReports)
     ? value.showReports.map((item) => isRecord(item) ? { ...item, calculationVersion: typeof item.calculationVersion === "string" ? item.calculationVersion : "legacy-unversioned" } : item) as ShowEvaluationUniverse["showReports"]

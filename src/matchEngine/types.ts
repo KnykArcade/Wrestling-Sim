@@ -190,6 +190,7 @@ export interface MatchEngineProfile {
   overall: number;
   health: number;
   popularity: number;
+  momentum: number;
   experience: number;
   fanReaction: number;
   gimmick: number;

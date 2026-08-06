@@ -52,7 +52,7 @@ function workerKey(worker: PlannedWorkerReference): string {
 }
 
 function workerRole(type: PlannedSegment["type"]): string {
-  return type === "match" ? "Competitor" : "Participant";
+  return type === "match" ? "Competitor" : "Presence";
 }
 
 function nextSide(segment: PlannedSegment): string {
@@ -286,7 +286,7 @@ export default function SegmentWorkbench({ snapshot, onOpenPlannedSegment }: { s
                 <input aria-label="Quick manual worker name" placeholder="Manual worker name" value={manualWorker} onChange={(event) => setManualWorker(event.target.value)} />
                 <button type="button" disabled={!manualWorker.trim()} onClick={() => addWorker(null, manualWorker)}>Add Manual Worker</button>
               </div>
-              {activeSegment.workers.map((worker, index) => <article className="workbench-worker-row" key={`${workerKey(worker)}-${index}`}><div><strong>{worker.name}</strong><small>{worker.source === "tew" ? "Linked to read-only TEW identity" : "Manual tracker worker"}</small></div><input aria-label={`${worker.name} workbench role`} value={worker.role} onChange={(event) => updateWorker(index, { role: event.target.value })} />{activeSegment.type === "match" && <select aria-label={`${worker.name} workbench side`} value={worker.side} onChange={(event) => updateWorker(index, { side: event.target.value })}><option>Side 1</option><option>Side 2</option><option>Other</option></select>}<button className="danger-button" type="button" onClick={() => removeWorker(index)}>Remove</button></article>)}
+              {activeSegment.workers.map((worker, index) => <article className="workbench-worker-row" key={`${workerKey(worker)}-${index}`}><div><strong>{worker.name}</strong><small>{worker.source === "tew" ? "Linked to read-only TEW identity" : "Manual tracker worker"}</small></div>{activeSegment.type === "angle" ? <select aria-label={`${worker.name} workbench role`} value={["Speaking", "Physical", "Reaction", "Presence"].includes(worker.role) ? worker.role : "Presence"} onChange={(event) => updateWorker(index, { role: event.target.value })}><option>Speaking</option><option>Physical</option><option>Reaction</option><option>Presence</option></select> : <input aria-label={`${worker.name} workbench role`} value={worker.role} onChange={(event) => updateWorker(index, { role: event.target.value })} />}{activeSegment.type === "match" && <select aria-label={`${worker.name} workbench side`} value={worker.side} onChange={(event) => updateWorker(index, { side: event.target.value })}><option>Side 1</option><option>Side 2</option><option>Other</option></select>}<button className="danger-button" type="button" onClick={() => removeWorker(index)}>Remove</button></article>)}
             </div>
 
             {activeSegment.type === "match" ? <div className="workbench-match-fields">

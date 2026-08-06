@@ -70,6 +70,7 @@ function normalizeProfile(value: unknown): MatchEngineProfile | null {
     overall: finiteNumber(value.overall, fallback.overall),
     health: finiteNumber(value.health, fallback.health),
     popularity: finiteNumber(value.popularity, fallback.popularity),
+    momentum: finiteNumber(value.momentum, fallback.momentum),
     experience: finiteNumber(value.experience, fallback.experience),
     fanReaction: finiteNumber(value.fanReaction, fallback.fanReaction),
     gimmick: finiteNumber(value.gimmick, fallback.gimmick),

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { loadChampionshipUniverse } from "../championships/storage";
 import { loadCompetitionUniverse } from "../competitions/storage";
-import { applyCoreResultConsequences } from "../consequences/model";
+import { applyCoreResultConsequences, synchronizeWorkerRecordsFromProfiles } from "../consequences/model";
 import { loadResultConsequenceUniverse, saveResultConsequenceUniverse } from "../consequences/storage";
 import type { ResultConsequenceUniverse } from "../consequences/types";
-import { loadMatchEngineUniverse } from "../matchEngine/storage";
+import { loadMatchEngineUniverse, saveMatchEngineUniverse } from "../matchEngine/storage";
 import { activeResolutionAttempt } from "../matchResolution/engine";
 import { loadMatchResolutionUniverse, saveMatchResolutionUniverse } from "../matchResolution/storage";
 import type { MatchResolutionRecord, MatchResolutionUniverse } from "../matchResolution/types";
@@ -215,6 +215,7 @@ export default function LiveCardRunnerWorkspace({ onOpenResolution, onOpenConseq
         competitions: loadCompetitionUniverse(window.localStorage),
       });
       saveResultConsequenceUniverse(window.localStorage, consequenceResult.universe);
+      saveMatchEngineUniverse(window.localStorage, { profiles: consequenceResult.profiles });
       savePlannedShows(window.localStorage, consequenceResult.shows);
       setConsequences(consequenceResult.universe);
       setShows(consequenceResult.shows);
@@ -260,9 +261,14 @@ export default function LiveCardRunnerWorkspace({ onOpenResolution, onOpenConseq
     if (!session || !currentSegment || currentSegment.type !== "angle" || !currentAngleEvaluation) return;
     try {
       const finalized = finalizeAngleEvaluation(currentAngleEvaluation, mode === "override" ? angleOverrideScore : undefined, mode === "override" ? angleOverrideReason : "");
-      const appliedUniverse = applyAngleEvaluation(evaluations, finalized);
+      const matchEngine = loadMatchEngineUniverse(window.localStorage);
+      const applied = applyAngleEvaluation(evaluations, finalized, matchEngine.profiles);
+      saveMatchEngineUniverse(window.localStorage, { profiles: applied.profiles });
+      const synchronizedConsequences = synchronizeWorkerRecordsFromProfiles(loadResultConsequenceUniverse(window.localStorage), applied.profiles);
+      saveResultConsequenceUniverse(window.localStorage, synchronizedConsequences);
       const next = completeAngleSegment(session, currentSegment.id, currentSegment.segmentOutput, currentSegment.consequences, currentSegment.followUp);
-      setEvaluations(appliedUniverse);
+      setEvaluations(applied.universe);
+      setConsequences(synchronizedConsequences);
       setUniverse((current) => upsertLiveCardSession(current, next));
       setNotice(mode === "override" ? "The explained angle override is official. Participant effects were applied exactly once." : "The calculated angle result is accepted. Participant effects were applied exactly once.");
     } catch (caught) {

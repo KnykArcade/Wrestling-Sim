@@ -1,9 +1,11 @@
+import type { AnglePerformanceRole } from "../planner/types";
+
 export type AngleEvaluationStatus = "Calculated" | "Accepted" | "Overridden";
 
 export interface AngleParticipantEvaluation {
   workerKey: string;
   workerName: string;
-  role: string;
+  role: AnglePerformanceRole;
   performanceScore: number;
   momentumDelta: number;
   popularityDelta: number;
@@ -12,6 +14,7 @@ export interface AngleParticipantEvaluation {
 
 export interface AngleEvaluation {
   id: string;
+  idempotencyKey: string;
   showId: string;
   showName: string;
   segmentId: string;

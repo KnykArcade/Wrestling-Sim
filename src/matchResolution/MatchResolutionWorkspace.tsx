@@ -85,7 +85,7 @@ function defaultImportance(show: PlannedShow, segment: PlannedSegment): MatchRes
   return "Television";
 }
 
-function createWorkerSettings(worker: PlannedWorkerReference, segment: PlannedSegment): MatchResolutionWorkerSettings {
+function createWorkerSettings(worker: PlannedWorkerReference, segment: PlannedSegment, profile: MatchEngineProfile | null): MatchResolutionWorkerSettings {
   const side = normalizeApproachName(worker.side);
   const teammates = side ? segment.workers.filter((candidate) => normalizeApproachName(candidate.side) === side) : [worker];
   const bookedPlan = segment.matchApproachSetup.workerPlans.find((plan) => plan.workerKey === workerProfileKey(worker) || normalizeApproachName(plan.workerName) === normalizeApproachName(worker.name));
@@ -100,14 +100,14 @@ function createWorkerSettings(worker: PlannedWorkerReference, segment: PlannedSe
     lockedApproachIds: [],
     manualApproachIds: bookedApproaches,
     storyNeed: 0,
-    momentum: 0,
+    momentum: profile?.momentum ?? 0,
     bookingBias: 0,
     teamId: side || workerProfileKey({ id: worker.id, name: worker.name, source: worker.source }),
     teamName: teammates.map((candidate) => candidate.name).join(" & ") || worker.name,
   };
 }
 
-function buildSetup(show: PlannedShow, segment: PlannedSegment, existing?: MatchResolutionRecord | null): MatchResolutionSetup {
+function buildSetup(show: PlannedShow, segment: PlannedSegment, profiles: MatchEngineProfile[], existing?: MatchResolutionRecord | null): MatchResolutionSetup {
   if (existing) {
     return {
       ...existing.setup,
@@ -123,13 +123,14 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, existing?: Match
       format: formatForSegment(segment),
       eliminationRules: formatForSegment(segment) === "Elimination" || formatForSegment(segment) === "Battle Royal",
       workers: segment.workers.map((worker) => {
-        const derived = createWorkerSettings(worker, segment);
+        const derived = createWorkerSettings(worker, segment, profileForWorker(worker, profiles));
         const saved = existing.setup.workers.find((item) => item.workerId === worker.id || normalizeApproachName(item.workerName) === normalizeApproachName(worker.name));
         return saved ? {
           ...derived,
           ...saved,
           approachMode: derived.manualApproachIds.length ? "Manual" : saved.approachMode,
           manualApproachIds: derived.manualApproachIds.length ? derived.manualApproachIds : saved.manualApproachIds,
+          momentum: derived.momentum,
           teamId: saved.teamId || derived.teamId,
           teamName: saved.teamName || derived.teamName,
         } : derived;
@@ -153,7 +154,7 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, existing?: Match
     volatility: 8,
     format: formatForSegment(segment),
     eliminationRules: formatForSegment(segment) === "Elimination" || formatForSegment(segment) === "Battle Royal",
-    workers: segment.workers.map((worker) => createWorkerSettings(worker, segment)),
+    workers: segment.workers.map((worker) => createWorkerSettings(worker, segment, profileForWorker(worker, profiles))),
   };
 }
 
@@ -174,7 +175,7 @@ export default function MatchResolutionWorkspace({ onReturnToShow }: { onReturnT
   const [selectedSegmentId, setSelectedSegmentId] = useState(initialSegmentId);
   const selectedSegment = eligibleSegments.find((segment) => segment.id === selectedSegmentId) ?? eligibleSegments[0] ?? null;
   const existingRecord = selectedShow && selectedSegment ? universe.records.find((record) => record.showId === selectedShow.id && record.segmentId === selectedSegment.id) ?? null : null;
-  const [setup, setSetup] = useState<MatchResolutionSetup | null>(() => selectedShow && selectedSegment ? buildSetup(selectedShow, selectedSegment, existingRecord) : null);
+  const [setup, setSetup] = useState<MatchResolutionSetup | null>(() => selectedShow && selectedSegment ? buildSetup(selectedShow, selectedSegment, matchEngine.profiles, existingRecord) : null);
   const [notice, setNotice] = useState("");
   const [changeReason, setChangeReason] = useState("");
   const [overrideWinnerKey, setOverrideWinnerKey] = useState("");
@@ -204,7 +205,7 @@ export default function MatchResolutionWorkspace({ onReturnToShow }: { onReturnT
       return;
     }
     const record = universe.records.find((item) => item.showId === selectedShow.id && item.segmentId === selectedSegment.id) ?? null;
-    setSetup(buildSetup(selectedShow, selectedSegment, record));
+    setSetup(buildSetup(selectedShow, selectedSegment, matchEngine.profiles, record));
     const attempt = activeResolutionAttempt(record);
     setOverrideWinnerKey(attempt?.engineResult.loserKey ?? attempt?.engineResult.winnerKey ?? "");
     setOverrideFinishType(attempt?.engineResult.finishType ?? "Pinfall");
