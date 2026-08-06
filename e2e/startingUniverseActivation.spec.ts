@@ -55,6 +55,7 @@ test("quick load activates the complete universe and shows a repeat-safe report"
   await expect(page.getByLabel("Starting Universe activation report")).toContainText("Championships");
   await expect(page.getByLabel("Starting Universe activation report")).toContainText("Television");
   await expect(page.getByRole("button", { name: "Activate Universe Again" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue to Main Game" })).toBeVisible();
 
   const activated = await page.evaluate(() => ({
     workers: JSON.parse(localStorage.getItem("tew-story-tracker:workers:v1") || "{}"),
@@ -74,4 +75,7 @@ test("quick load activates the complete universe and shows a repeat-safe report"
   expect(afterRepeat.workers.relationships).toHaveLength(1);
   expect(afterRepeat.titles.championships).toHaveLength(1);
   expect(afterRepeat.schedule.series).toHaveLength(1);
+
+  await page.getByRole("button", { name: "Continue to Main Game" }).click();
+  await expect(page.getByRole("heading", { name: /Your current TEW snapshot/ })).toBeVisible();
 });

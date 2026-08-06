@@ -239,7 +239,6 @@ export default function StartingUniverseWorkspace({ onUniverseLoaded }: { onUniv
       setActivationReport(report);
       const totals = Object.values(report.categories).reduce((sum, item) => ({ created: sum.created + item.created, updated: sum.updated + item.updated, preserved: sum.preserved + item.preserved, skipped: sum.skipped + item.skipped }), { created: 0, updated: 0, preserved: 0, skipped: 0 });
       setNotice(`${report.companyName} activated for ${report.gameDate || "the imported game date"}. ${totals.created} created, ${totals.updated} updated, ${totals.preserved} preserved, ${totals.skipped} skipped.`);
-      onUniverseLoaded?.();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The starting universe could not be confirmed.");
     }
