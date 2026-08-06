@@ -236,6 +236,17 @@
   line-height: 1.45;
 }
 
+.auto-match-name > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.auto-match-name button {
+  min-height: 39px;
+  white-space: nowrap;
+}
+
 .field input:focus,
 .field select:focus,
 .field textarea:focus {

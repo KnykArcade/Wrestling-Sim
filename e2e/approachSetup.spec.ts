@@ -10,7 +10,7 @@ test("selects and persists wrestler approaches inside a planned TEW match", asyn
   await page.getByRole("button", { name: "Add Match" }).click();
 
   const match = page.locator('[data-segment-type="match"]');
-  await match.getByLabel("Segment name").fill("Jay White vs PAC");
+  await match.getByLabel("Segment name").fill("Manual match title");
   await match.getByLabel("Length (minutes)").fill("20");
   await expect(match.getByLabel("Approach limit per wrestler")).toHaveValue("3");
   await expect(match.getByText("Recommended: 3", { exact: true })).toBeVisible();
@@ -20,6 +20,8 @@ test("selects and persists wrestler approaches inside a planned TEW match", asyn
   await match.getByRole("button", { name: "Add Manual Worker" }).click();
   await match.getByLabel("Manual worker name").fill("PAC");
   await match.getByRole("button", { name: "Add Manual Worker" }).click();
+  await match.getByRole("button", { name: "Auto-Name Match" }).click();
+  await expect(match.getByLabel("Segment name")).toHaveValue("Jay White vs PAC");
 
   await expect(match.locator(".match-competitor-card")).toHaveCount(2);
   await match.getByLabel("Match aim").selectOption("competitive-tv-match");

@@ -43,6 +43,29 @@ export function assignAutomaticMatchSides(segment: PlannedSegment, format: Match
   };
 }
 
+const NON_COMPETITOR_ROLES = ["manager", "referee", "announcer", "commentator", "road agent", "cornerman", "valet", "interviewer", "authority", "staff", "timekeeper", "medic", "doctor"];
+
+export function isMatchCompetitor(worker: PlannedSegment["workers"][number]): boolean {
+  const role = worker.role.trim().toLowerCase();
+  return !role || !NON_COMPETITOR_ROLES.some((term) => role.includes(term));
+}
+
+export function autoNameMatch(segment: PlannedSegment): string | null {
+  if (segment.type !== "match") return null;
+  const competitors = segment.workers.filter(isMatchCompetitor).filter((worker) => worker.name.trim());
+  if (competitors.length < 2) return null;
+
+  const sides = new Map<string, string[]>();
+  competitors.forEach((worker, index) => {
+    const side = worker.side.trim();
+    const sideKey = side ? `side:${side.toLocaleLowerCase()}` : `unassigned:${index}`;
+    sides.set(sideKey, [...(sides.get(sideKey) ?? []), worker.name.trim()]);
+  });
+
+  if (sides.size < 2) return null;
+  return [...sides.values()].map((names) => names.join(" & ")).join(" vs ");
+}
+
 export function matchBookingValidation(segment: PlannedSegment): string {
   const format = normalizeMatchFormat(segment.matchType);
   const rule = MATCH_FORMAT_RULES[format];
