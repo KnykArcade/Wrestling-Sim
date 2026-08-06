@@ -3,7 +3,7 @@ import MatchApproachSetupEditor from "../matchEngine/MatchApproachSetup";
 import { loadMatchEngineUniverse, saveMatchEngineUniverse } from "../matchEngine/storage";
 import type { MatchEngineUniverse } from "../matchEngine/types";
 import NarrativeGenerator from "../narratives/NarrativeGenerator";
-import { createPlannerId, touchShow } from "../planner/model";
+import { autoNameMatch, createPlannerId, touchShow } from "../planner/model";
 import { loadPlannedShows, savePlannedShows } from "../planner/storage";
 import type { PlannedSegment, PlannedShow, PlannedWorkerReference } from "../planner/types";
 import type { TewSnapshot, WorkerReference } from "../tew/types";
@@ -274,7 +274,7 @@ export default function SegmentWorkbench({ snapshot, onOpenPlannedSegment }: { s
           <section className="workbench-panel">
             <header><div><p className="eyebrow">SEGMENT SETUP</p><h3>{segmentLabel(activeSegment)}</h3></div><span className={`workbench-kind workbench-kind--${activeSegment.type}`}>{activeSegment.type === "match" ? "MATCH" : "ANGLE"}</span></header>
             <div className="workbench-basic-grid">
-              <label className="field field--wide"><span>Segment name</span><input aria-label="Workbench segment name" value={activeSegment.title} onChange={(event) => updateSegment({ ...activeSegment, title: event.target.value })} /></label>
+              <div className="field field--wide auto-match-name"><span>Segment name</span><div><input aria-label="Workbench segment name" value={activeSegment.title} onChange={(event) => updateSegment({ ...activeSegment, title: event.target.value })} />{activeSegment.type === "match" && <button className="secondary-button" type="button" disabled={!autoNameMatch(activeSegment)} onClick={() => { const title = autoNameMatch(activeSegment); if (title) updateSegment({ ...activeSegment, title }); }}>Auto-Name Match</button>}</div></div>
               <label className="field"><span>Length</span><input aria-label="Workbench duration" type="number" min={1} max={180} value={activeSegment.durationMinutes} onChange={(event) => updateSegment({ ...activeSegment, durationMinutes: Math.max(1, Number(event.target.value) || 1) })} /></label>
               <label className="field field--full"><span>Quick planning outline</span><textarea rows={3} value={activeSegment.notes} onChange={(event) => updateSegment({ ...activeSegment, notes: event.target.value })} /></label>
             </div>

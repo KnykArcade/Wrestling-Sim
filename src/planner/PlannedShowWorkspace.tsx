@@ -6,6 +6,7 @@ import NarrativeGenerator from "../narratives/NarrativeGenerator";
 import type { TewSnapshot } from "../tew/types";
 import {
   assignAutomaticMatchSides,
+  autoNameMatch,
   automaticMatchSide,
   createPlannerId,
   createPlannedSegment,
@@ -141,7 +142,7 @@ function SegmentEditor({
       </header>
 
       <div className="segment-form-grid">
-        <label className="field field--wide"><span>Segment name</span><input value={segment.title} onChange={(event) => onChange({ ...segment, title: event.target.value })} /></label>
+        <div className="field field--wide auto-match-name"><span>Segment name</span><div><input aria-label="Segment name" value={segment.title} onChange={(event) => onChange({ ...segment, title: event.target.value })} />{segment.type === "match" && <button className="secondary-button" type="button" disabled={!autoNameMatch(segment)} onClick={() => { const title = autoNameMatch(segment); if (title) onChange({ ...segment, title }); }}>Auto-Name Match</button>}</div></div>
         <label className="field"><span>Placement</span><select value={segment.section} onChange={(event) => onChange({ ...segment, section: event.target.value as PlannedSegment["section"] })}><option>Pre-Show</option><option>Main Show</option><option>Post-Show</option></select></label>
         <label className="field"><span>Length (minutes)</span><input type="number" min={1} max={180} value={segment.durationMinutes} onChange={(event) => onChange({ ...segment, durationMinutes: Math.max(1, Number(event.target.value) || 1) })} /></label>
         {segment.type === "angle" && <label className="field field--full"><span>Quick planning outline</span><textarea rows={3} placeholder="A short overview for the running order. Use Narrative Details below for the complete story." value={segment.notes} onChange={(event) => onChange({ ...segment, notes: event.target.value })} /></label>}

@@ -7,11 +7,13 @@ test("creates and persists a Quick Match output revision in Companion Core", asy
   await expect(page.getByRole("heading", { name: "Match approaches and segment outputs without rebuilding the whole game" })).toBeVisible();
 
   await page.getByLabel("Workbench template").selectOption("technical-showcase");
-  await page.getByLabel("Workbench segment name").fill("Jay White vs PAC");
+  await page.getByLabel("Workbench segment name").fill("Manual quick-match title");
   await page.getByLabel("Quick manual worker name").fill("Jay White");
   await page.getByRole("button", { name: "Add Manual Worker" }).click();
   await page.getByLabel("Quick manual worker name").fill("PAC");
   await page.getByRole("button", { name: "Add Manual Worker" }).click();
+  await page.getByRole("button", { name: "Auto-Name Match" }).click();
+  await expect(page.getByLabel("Workbench segment name")).toHaveValue("Jay White vs PAC");
   await page.getByLabel("Workbench planned winner").fill("Jay White");
   await page.getByLabel("Workbench planned finish").fill("Blade Runner after a counter");
   await page.getByLabel("Workbench current output").fill("PAC controls the pace before White creates the decisive opening and finishes with Blade Runner.");

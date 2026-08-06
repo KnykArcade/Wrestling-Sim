@@ -9,6 +9,7 @@ import { emptyShowOperationsUniverse } from "../src/operations/model";
 import { emptyOutputLibraryUniverse } from "../src/outputLibrary/model";
 import {
   assignAutomaticMatchSides,
+  autoNameMatch,
   buildTewEntrySummary,
   createPlannedSegment,
   createPlannedShow,
@@ -107,6 +108,45 @@ function priorBackup(version: number, shows = [createPlannedShow(1)]) {
 }
 
 describe("planned show workspace", () => {
+  test("auto-names singles, teams, multi-sided matches, and unassigned competitors", () => {
+    const match = createPlannedSegment("match");
+    match.workers = [
+      { id: "1", name: "Roderick Strong", role: "Competitor", side: "Side 1", source: "tew" },
+      { id: "2", name: "Ricochet", role: "Competitor", side: "Side 2", source: "tew" },
+    ];
+    expect(autoNameMatch(match)).toBe("Roderick Strong vs Ricochet");
+
+    match.workers = [
+      { id: "1", name: "Santana", role: "Competitor", side: "Team 1", source: "tew" },
+      { id: "2", name: "Ortiz", role: "Competitor", side: "Team 1", source: "tew" },
+      { id: "3", name: "Alex Shelley", role: "Competitor", side: "Team 2", source: "tew" },
+      { id: "4", name: "Chris Sabin", role: "Competitor", side: "Team 2", source: "tew" },
+    ];
+    expect(autoNameMatch(match)).toBe("Santana & Ortiz vs Alex Shelley & Chris Sabin");
+
+    match.workers = [
+      { id: "1", name: "PAC", role: "Competitor", side: "", source: "tew" },
+      { id: "2", name: "Jay White", role: "Competitor", side: "", source: "tew" },
+      { id: "3", name: "Bobby Lashley", role: "Competitor", side: "Side 3", source: "tew" },
+    ];
+    expect(autoNameMatch(match)).toBe("PAC vs Jay White vs Bobby Lashley");
+  });
+
+  test("auto-name excludes non-competitors and requires a valid matchup", () => {
+    const match = createPlannedSegment("match");
+    match.workers = [
+      { id: "1", name: "Roderick Strong", role: "Competitor", side: "Side 1", source: "tew" },
+      { id: "2", name: "Ricochet", role: "Competitor", side: "Side 2", source: "tew" },
+      { id: "3", name: "MVP", role: "Manager", side: "Side 1", source: "tew" },
+      { id: "4", name: "Referee", role: "Referee", side: "", source: "manual" },
+    ];
+    match.title = "Manual Main Event Name";
+    expect(autoNameMatch(match)).toBe("Roderick Strong vs Ricochet");
+
+    match.workers = match.workers.slice(0, 1);
+    expect(autoNameMatch(match)).toBeNull();
+  });
+
   test("creates rich match and angle defaults and calculates card time", () => {
     const show = createPlannedShow(1);
     const match = createPlannedSegment("match");
