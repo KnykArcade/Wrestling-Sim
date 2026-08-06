@@ -28,7 +28,7 @@ const record = {
   approachFormulaVersion: "test-v1", createdAt: "2019-01-01T00:00:00.000Z", updatedAt: "2019-01-01T00:00:00.000Z", confirmedAt: "",
 };
 
-test("quick load activates the complete universe and shows a repeat-safe report", async ({ page }) => {
+test("quick load keeps the activation report visible until continuing", async ({ page }) => {
   await page.goto("/");
   await page.evaluate(async (universe) => {
     localStorage.clear();
