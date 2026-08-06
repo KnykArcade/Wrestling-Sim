@@ -197,6 +197,8 @@ export function showFingerprint(show: PlannedShow): string {
     company: show.company,
     showType: show.showType,
     venue: show.venue,
+    venueCapacity: show.venueCapacity,
+    marketDemand: show.marketDemand,
     expectedMinutes: show.expectedMinutes,
     notes: show.notes,
     segments: show.segments.map((segment) => ({

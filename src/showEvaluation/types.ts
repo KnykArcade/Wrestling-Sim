@@ -36,10 +36,32 @@ export interface CrowdProgressionEntry {
   segmentTitle: string;
   segmentType: "match" | "angle";
   score: number;
+  receptionScore: number;
+  crowdModifier: number;
   importanceWeight: number;
+  mainEvent: boolean;
   crowdBefore: number;
   crowdAfter: number;
   reaction: string;
+}
+
+export interface PromotionStrengthSnapshot {
+  source: "Imported Company" | "Saved Promotion" | "Estimated Baseline";
+  companyName: string;
+  companySize: string;
+  sizeScore: number;
+  prestige: number;
+  momentum: number;
+}
+
+export interface AttendanceCalculation {
+  expectedCardStrength: number;
+  marketDemand: number;
+  recentPerformance: number;
+  showImportance: number;
+  venueCapacity: number;
+  unconstrainedDemand: number;
+  capacityLimited: boolean;
 }
 
 export interface ShowEvaluationReport {
@@ -51,6 +73,9 @@ export interface ShowEvaluationReport {
   overallScore: number;
   audienceReaction: string;
   estimatedAttendance: number;
+  expectedShowScore: number;
+  promotionStrength: PromotionStrengthSnapshot;
+  attendanceCalculation: AttendanceCalculation;
   promotionPopularityBefore: number;
   promotionPopularityAfter: number;
   promotionPopularityDelta: number;
@@ -86,4 +111,5 @@ export interface ShowEvaluationUniverse {
   workerImpacts: AngleWorkerImpact[];
   showReports: ShowEvaluationReport[];
   promotionPopularity: number;
+  promotionPopularitySeeded: boolean;
 }

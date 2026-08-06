@@ -124,7 +124,7 @@ describe("native match engine data foundation", () => {
     expect(normalizeRating(-4)).toBe(0);
     expect(calculationQualityLabel(85)).toBe("Elite");
     expect(calculationQualityLabel(49.99)).toBe("Weak");
-    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b10c-v1");
+    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b10d-v1");
   });
 
   test("migrates saved resolver IDs without losing selected or locked approaches", () => {

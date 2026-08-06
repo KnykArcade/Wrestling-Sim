@@ -96,6 +96,8 @@ export function createPlannedShow(sequence: number): PlannedShow {
     company: "",
     showType: "Television",
     venue: "",
+    venueCapacity: 0,
+    marketDemand: 50,
     expectedMinutes: 120,
     status: "Draft",
     notes: "",

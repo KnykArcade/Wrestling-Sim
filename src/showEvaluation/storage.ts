@@ -13,13 +13,21 @@ export function parseShowEvaluationUniverse(value: unknown): ShowEvaluationUnive
     ? value.angleEvaluations.map((item) => isRecord(item) ? { ...item, idempotencyKey: typeof item.idempotencyKey === "string" ? item.idempotencyKey : `${String(item.showId ?? "legacy")}:${String(item.segmentId ?? item.id ?? "angle")}:angle-consequences`, calculationVersion: typeof item.calculationVersion === "string" ? item.calculationVersion : "legacy-unversioned" } : item) as ShowEvaluationUniverse["angleEvaluations"]
     : [];
   const showReports = Array.isArray(value.showReports)
-    ? value.showReports.map((item) => isRecord(item) ? { ...item, calculationVersion: typeof item.calculationVersion === "string" ? item.calculationVersion : "legacy-unversioned" } : item) as ShowEvaluationUniverse["showReports"]
+    ? value.showReports.map((item) => isRecord(item) ? {
+      ...item,
+      calculationVersion: typeof item.calculationVersion === "string" ? item.calculationVersion : "legacy-unversioned",
+      expectedShowScore: typeof item.expectedShowScore === "number" ? item.expectedShowScore : 65,
+      promotionStrength: isRecord(item.promotionStrength) ? item.promotionStrength : { source: "Estimated Baseline", companyName: "", companySize: "Medium", sizeScore: 50, prestige: 50, momentum: 50 },
+      attendanceCalculation: isRecord(item.attendanceCalculation) ? item.attendanceCalculation : { expectedCardStrength: 50, marketDemand: 50, recentPerformance: 50, showImportance: 0, venueCapacity: 0, unconstrainedDemand: typeof item.estimatedAttendance === "number" ? item.estimatedAttendance : 0, capacityLimited: false },
+      segments: Array.isArray(item.segments) ? item.segments.map((segment) => isRecord(segment) ? { ...segment, receptionScore: typeof segment.receptionScore === "number" ? segment.receptionScore : Number(segment.score ?? 0), crowdModifier: typeof segment.crowdModifier === "number" ? segment.crowdModifier : 0, mainEvent: Boolean(segment.mainEvent) } : segment) : [],
+    } : item) as ShowEvaluationUniverse["showReports"]
     : [];
   return {
     angleEvaluations,
     workerImpacts: Array.isArray(value.workerImpacts) ? value.workerImpacts as ShowEvaluationUniverse["workerImpacts"] : [],
     showReports,
     promotionPopularity: typeof value.promotionPopularity === "number" && Number.isFinite(value.promotionPopularity) ? Math.max(0, Math.min(100, value.promotionPopularity)) : 50,
+    promotionPopularitySeeded: typeof value.promotionPopularitySeeded === "boolean" ? value.promotionPopularitySeeded : showReports.length > 0,
   };
 }
 
