@@ -22,10 +22,11 @@ test("uses a compact TEW-style card and previews wrestler approach quality befor
   await expect(choices.locator(".approach-candidate")).toHaveCount(16);
   const firstChoice = choices.locator(".approach-candidate").first();
   await expect(firstChoice.locator(".approach-rating-gauge b")).toHaveText(/\d+\.\d/);
-  await expect(firstChoice.getByText(/^Style$/)).toBeVisible();
-  await expect(firstChoice.getByText(/^Match aim$/)).toBeVisible();
-  await expect(firstChoice.getByText(/^Pace$/)).toBeVisible();
-  await expect(firstChoice.getByText(/^Stamina$/)).toBeVisible();
+  const fitIndicators = firstChoice.locator(".approach-candidate__fit span");
+  await expect(fitIndicators.filter({ hasText: /^Style / })).toHaveText(/^Style (Strong fit|Neutral)$/);
+  await expect(fitIndicators.filter({ hasText: /^Match aim / })).toHaveText(/^Match aim (Strong fit|Clash|Neutral)$/);
+  await expect(fitIndicators.filter({ hasText: /^Pace / })).toHaveText(/^Pace (Ideal|Usable|Risk)$/);
+  await expect(fitIndicators.filter({ hasText: /^Stamina / })).toHaveText(/^Stamina \d+$/);
   await expect(firstChoice.locator(".approach-quality")).toHaveText(/Elite|Strong|Capable|Developing|Weak/);
   await expect(choices.getByText("Recommended", { exact: true })).toHaveCount(3);
   await expect(firstChoice.getByText("More details", { exact: true })).toHaveCount(0);
