@@ -1,9 +1,16 @@
 import { describe, expect, test } from "vitest";
 import { confirmStartingUniverse, createStartingUniverse } from "../src/startingUniverse/model";
+import { activateStartingUniverseData, emptyStartingUniverseActivationState } from "../src/startingUniverse/activation";
 import { calculateWorkbookMetrics, IMPORTED_APPROACH_FORMULAS } from "../src/startingUniverse/formulas";
 import type { ParsedTewExport } from "../src/startingUniverse/parser";
 import type { StartingUniverseContract, StartingUniverseWorker } from "../src/startingUniverse/types";
 import { MATCH_APPROACHES } from "../src/matchEngine/catalog";
+import { emptyMatchEngineUniverse } from "../src/matchEngine/storage";
+import { emptyWorkerUniverse } from "../src/workers/storage";
+import { emptyProfileLibraryUniverse } from "../src/profileLibrary/model";
+import { emptyChampionshipUniverse } from "../src/championships/storage";
+import { emptyPromotionScheduleUniverse } from "../src/schedule/model";
+import { emptySnapshotVaultUniverse } from "../src/snapshotVault/model";
 
 function importedWorld(): ParsedTewExport {
   return {
@@ -31,6 +38,45 @@ function importedWorld(): ParsedTewExport {
         { UID: "company", Name: "PWL Team", CompanyUID: "1", CompanyName: "Pro Wrestling League", Worker1: "w1", Worker2: "w2", Active: 1, Experience: 50 },
       ],
     },
+  };
+}
+
+function activationWorld(): ParsedTewExport {
+  const base = importedWorld();
+  return {
+    ...base,
+    tableNames: [...base.tableNames, "Save_Game_Info", "Title_Belts", "TV_Shows", "Stables", "Worker_Relationships"],
+    tables: {
+      ...base.tables,
+      Save_Game_Info: [{ Current_Date: "01/02/2019", Game_Start: "01/01/2019" }],
+      Workers: [
+        { UID: "w1", Name: "Roderick Strong", Active: 1, Wrestler: 1, Style: "Technician", Stamina: 70, Basics: 70 },
+        { UID: "w2", Name: "Trevor Mann", Active: 1, Wrestler: 1, Style: "High Flyer", Stamina: 65, Basics: 65 },
+        { UID: "s1", Name: "Senior Official", Active: 1, Referee: 1, Basics: 80 },
+      ],
+      Contracts: [
+        { CompanyUID: "1", CompanyName: "Pro Wrestling League", WorkerUID: "w1", WorkerName: "Roderick Strong", Name: "Roderick Strong", Wrestler: 1, Babyface: 0, Gimmick: "Technical master", Brand: "Power Hour", Momentum: 74 },
+        { CompanyUID: "1", CompanyName: "Pro Wrestling League", WorkerUID: "w2", WorkerName: "Trevor Mann", Name: "Ricochet", Wrestler: 1, Babyface: 1, Gimmick: "One and only", Brand: "Power Hour", Momentum: 81 },
+        { CompanyUID: "1", CompanyName: "Pro Wrestling League", WorkerUID: "s1", WorkerName: "Senior Official", Name: "Senior Official", Referee: 1 },
+      ],
+      Title_Belts: [{ UID: "title-1", CompanyUID: "1", CompanyName: "Pro Wrestling League", Name: "PWL World Championship", BeltStyle: "Singles", BeltLevel: "World", Active: 1, Holder1: "w1", HolderName1: "Roderick Strong", Defences: 2, Reign_Began: "12/01/2018", Last_Defence: "12/29/2018" }],
+      TV_Shows: [{ CompanyUID: "1", Company_Name: "Pro Wrestling League", Name: "PWL Power Hour", Length: 60, Brand: "Power Hour", Showday: "Wednesday", Currently_On_Air: 1, Dormant: 0 }],
+      Tag_Teams: [{ UID: "team-1", Name: "Technical Flight", CompanyUID: "1", CompanyName: "Pro Wrestling League", Worker1: "w1", WorkerName1: "Roderick Strong", Worker2: "w2", WorkerName2: "Ricochet", Active: 1, Experience: 70, Finisher: "End of Heartache" }],
+      Stables: [{ CompanyUID: "1", CompanyName: "Pro Wrestling League", Name: "PWL Originals", Active: 1, Member1: "w1", MemberName1: "Roderick Strong", Role1: "Leader", Member2: "w2", MemberName2: "Ricochet", Role2: "Member" }],
+      Worker_Relationships: [{ WorkerUID1: "w1", Worker1_Name: "Roderick Strong", WorkerUID2: "w2", Worker2_Name: "Trevor Mann", Family_Relationship: "Cousins" }],
+    },
+  };
+}
+
+function emptyActivationData() {
+  return {
+    matchEngine: emptyMatchEngineUniverse(),
+    workers: emptyWorkerUniverse(),
+    profiles: emptyProfileLibraryUniverse(),
+    championships: emptyChampionshipUniverse(),
+    schedule: emptyPromotionScheduleUniverse(),
+    vault: emptySnapshotVaultUniverse(),
+    activation: emptyStartingUniverseActivationState(),
   };
 }
 
@@ -72,5 +118,57 @@ describe("Phase 6B10A canonical calculation foundation", () => {
     const worker = { skills, popularity, starQuality: 50, experience: 50, looks: 50, reputation: 50, respect: 50, physical: { head: 100, body: 100, arms: 100, legs: 100 } } as unknown as StartingUniverseWorker;
     const contract = { gimmickRating: 50, perception: "Well Known" } as StartingUniverseContract;
     expect(calculateWorkbookMetrics(worker, contract).popularityRating).toBe(50);
+  });
+});
+
+describe("Phase 6B12 complete Starting Universe activation", () => {
+  test("activates company, date, roster, profiles, titles, television, teams, stables, and relationships", () => {
+    const record = confirmStartingUniverse(createStartingUniverse(activationWorld()));
+    const result = activateStartingUniverseData(record, emptyActivationData());
+
+    expect(result.activation).toMatchObject({ activeUniverseId: record.id, activeCompanyId: "1", activeCompanyName: "Pro Wrestling League", gameDate: "2019-01-02" });
+    expect(result.vault.promotion).toMatchObject({ status: "Completed", promotionName: "Pro Wrestling League", abbreviation: "PWL", defaultWeeklyShow: "PWL Power Hour", calendarStartDate: "2019-01-02" });
+    expect(result.matchEngine.profiles).toHaveLength(2);
+    expect(result.matchEngine.profiles.find((profile) => profile.workerId === "w2")).toMatchObject({ workerName: "Ricochet", momentum: 81 });
+    expect(result.workers.profiles).toHaveLength(3);
+    expect(result.workers.profiles.find((profile) => profile.linkedTewWorkerId === "w2")).toMatchObject({ displayName: "Ricochet", alignment: "Face", brand: "Power Hour", gimmickSummary: "One and only" });
+    expect(result.profiles.records).toHaveLength(2);
+    expect(result.profiles.records.every((profile) => profile.identity.status === "Confirmed")).toBe(true);
+    expect(result.championships.championships[0]).toMatchObject({ name: "PWL World Championship", status: "Active", defenses: 2, dateWon: "2018-12-01" });
+    expect(result.championships.championships[0].currentChampions[0].name).toBe("Roderick Strong");
+    expect(result.schedule.series[0]).toMatchObject({ name: "PWL Power Hour", company: "Pro Wrestling League", defaultMinutes: 60, defaultDayOfWeek: 3, startDate: "2019-01-02" });
+    expect(result.workers.relationships.some((relationship) => relationship.type === "Tag Partner" && relationship.publicDescription === "Technical Flight")).toBe(true);
+    expect(result.workers.relationships.some((relationship) => relationship.type === "Stable Member" && relationship.publicDescription === "PWL Originals")).toBe(true);
+    expect(result.workers.relationships.some((relationship) => relationship.type === "Family")).toBe(true);
+  });
+
+  test("repeat activation is duplicate-safe and preserves later user edits", () => {
+    const record = confirmStartingUniverse(createStartingUniverse(activationWorld()));
+    const first = activateStartingUniverseData(record, emptyActivationData());
+    const edited = {
+      ...first,
+      workers: { ...first.workers, profiles: first.workers.profiles.map((profile, index) => index === 0 ? { ...profile, displayName: "My Custom Name" } : profile) },
+      championships: { championships: first.championships.championships.map((title) => ({ ...title, name: "My Custom Championship" })) },
+    };
+    const second = activateStartingUniverseData(record, edited);
+
+    expect(second.workers.profiles).toHaveLength(3);
+    expect(second.matchEngine.profiles).toHaveLength(2);
+    expect(second.championships.championships).toHaveLength(1);
+    expect(second.schedule.series).toHaveLength(1);
+    expect(second.workers.profiles[0].displayName).toBe("My Custom Name");
+    expect(second.championships.championships[0].name).toBe("My Custom Championship");
+    expect(second.report.categories["Worker Hub"].created).toBe(0);
+    expect(second.report.categories["Championships"].preserved).toBe(1);
+  });
+
+  test("updates an untouched imported record when its reviewed source value changes", () => {
+    const record = confirmStartingUniverse(createStartingUniverse(activationWorld()));
+    const first = activateStartingUniverseData(record, emptyActivationData());
+    const changed = { ...record, review: { ...record.review, titles: record.review.titles.map((title) => ({ ...title, gameName: "PWL Crown Championship" })) } };
+    const second = activateStartingUniverseData(changed, first);
+
+    expect(second.championships.championships[0].name).toBe("PWL Crown Championship");
+    expect(second.report.categories["Championships"].updated).toBe(1);
   });
 });

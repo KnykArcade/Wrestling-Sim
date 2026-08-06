@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { loadMatchEngineUniverse, saveMatchEngineUniverse } from "../matchEngine/storage";
 import { formulaLabel, IMPORTED_APPROACH_FORMULAS } from "./formulas";
+import { activateStartingUniverseInStorage, loadStartingUniverseActivationState, type StartingUniverseActivationReport } from "./activation";
 import {
   addWorldWorkerToRoster,
-  applyStartingRosterToMatchEngine,
   confirmStartingUniverse,
   createStartingUniverse,
   rebuildStartingUniverseReview,
@@ -67,6 +66,17 @@ function topApproaches(ratings: Record<ImportedApproachFormulaId, number>): stri
     .join(" · ");
 }
 
+function ActivationReport({ report }: { report: StartingUniverseActivationReport }) {
+  return <section className="starting-activation-report" aria-label="Starting Universe activation report">
+    <header><div><p className="eyebrow">ACTIVATION REPORT</p><h4>{report.companyName}</h4></div><span>{report.gameDate || "Imported date unavailable"}</span></header>
+    <div className="starting-activation-table">
+      <div className="starting-activation-row starting-activation-head"><strong>Destination</strong><span>Created</span><span>Updated</span><span>Preserved</span><span>Skipped</span></div>
+      {Object.entries(report.categories).map(([category, values]) => <div className="starting-activation-row" key={category}><strong>{category}</strong><span>{values.created}</span><span>{values.updated}</span><span>{values.preserved}</span><span>{values.skipped}</span></div>)}
+    </div>
+    <small>Activated {formatDate(report.activatedAt)}. Preserved records include later user edits and already-customized data.</small>
+  </section>;
+}
+
 export default function StartingUniverseWorkspace({ onUniverseLoaded }: { onUniverseLoaded?: () => void }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const packageInputRef = useRef<HTMLInputElement | null>(null);
@@ -78,7 +88,7 @@ export default function StartingUniverseWorkspace({ onUniverseLoaded }: { onUniv
   const [error, setError] = useState("");
   const [rosterFilter, setRosterFilter] = useState("");
   const [worldSearch, setWorldSearch] = useState("");
-  const [replaceExistingProfiles, setReplaceExistingProfiles] = useState(false);
+  const [activationReport, setActivationReport] = useState<StartingUniverseActivationReport | null>(() => loadStartingUniverseActivationState(window.localStorage).lastReport);
   const [customReview, setCustomReview] = useState(false);
 
   useEffect(() => {
@@ -223,11 +233,12 @@ export default function StartingUniverseWorkspace({ onUniverseLoaded }: { onUniv
     if (!record) return;
     setError("");
     try {
-      const confirmed = confirmStartingUniverse(record);
-      const matchEngineResult = applyStartingRosterToMatchEngine(confirmed, loadMatchEngineUniverse(window.localStorage), replaceExistingProfiles);
-      saveMatchEngineUniverse(window.localStorage, matchEngineResult.universe);
+      const confirmed = record.status === "Confirmed" ? record : confirmStartingUniverse(record);
+      const report = activateStartingUniverseInStorage(confirmed, window.localStorage);
       await persist(confirmed, "confirm");
-      setNotice(`Standalone starting universe confirmed. Match Engine profiles: ${matchEngineResult.created} created, ${matchEngineResult.updated} updated, ${matchEngineResult.preserved} existing customized profiles preserved.`);
+      setActivationReport(report);
+      const totals = Object.values(report.categories).reduce((sum, item) => ({ created: sum.created + item.created, updated: sum.updated + item.updated, preserved: sum.preserved + item.preserved, skipped: sum.skipped + item.skipped }), { created: 0, updated: 0, preserved: 0, skipped: 0 });
+      setNotice(`${report.companyName} activated for ${report.gameDate || "the imported game date"}. ${totals.created} created, ${totals.updated} updated, ${totals.preserved} preserved, ${totals.skipped} skipped.`);
       onUniverseLoaded?.();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The starting universe could not be confirmed.");
@@ -270,7 +281,8 @@ export default function StartingUniverseWorkspace({ onUniverseLoaded }: { onUniv
         {!record.companies.some((item) => item.userControlled) && <label className="field field--wide"><span>Company you want to control</span><select aria-label="Quick load playable company" value={record.playableCompanyId} onChange={(event) => void selectCompany(event.target.value)}>{record.companies.map((item) => <option key={item.id} value={item.id}>{item.name} ({item.initials || item.id})</option>)}</select></label>}
         <div className="starting-ready-grid"><article><span>Company</span><strong>{company?.name ?? "Not selected"}</strong></article><article><span>Roster and staff</span><strong>{record.review.roster.filter((decision) => decision.included).length}</strong></article><article><span>Titles and TV</span><strong>{record.review.titles.filter((decision) => decision.included).length} / {record.review.tvShows.filter((decision) => decision.included).length}</strong></article><article><span>Teams and stables</span><strong>{record.review.tagTeams.filter((decision) => decision.included).length} / {record.review.stables.filter((decision) => decision.included).length}</strong></article></div>
         {record.review.issues.length > 0 && <details className="starting-ready-warnings"><summary>{blockingIssues.length ? `${blockingIssues.length} problem${blockingIssues.length === 1 ? "" : "s"} must be fixed` : `${record.review.issues.length} import note${record.review.issues.length === 1 ? "" : "s"}`}</summary>{record.review.issues.map((issue) => <p key={issue.id}><strong>{issue.severity}: {issue.message}</strong> {issue.detail}</p>)}</details>}
-        <div className="starting-final-actions"><button className="primary-button" type="button" disabled={blockingIssues.length > 0 || record.status === "Confirmed"} onClick={() => void finalizeUniverse()}>{record.status === "Confirmed" ? "Universe Loaded" : "Load Universe and Start"}</button><button className="secondary-button" type="button" onClick={() => setCustomReview(true)}>Review or Customize Import</button>{record.status === "Confirmed" && <button className="secondary-button" type="button" onClick={onUniverseLoaded}>Continue to Main Game</button>}</div>
+        <div className="starting-final-actions"><button className="primary-button" type="button" disabled={blockingIssues.length > 0} onClick={() => void finalizeUniverse()}>{record.status === "Confirmed" ? "Activate Universe Again" : "Load Universe and Start"}</button><button className="secondary-button" type="button" onClick={() => setCustomReview(true)}>Review or Customize Import</button>{record.status === "Confirmed" && <button className="secondary-button" type="button" onClick={onUniverseLoaded}>Continue to Main Game</button>}</div>
+        {activationReport?.universeId === record.id && <ActivationReport report={activationReport} />}
       </section>}
 
       {customReview && <>
@@ -289,7 +301,7 @@ export default function StartingUniverseWorkspace({ onUniverseLoaded }: { onUniv
 
       {state.selectedTab === "formulas" && <section className="starting-review-panel"><header><div><p className="eyebrow">EXCEL MATCH SYSTEM</p><h3>All 16 distinct approach formulas retained</h3><p>Counter Specialist remains separate. Ring General remains a separate six-part formula and is presented as Pace Controller in the companion.</p></div><span>{record.approachFormulaVersion}</span></header><div className="starting-formula-list">{IMPORTED_APPROACH_FORMULAS.map((formula, index) => <article key={formula.id}><b>{index + 1}</b><div><strong>{formula.name}</strong><span>Workbook: {formula.workbookName}</span><p>{formulaLabel(formula)}</p><small>{formula.sourceNote}</small></div><em>{formula.currentMatchEngineId ? "Current companion mapping" : "Reserved for Phase 6B"}</em></article>)}</div><footer><button className="primary-button" type="button" onClick={() => setState((current) => ({ ...current, selectedTab: "confirm" }))}>Continue to Confirmation</button></footer></section>}
 
-      {state.selectedTab === "confirm" && <section className="starting-review-panel"><header><div><p className="eyebrow">CONFIRM STARTING WORLD</p><h3>{record.name}</h3><p>Confirmation freezes the reviewed import as your standalone starting point and creates Match Engine profiles for included wrestlers.</p></div><span>{record.status}</span></header><div className="starting-confirm-grid"><article><span>Playable company</span><strong>{company?.name}</strong></article><article><span>Included roster</span><strong>{record.review.roster.filter((decision) => decision.included).length}</strong></article><article><span>Wrestler-enabled</span><strong>{record.review.roster.filter((decision) => decision.included && decision.rosterClass !== "Staff").length}</strong></article><article><span>Staff-enabled</span><strong>{record.review.roster.filter((decision) => decision.included && decision.rosterClass !== "Wrestler").length}</strong></article><article><span>Titles</span><strong>{record.review.titles.filter((decision) => decision.included).length}</strong></article><article><span>Teams</span><strong>{record.review.tagTeams.filter((decision) => decision.included).length}</strong></article></div><section className="starting-review-issues"><header><h4>Review findings</h4><span>{record.review.issues.length}</span></header>{record.review.issues.map((issue) => <article key={issue.id} className={`starting-issue--${issue.severity.toLowerCase()}`}><strong>{issue.severity}: {issue.message}</strong><span>{issue.detail}</span></article>)}</section><div className="starting-acknowledgements"><label><input type="checkbox" checked={record.review.rosterAcknowledged} onChange={() => void acknowledge("roster")} /> Starting roster reviewed</label><label><input type="checkbox" checked={record.review.titlesAcknowledged} onChange={() => void acknowledge("titles")} /> Titles and television reviewed</label><label><input type="checkbox" checked={record.review.teamsAcknowledged} onChange={() => void acknowledge("teams")} /> Teams and stables reviewed</label><label><input type="checkbox" checked={replaceExistingProfiles} onChange={(event) => setReplaceExistingProfiles(event.target.checked)} /> Replace already customized Match Engine profiles with imported TEW ratings</label></div><div className="starting-final-actions"><button className="primary-button" type="button" disabled={blockingIssues.length > 0 || record.status === "Confirmed"} onClick={() => void finalizeUniverse()}>{record.status === "Confirmed" ? "Starting Universe Confirmed" : "Confirm Standalone Starting Universe"}</button><button className="secondary-button" type="button" onClick={() => void exportPackage()}>Export Starting Universe Package</button></div>{record.status === "Confirmed" && <div className="starting-confirmed-banner"><strong>Standalone starting point locked</strong><span>Confirmed {formatDate(record.confirmedAt)}. Phase 6B can now use these ratings and formulas to suggest the winner, finish, and match rating.</span></div>}</section>}
+      {state.selectedTab === "confirm" && <section className="starting-review-panel"><header><div><p className="eyebrow">CONFIRM STARTING WORLD</p><h3>{record.name}</h3><p>Confirmation activates the reviewed company, date, roster, titles, television, teams, stables, relationships, and Match Engine profiles across Wrestling Sim.</p></div><span>{record.status}</span></header><div className="starting-confirm-grid"><article><span>Playable company</span><strong>{company?.name}</strong></article><article><span>Included roster</span><strong>{record.review.roster.filter((decision) => decision.included).length}</strong></article><article><span>Wrestler-enabled</span><strong>{record.review.roster.filter((decision) => decision.included && decision.rosterClass !== "Staff").length}</strong></article><article><span>Staff-enabled</span><strong>{record.review.roster.filter((decision) => decision.included && decision.rosterClass !== "Wrestler").length}</strong></article><article><span>Titles</span><strong>{record.review.titles.filter((decision) => decision.included).length}</strong></article><article><span>Teams</span><strong>{record.review.tagTeams.filter((decision) => decision.included).length}</strong></article></div><section className="starting-review-issues"><header><h4>Review findings</h4><span>{record.review.issues.length}</span></header>{record.review.issues.map((issue) => <article key={issue.id} className={`starting-issue--${issue.severity.toLowerCase()}`}><strong>{issue.severity}: {issue.message}</strong><span>{issue.detail}</span></article>)}</section><div className="starting-acknowledgements"><label><input type="checkbox" checked={record.review.rosterAcknowledged} onChange={() => void acknowledge("roster")} /> Starting roster reviewed</label><label><input type="checkbox" checked={record.review.titlesAcknowledged} onChange={() => void acknowledge("titles")} /> Titles and television reviewed</label><label><input type="checkbox" checked={record.review.teamsAcknowledged} onChange={() => void acknowledge("teams")} /> Teams and stables reviewed</label></div><div className="starting-final-actions"><button className="primary-button" type="button" disabled={blockingIssues.length > 0} onClick={() => void finalizeUniverse()}>{record.status === "Confirmed" ? "Activate Universe Again" : "Confirm and Activate Starting Universe"}</button><button className="secondary-button" type="button" onClick={() => void exportPackage()}>Export Starting Universe Package</button></div>{activationReport?.universeId === record.id && <ActivationReport report={activationReport} />}{record.status === "Confirmed" && <div className="starting-confirmed-banner"><strong>Standalone starting point active</strong><span>Confirmed {formatDate(record.confirmedAt)}. Imported records are linked to their sources, and later user edits are protected during repeat activation.</span></div>}</section>}
       </>}
     </>}
   </section>;

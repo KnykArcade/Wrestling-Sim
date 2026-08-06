@@ -617,7 +617,9 @@ export function applyStartingRosterToMatchEngine(
   for (const decision of record.review.roster.filter((item) => item.included && item.rosterClass !== "Staff")) {
     const worker = workers.get(decision.workerId);
     if (!worker) continue;
-    const base = createMatchEngineProfile({ id: worker.id, name: worker.name, source: "tew" });
+    const contract = record.contracts.find((item) => item.id === decision.contractId);
+    const ringName = contract?.ringName || worker.name;
+    const base = createMatchEngineProfile({ id: worker.id, name: ringName, source: "tew" });
     const existing = byKey.get(base.workerKey);
     if (existing && !replaceExisting && !untouchedProfile(existing)) {
       preserved += 1;
@@ -626,12 +628,13 @@ export function applyStartingRosterToMatchEngine(
     const profile: MatchEngineProfile = {
       ...(existing ?? base),
       workerId: worker.id,
-      workerName: worker.name,
+      workerName: ringName,
       workerSource: "tew",
       styleId: styleId(worker.style),
       overall: decision.workbookMetrics.overallRating,
       health: decision.workbookMetrics.matchHealth,
       popularity: decision.workbookMetrics.popularityRating,
+      momentum: contract?.momentum ?? existing?.momentum ?? base.momentum,
       experience: decision.workbookMetrics.realInRingExperience,
       fanReaction: Math.max(1, Math.min(5, decision.workbookMetrics.perceptionRating || 1)),
       gimmick: Math.max(1, Math.min(5, decision.workbookMetrics.gimmickStarRating || 1)),
