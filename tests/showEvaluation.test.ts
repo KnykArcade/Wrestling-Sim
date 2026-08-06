@@ -10,6 +10,7 @@ import {
   finalizeAngleEvaluation,
 } from "../src/showEvaluation/model";
 import { parseShowEvaluationUniverse } from "../src/showEvaluation/storage";
+import type { StartingUniverseCompany } from "../src/startingUniverse/types";
 
 function angleShow() {
   const show = createPlannedShow(1);
@@ -82,6 +83,38 @@ describe("Phase 6B7 angle resolution and show evaluation", () => {
   });
 
   test("loads older storage safely with neutral defaults", () => {
-    expect(parseShowEvaluationUniverse({ angleEvaluations: [] })).toEqual({ angleEvaluations: [], workerImpacts: [], showReports: [], promotionPopularity: 50 });
+    expect(parseShowEvaluationUniverse({ angleEvaluations: [] })).toEqual({ angleEvaluations: [], workerImpacts: [], showReports: [], promotionPopularity: 50, promotionPopularitySeeded: false });
+  });
+
+  test("uses imported strength, the real main event, crowd carryover, expectations, and venue capacity", () => {
+    const { show, angle } = angleShow();
+    const second = { ...createPlannedSegment("angle"), id: "main-event", title: "Main Event Celebration", segmentOutput: angle.segmentOutput, purpose: angle.purpose, workers: angle.workers };
+    const post = { ...createPlannedSegment("angle"), id: "post-show", title: "Post Show Interview", section: "Post-Show" as const, segmentOutput: angle.segmentOutput, purpose: angle.purpose, workers: angle.workers };
+    show.segments = [angle, second, post];
+    show.venueCapacity = 600;
+    show.marketDemand = 90;
+    const company: StartingUniverseCompany = { id: "pwl", name: "Pro Wrestling League", initials: "PWL", profile: "", active: true, userControlled: true, basedIn: "USA", size: "Small", prestige: 35, ranking: 0, momentum: 40, money: 0, ownerName: "", headBookerName: "", styleName: "", productBase: "" };
+    let evaluations = emptyShowEvaluationUniverse();
+    let profiles = [createMatchEngineProfile({ id: "pac", name: "PAC", source: "manual" }), createMatchEngineProfile({ id: "white", name: "Jay White", source: "manual" })];
+    for (const segment of show.segments) {
+      const finalized = finalizeAngleEvaluation(calculateAngleEvaluation(show, segment, profiles), 60, "Fixed score for a golden show calculation.");
+      const applied = applyAngleEvaluation(evaluations, finalized, profiles);
+      evaluations = applied.universe;
+      profiles = applied.profiles;
+    }
+    let session = startLiveCardSession(createLiveCardSession(show, { records: [], settings: { defaultImportance: "Television", defaultChemistry: 0, defaultVolatility: 8, requireOverrideReason: true, selectedShowId: "", selectedSegmentId: "" } }));
+    for (const segment of show.segments) session = completeAngleSegment(session, segment.id, segment.segmentOutput, "", "");
+    session = completeLiveCard(session);
+    const evaluated = evaluateCompletedShow(evaluations, show, session, { company, profiles });
+    const report = evaluated.showReports[0];
+    expect(report.promotionStrength).toMatchObject({ source: "Imported Company", companyName: "Pro Wrestling League", companySize: "Small" });
+    expect(report.promotionPopularityBefore).not.toBe(50);
+    expect(report.segments.find((item) => item.segmentId === "main-event")).toMatchObject({ mainEvent: true, importanceWeight: 1.4 });
+    expect(report.segments.find((item) => item.segmentId === "post-show")).toMatchObject({ mainEvent: false, importanceWeight: .65 });
+    expect(report.segments[1].crowdModifier).not.toBe(report.segments[0].crowdModifier);
+    expect(report.expectedShowScore).toBeLessThanOrEqual(60);
+    expect(report.promotionPopularityDelta).toBeGreaterThanOrEqual(0);
+    expect(report.estimatedAttendance).toBe(600);
+    expect(report.attendanceCalculation).toMatchObject({ venueCapacity: 600, capacityLimited: true });
   });
 });

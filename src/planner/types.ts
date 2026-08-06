@@ -135,6 +135,8 @@ export interface PlannedShow {
   company: string;
   showType: string;
   venue: string;
+  venueCapacity: number;
+  marketDemand: number;
   expectedMinutes: number;
   status: PlannedShowStatus;
   notes: string;

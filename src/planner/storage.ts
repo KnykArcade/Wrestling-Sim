@@ -251,6 +251,8 @@ function normalizeShow(value: unknown): PlannedShow | null {
     company: text(value.company),
     showType: text(value.showType, "Television"),
     venue: text(value.venue),
+    venueCapacity: Math.max(0, Math.round(finiteNumber(value.venueCapacity, 0))),
+    marketDemand: Math.max(0, Math.min(100, finiteNumber(value.marketDemand, 50))),
     expectedMinutes: Math.max(15, finiteNumber(value.expectedMinutes, 120)),
     status,
     notes: text(value.notes),

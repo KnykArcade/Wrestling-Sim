@@ -4,6 +4,7 @@ import { createPlannerId } from "../planner/model";
 import type { AnglePerformanceRole, PlannedSegment, PlannedShow, PlannedWorkerReference } from "../planner/types";
 import type { LiveCardSession } from "../liveCard/types";
 import { CALCULATION_SYSTEM_VERSION } from "../calculations/foundation";
+import type { StartingUniverseCompany } from "../startingUniverse/types";
 import type {
   AngleEvaluation,
   AngleParticipantEvaluation,
@@ -11,6 +12,8 @@ import type {
   CrowdProgressionEntry,
   ShowEvaluationReport,
   ShowEvaluationUniverse,
+  PromotionStrengthSnapshot,
+  AttendanceCalculation,
 } from "./types";
 
 function clamp(value: number, minimum = 0, maximum = 100): number {
@@ -171,49 +174,149 @@ function reaction(score: number): string {
   return "Poor";
 }
 
-export function evaluateCompletedShow(universe: ShowEvaluationUniverse, show: PlannedShow, session: LiveCardSession): ShowEvaluationUniverse {
+export interface ShowEvaluationContext {
+  company?: StartingUniverseCompany | null;
+  profiles?: MatchEngineProfile[];
+}
+
+function sizeScore(size: string): number {
+  const value = normalized(size);
+  const exact: Record<string, number> = {
+    insignificant: 15, tiny: 25, local: 25, small: 40, regional: 45, medium: 55,
+    big: 70, national: 75, large: 82, huge: 90, international: 92, global: 100, titanic: 100,
+  };
+  return exact[value] ?? 50;
+}
+
+function sizeAttendanceBaseline(size: string): number {
+  const score = sizeScore(size);
+  if (score >= 95) return 50000;
+  if (score >= 85) return 25000;
+  if (score >= 78) return 12000;
+  if (score >= 65) return 6000;
+  if (score >= 50) return 2500;
+  if (score >= 35) return 1000;
+  if (score >= 20) return 400;
+  return 150;
+}
+
+function showImportance(showType: string): number {
+  if (/pay.per.view|ppv|premium|major|classic|final/i.test(showType)) return 3;
+  if (/special|competition|event/i.test(showType)) return 2;
+  if (/television|tv/i.test(showType)) return 1;
+  if (/house|tour/i.test(showType)) return -1;
+  return 0;
+}
+
+export function promotionStrength(company: StartingUniverseCompany | null | undefined, savedPopularity: number): { popularity: number; snapshot: PromotionStrengthSnapshot } {
+  if (!company) return {
+    popularity: clamp(savedPopularity),
+    snapshot: { source: "Saved Promotion", companyName: "", companySize: "Medium", sizeScore: 50, prestige: clamp(savedPopularity), momentum: 50 },
+  };
+  const companySizeScore = sizeScore(company.size);
+  const prestige = clamp(company.prestige);
+  const momentum = clamp(company.momentum);
+  return {
+    popularity: round(clamp(prestige * .55 + companySizeScore * .35 + momentum * .1)),
+    snapshot: { source: "Imported Company", companyName: company.name, companySize: company.size, sizeScore: companySizeScore, prestige, momentum },
+  };
+}
+
+function expectedCardStrength(show: PlannedShow, profiles: MatchEngineProfile[]): number {
+  const keys = new Set<string>();
+  const values: number[] = [];
+  show.segments.forEach((segment) => segment.workers.forEach((worker) => {
+    const key = workerKey(worker);
+    if (keys.has(key)) return;
+    keys.add(key);
+    const profile = profileFor(worker, profiles);
+    if (!profile) return;
+    values.push(profile.overall * .45 + profile.popularity * .35 + clamp(profile.momentum + 50) * .1 + profile.health * .1);
+  }));
+  return round(values.length ? values.reduce((total, value) => total + value, 0) / values.length : 50);
+}
+
+function attendanceForShow(
+  show: PlannedShow,
+  popularity: number,
+  strength: PromotionStrengthSnapshot,
+  cardStrength: number,
+  recentPerformance: number,
+): { attendance: number; calculation: AttendanceCalculation } {
+  const importance = showImportance(show.showType);
+  const market = clamp(show.marketDemand ?? 50);
+  const base = sizeAttendanceBaseline(strength.companySize);
+  const popularityFactor = .45 + clamp(popularity) / 100 * .75;
+  const marketFactor = .55 + market / 100 * .9;
+  const cardFactor = .75 + clamp(cardStrength) / 100 * .5;
+  const recentFactor = .85 + clamp(recentPerformance) / 100 * .3;
+  const importanceFactor = importance === 3 ? 1.35 : importance === 2 ? 1.18 : importance === 1 ? 1 : importance === -1 ? .75 : .9;
+  const momentumFactor = .8 + clamp(strength.momentum) / 100 * .4;
+  const unconstrainedDemand = Math.max(50, Math.round(base * popularityFactor * marketFactor * cardFactor * recentFactor * importanceFactor * momentumFactor));
+  const venueCapacity = Math.max(0, Math.round(show.venueCapacity ?? 0));
+  const attendance = venueCapacity > 0 ? Math.min(venueCapacity, unconstrainedDemand) : unconstrainedDemand;
+  return {
+    attendance,
+    calculation: { expectedCardStrength: cardStrength, marketDemand: market, recentPerformance: round(recentPerformance), showImportance: importance, venueCapacity, unconstrainedDemand, capacityLimited: venueCapacity > 0 && attendance < unconstrainedDemand },
+  };
+}
+
+export function evaluateCompletedShow(universe: ShowEvaluationUniverse, show: PlannedShow, session: LiveCardSession, context: ShowEvaluationContext = {}): ShowEvaluationUniverse {
   const existing = universe.showReports.find((report) => report.showId === show.id);
   if (existing) return universe;
   if (session.status !== "Completed") throw new Error("Complete the live show before calculating its final evaluation.");
   const completed = session.progress.filter((item) => item.status === "Completed");
   if (!completed.length) throw new Error("A show needs at least one completed segment to receive a final evaluation.");
-  let crowd = 50;
+  const seeded = promotionStrength(context.company, universe.promotionPopularity);
+  const promotionPopularityBefore = universe.promotionPopularitySeeded ? universe.promotionPopularity : seeded.popularity;
+  const strength = context.company ? seeded.snapshot : { ...seeded.snapshot, source: universe.promotionPopularitySeeded ? "Saved Promotion" as const : "Estimated Baseline" as const };
+  const importance = showImportance(show.showType);
+  const crowdStart = round(clamp(42 + promotionPopularityBefore * .15 + importance * 2.5, 35, 70));
+  const segmentExpectation = round(clamp(50 + promotionPopularityBefore * .15, 50, 68));
+  let crowd = crowdStart;
   let weightedTotal = 0;
   let totalWeight = 0;
+  const mainShowIds = completed.filter((progress) => show.segments.find((segment) => segment.id === progress.segmentId)?.section === "Main Show").map((progress) => progress.segmentId);
+  const mainEventId = mainShowIds[mainShowIds.length - 1] ?? "";
   const segments: CrowdProgressionEntry[] = completed.map((progress, index) => {
     const segment = show.segments.find((item) => item.id === progress.segmentId);
     const angle = universe.angleEvaluations.find((item) => item.segmentId === progress.segmentId && item.appliedAt);
     const score = progress.type === "match" ? progress.result?.finalResult.matchScore ?? 0 : angle?.finalScore ?? 0;
-    const isLast = index === completed.length - 1;
-    const weight = segment?.section === "Main Show" ? (isLast ? 1.4 : 1) : .65;
+    const isMainEvent = progress.segmentId === mainEventId;
+    const weight = segment?.section === "Main Show" ? (isMainEvent ? 1.4 : 1) : .65;
     const before = crowd;
-    crowd = round(clamp(crowd + (score - 60) / 7, 0, 100));
-    weightedTotal += score * weight;
+    const crowdModifier = round(clamp((before - 50) * .08, -4, 4));
+    const receptionScore = round(clamp(score + crowdModifier));
+    crowd = round(clamp(crowd + (receptionScore - segmentExpectation) / 7, 0, 100));
+    weightedTotal += receptionScore * weight;
     totalWeight += weight;
-    return { segmentId: progress.segmentId, segmentTitle: progress.title, segmentType: progress.type, score: round(score), importanceWeight: weight, crowdBefore: before, crowdAfter: crowd, reaction: reaction(score) };
+    return { segmentId: progress.segmentId, segmentTitle: progress.title, segmentType: progress.type, score: round(score), receptionScore, crowdModifier, importanceWeight: weight, mainEvent: isMainEvent, crowdBefore: before, crowdAfter: crowd, reaction: reaction(receptionScore) };
   });
   const overallScore = round(weightedTotal / totalWeight);
-  const promotionPopularityBefore = universe.promotionPopularity;
-  const promotionPopularityDelta = round(clamp((overallScore - 65) / 12, -2.5, 2.5));
+  const expectedShowScore = round(clamp(48 + promotionPopularityBefore * .18 + strength.prestige * .12 + importance, 45, 82));
+  const promotionPopularityDelta = round(clamp((overallScore - expectedShowScore) / 10, -2.5, 2.5));
   const promotionPopularityAfter = round(clamp(promotionPopularityBefore + promotionPopularityDelta));
-  const showTypeMultiplier = /pay.per.view|ppv|premium/i.test(show.showType) ? 1.35 : /television|tv/i.test(show.showType) ? 1.1 : 1;
-  const estimatedAttendance = Math.max(100, Math.round((350 + promotionPopularityBefore * 85 + overallScore * 25) * showTypeMultiplier));
+  const cardStrength = expectedCardStrength(show, context.profiles ?? []);
+  const recentReports = universe.showReports.slice(0, 5);
+  const recentPerformance = recentReports.length ? recentReports.reduce((total, report) => total + report.overallScore, 0) / recentReports.length : expectedShowScore;
+  const attendanceResult = attendanceForShow(show, promotionPopularityBefore, strength, cardStrength, recentPerformance);
   const timestamp = now();
   const report: ShowEvaluationReport = {
-    id: createPlannerId(), showId: show.id, showName: show.name, showDate: show.date, calculationVersion: CALCULATION_SYSTEM_VERSION, overallScore, audienceReaction: reaction(overallScore), estimatedAttendance,
-    promotionPopularityBefore, promotionPopularityAfter, promotionPopularityDelta, crowdStart: 50, crowdFinish: crowd, segments,
+    id: createPlannerId(), showId: show.id, showName: show.name, showDate: show.date, calculationVersion: CALCULATION_SYSTEM_VERSION, overallScore, audienceReaction: reaction(overallScore), estimatedAttendance: attendanceResult.attendance, expectedShowScore, promotionStrength: strength, attendanceCalculation: attendanceResult.calculation,
+    promotionPopularityBefore, promotionPopularityAfter, promotionPopularityDelta, crowdStart, crowdFinish: crowd, segments,
     explanations: [
       "Every completed segment contributes its accepted score.",
-      "The final main-show segment carries 1.4× weight; other main-show segments carry 1×; pre-show and post-show segments carry 0.65×.",
-      "Crowd level moves after each segment according to how far its score is above or below 60.",
-      "Attendance is an in-game estimate based on promotion popularity, final show score, and show type.",
-      "Promotion popularity moves once from the final score and cannot be applied again by reopening the report.",
+      "The actual final main-show segment carries 1.4× weight; other main-show segments carry 1×; pre-show and post-show segments carry 0.65×.",
+      `The crowd began at ${crowdStart.toFixed(1)} from promotion strength and show importance, then affected how later segments were received.`,
+      `The promotion was expected to deliver a ${expectedShowScore.toFixed(1)} show; popularity changed according to performance above or below that expectation.`,
+      "Attendance uses promotion size and popularity, show importance, expected card strength, local market demand, recent show performance, momentum, and the venue ceiling.",
+      "Promotion popularity and attendance consequences apply once and cannot be duplicated by reopening the report.",
     ],
     createdAt: timestamp, appliedAt: timestamp,
   };
-  return { ...universe, promotionPopularity: promotionPopularityAfter, showReports: [report, ...universe.showReports] };
+  return { ...universe, promotionPopularity: promotionPopularityAfter, promotionPopularitySeeded: true, showReports: [report, ...universe.showReports] };
 }
 
 export function emptyShowEvaluationUniverse(): ShowEvaluationUniverse {
-  return { angleEvaluations: [], workerImpacts: [], showReports: [], promotionPopularity: 50 };
+  return { angleEvaluations: [], workerImpacts: [], showReports: [], promotionPopularity: 50, promotionPopularitySeeded: false };
 }
