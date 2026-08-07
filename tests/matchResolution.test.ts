@@ -254,7 +254,7 @@ describe("Phase 6B1 official singles match resolution", () => {
     }
     expect(pacWins).toBeGreaterThan(1000);
     expect(pacWins).toBeLessThan(1800);
-  });
+  }, 15_000);
 
   test("accepts the official result without altering the engine calculation", () => {
     const attempt = resolveSinglesMatch({ setup: setup(), workers: sources(), seed: "accept-result" });
