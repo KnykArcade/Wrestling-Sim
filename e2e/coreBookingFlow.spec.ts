@@ -11,7 +11,7 @@ test("creates a first show and a valid match from the primary booking path", asy
   await expect(page.getByText("Match added. Choose the format and wrestlers below.")).toBeVisible();
 
   const match = page.locator('[data-segment-type="match"]');
-  await match.getByLabel("Match format").selectOption("Tag Team");
+  await match.getByLabel("Match type").selectOption("Tag Team");
   for (const name of ["Alex Shelley", "Chris Sabin", "Mark Davis", "Kyle Fletcher"]) {
     await match.getByLabel("Manual worker name").fill(name);
     await match.getByRole("button", { name: "Add Manual Worker" }).click();

@@ -51,6 +51,8 @@ function normalizeProfile(value: unknown, index: number): WorkerProfile | null {
     source: sources.includes(text(value.source)) ? value.source as WorkerProfile["source"] : defaults.source,
     linkedTewWorkerId: text(value.linkedTewWorkerId),
     linkedTewWorkerName: text(value.linkedTewWorkerName),
+    companyId: text(value.companyId),
+    companyName: text(value.companyName),
     currentRole: text(value.currentRole, defaults.currentRole),
     alignment: alignments.includes(text(value.alignment)) ? value.alignment as WorkerProfile["alignment"] : defaults.alignment,
     brand: text(value.brand),

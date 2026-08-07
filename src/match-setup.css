@@ -5,6 +5,12 @@
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
+.match-settings-panel {
+  margin-top: 14px;
+  border: 1px solid #4f6f9f;
+  background: #081526;
+}
+
 .match-approach-setup__header {
   display: flex;
   align-items: flex-start;
@@ -29,7 +35,7 @@
 
 .match-approach-controls {
   display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) repeat(4, minmax(120px, 0.75fr));
+  grid-template-columns: repeat(2, minmax(170px, 1.15fr)) repeat(4, minmax(105px, .75fr));
   gap: 1px;
   background: #31527b;
   border-bottom: 1px solid #31527b;
@@ -146,6 +152,11 @@
   min-width: 0;
   border: 1px solid #35587f;
   background: #0b1b31;
+}
+
+.match-competitor-card--active {
+  border-color: #f1df42;
+  box-shadow: 0 0 0 1px rgba(241, 223, 66, .22);
 }
 
 .match-competitor-card > header {
@@ -351,6 +362,10 @@
   background: #08182b;
 }
 
+.approach-selection-board--shared {
+  margin: 10px;
+}
+
 .approach-selection-board__header {
   display: flex;
   align-items: center;
@@ -372,7 +387,7 @@
 
 .approach-candidate-list {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   padding: 8px;
 }
@@ -382,8 +397,8 @@
   grid-template-columns: 58px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px 10px;
-  min-height: 76px;
-  padding: 8px 10px;
+  min-height: 68px;
+  padding: 6px 8px;
   border: 1px solid #315278;
   border-left: 4px solid;
   background: linear-gradient(155deg, #102947, #0a1c32);
@@ -400,8 +415,8 @@
 .approach-rating-badge {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   border: 2px solid #59d38c;
   background: #091a2e;
@@ -501,6 +516,8 @@
   .match-profile-skill-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .approach-candidate-list { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 720px) {
