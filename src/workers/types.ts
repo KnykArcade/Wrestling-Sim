@@ -42,6 +42,8 @@ export interface WorkerProfile {
   source: WorkerSource;
   linkedTewWorkerId: string;
   linkedTewWorkerName: string;
+  companyId?: string;
+  companyName?: string;
   currentRole: string;
   alignment: WorkerAlignment;
   brand: string;

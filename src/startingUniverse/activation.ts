@@ -268,6 +268,8 @@ export function activateStartingUniverseData(
       displayName: contract?.ringName || worker.name,
       linkedTewWorkerId: worker.id,
       linkedTewWorkerName: worker.name,
+      companyId: company.id,
+      companyName: company.name,
       currentRole: decision.primaryRole,
       alignment: alignmentFor(contract),
       brand: contract?.brand ?? "",

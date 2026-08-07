@@ -11,7 +11,7 @@ test("resolves a tag match as teams and preserves the deciding fall", async ({ p
 
   const match = page.locator('[data-segment-type="match"]').first();
   await match.getByLabel("Segment name").fill("MCMG vs Aussie Open");
-  await match.getByLabel("Match format").selectOption("Tag Team");
+  await match.getByLabel("Match type").selectOption("Tag Team");
   for (const name of ["Alex Shelley", "Chris Sabin", "Mark Davis", "Kyle Fletcher"]) {
     await match.getByLabel("Manual worker name").fill(name);
     await match.getByRole("button", { name: "Add Manual Worker" }).click();

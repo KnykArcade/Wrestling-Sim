@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from "react";
 import type { PlannedSegment, PlannedWorkerReference } from "../planner/types";
-import { isMatchCompetitor } from "../planner/model";
+import { assignAutomaticMatchSides, isMatchCompetitor, MATCH_FORMATS, normalizeMatchFormat } from "../planner/model";
 import { MATCH_AIMS, MATCH_APPROACHES } from "./catalog";
 import MatchPerformancePreviewEditor from "./MatchPerformancePreview";
 import {
@@ -57,6 +57,33 @@ function resultTone(value: number): string {
   return "risk";
 }
 
+export function MatchSettingsEditor({ segment, universe, onChange }: { segment: PlannedSegment; universe: MatchEngineUniverse; onChange: (segment: PlannedSegment) => void }) {
+  const competitors = segment.workers.filter(isMatchCompetitor);
+  const recommendedSlots = approachSlotsForDuration(segment.durationMinutes);
+  const slots = segment.matchApproachSetup.approachLimit ?? recommendedSlots;
+  const aim = MATCH_AIMS.find((item) => item.id === segment.matchApproachSetup.matchAimId) ?? MATCH_AIMS[0];
+  const results = competitors.map((worker) => {
+    const profile = profileForWorker(universe, worker);
+    const plan = planForWorker(segment, worker);
+    return profile ? evaluateApproachPlan(profile, aim.id, segment.durationMinutes, plan.selectedApproachIds, slots) : null;
+  }).filter((result) => result !== null);
+  const projectedPace = results.length ? Math.round(results.reduce((sum, result) => sum + result.actualPace, 0) / results.length) : 0;
+  const paceEvaluation = evaluatePace(aim.idealPace, projectedPace);
+  const updateSetup = (patch: Partial<PlannedSegment["matchApproachSetup"]>) => onChange({ ...segment, matchApproachSetup: { ...segment.matchApproachSetup, ...patch, performancePreview: null, updatedAt: new Date().toISOString() } });
+
+  return <section className="match-settings-panel" aria-label="Match Settings">
+    <div className="match-settings-heading"><p className="eyebrow">MATCH SETTINGS</p><strong>Set the match before choosing the roster and individual strategies</strong></div>
+    <div className="match-approach-controls">
+      <label className="field"><span>Match type</span><select aria-label="Match type" value={normalizeMatchFormat(segment.matchType)} onChange={(event) => onChange(assignAutomaticMatchSides(segment, event.target.value as ReturnType<typeof normalizeMatchFormat>))}>{MATCH_FORMATS.map((item) => <option key={item}>{item}</option>)}</select></label>
+      <label className="field"><span>Length (minutes)</span><input aria-label="Length (minutes)" type="number" min={1} max={180} value={segment.durationMinutes} onChange={(event) => onChange({ ...segment, durationMinutes: Math.max(1, Number(event.target.value) || 1), matchApproachSetup: { ...segment.matchApproachSetup, performancePreview: null } })} /></label>
+      <label className="field"><span>Match aim</span><select aria-label="Match aim" value={aim.id} onChange={(event) => updateSetup({ matchAimId: event.target.value as PlannedSegment["matchApproachSetup"]["matchAimId"] })}>{MATCH_AIMS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <label className="field"><span>Approach limit</span><input aria-label="Approach limit per wrestler" type="number" min={1} max={8} value={slots} onChange={(event) => updateSetup({ approachLimit: Math.max(1, Math.min(8, Number(event.target.value) || recommendedSlots)) })} /><small>Recommended: {recommendedSlots}</small></label>
+      <div><span>Ideal pace</span><strong>{aim.idealPace === 0 ? "Open" : aim.idealPace}</strong></div>
+      <div className={`match-pace-result match-pace-result--${projectedPace && paceEvaluation.modifier < 0 ? "risk" : "balanced"}`}><span>Projected pace</span><strong>{projectedPace || "—"}</strong><small>{!projectedPace ? "Choose approaches" : paceEvaluation.status}</small></div>
+    </div>
+  </section>;
+}
+
 export default function MatchApproachSetupEditor({
   segment,
   universe,
@@ -69,6 +96,7 @@ export default function MatchApproachSetupEditor({
   onChange: (segment: PlannedSegment) => void;
 }) {
   const [editingProfileKey, setEditingProfileKey] = useState("");
+  const [activeStrategyKey, setActiveStrategyKey] = useState("");
   const competitors = useMemo(() => segment.workers.filter(isMatchCompetitor), [segment.workers]);
   const competitorSides = useMemo(() => {
     const groups = new Map<string, PlannedWorkerReference[]>();
@@ -189,15 +217,12 @@ export default function MatchApproachSetupEditor({
     upsertProfile({ ...profile, [field]: Math.max(min, Math.min(max, Number.isFinite(value) ? value : min)) });
   }
 
-  const planResults = competitors.map((worker) => {
-    const profile = profileForWorker(universe, worker);
-    const plan = planForWorker(segment, worker);
-    return profile ? evaluateApproachPlan(profile, aim.id, segment.durationMinutes, plan.selectedApproachIds, slots) : null;
-  }).filter((result) => result !== null);
-  const combinedPace = planResults.length > 0
-    ? Math.round(planResults.reduce((sum, result) => sum + result.actualPace, 0) / planResults.length)
-    : 0;
-  const combinedPaceEvaluation = evaluatePace(aim.idealPace, combinedPace);
+  const activeWorker = competitors.find((worker) => workerProfileKey(worker) === activeStrategyKey) ?? competitors[0] ?? null;
+  const activeKey = activeWorker ? workerProfileKey(activeWorker) : "";
+  const activePreviewProfile = activeWorker ? profileForWorker(universe, activeWorker) ?? createMatchEngineProfile(activeWorker) : null;
+  const activePlan = activeWorker ? planForWorker(segment, activeWorker) : null;
+  const activeCandidates = activePreviewProfile ? MATCH_APPROACHES.map((approach) => ({ approach, score: scoreApproachCandidate(activePreviewProfile, aim.id, approach) })).sort((left, right) => right.score.total - left.score.total || right.score.rating - left.score.rating || left.approach.name.localeCompare(right.approach.name)) : [];
+  const activeRecommendedIds = new Set(activeCandidates.slice(0, Math.min(3, activeCandidates.length)).map(({ approach }) => approach.id));
 
   return <section className="match-approach-setup" aria-label="Match approach setup">
     <header className="match-approach-setup__header">
@@ -209,15 +234,6 @@ export default function MatchApproachSetupEditor({
       <button className="primary-button" type="button" onClick={runAll} disabled={competitors.length === 0}>Run AI for All Competitors</button>
     </header>
 
-    <div className="match-settings-heading"><p className="eyebrow">MATCH SETTINGS</p><strong>Set time, approach limits, aim, and pace before choosing strategies</strong></div>
-    <div className="match-approach-controls">
-      <label className="field"><span>Match aim</span><select aria-label="Match aim" value={aim.id} onChange={(event) => updateSetup({ matchAimId: event.target.value as PlannedSegment["matchApproachSetup"]["matchAimId"] })}>{MATCH_AIMS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <div><span>Match time</span><strong>{segment.durationMinutes} minutes</strong></div>
-      <label className="field"><span>Approach limit per wrestler</span><input aria-label="Approach limit per wrestler" type="number" min={1} max={8} value={slots} onChange={(event) => updateSetup({ approachLimit: Math.max(1, Math.min(8, Number(event.target.value) || recommendedSlots)) })} /><small>Recommended: {recommendedSlots}</small></label>
-      <div><span>Ideal pace</span><strong>{aim.idealPace === 0 ? "Open" : aim.idealPace}</strong></div>
-      <div className={`match-pace-result match-pace-result--${combinedPace && combinedPaceEvaluation.modifier < 0 ? "risk" : "balanced"}`}><span>Projected pace</span><strong>{combinedPace || "—"}</strong><small>{!combinedPace ? "Choose approaches" : combinedPaceEvaluation.status}</small></div>
-    </div>
-
     {competitors.length === 0 ? <div className="match-approach-empty">
       Add the wrestlers to this match above. Managers, referees, announcers, and commentators are excluded from approach selection.
     </div> : <div className={`match-side-board match-side-board--${Math.min(competitorSides.length, 4)}`}>
@@ -227,19 +243,14 @@ export default function MatchApproachSetupEditor({
           {sideWorkers.map((worker) => {
         const key = workerProfileKey(worker);
         const profile = profileForWorker(universe, worker);
-        const previewProfile = profile ?? createMatchEngineProfile(worker);
         const plan = planForWorker(segment, worker);
         const result = profile ? evaluateApproachPlan(profile, aim.id, segment.durationMinutes, plan.selectedApproachIds, slots) : null;
         const averageApproachRating = result?.candidateScores.length ? result.candidateScores.reduce((total, score) => total + score.rating, 0) / result.candidateScores.length : 0;
-        const approachCandidates = MATCH_APPROACHES.map((approach) => ({
-          approach,
-          score: scoreApproachCandidate(previewProfile, aim.id, approach),
-        })).sort((left, right) => right.score.total - left.score.total || right.score.rating - left.score.rating || left.approach.name.localeCompare(right.approach.name));
-        const recommendedApproachIds = new Set(approachCandidates.slice(0, Math.min(3, approachCandidates.length)).map(({ approach }) => approach.id));
-        return <article className="match-competitor-card" key={key} data-match-worker={key}>
+        return <article className={`match-competitor-card${key === activeKey ? " match-competitor-card--active" : ""}`} key={key} data-match-worker={key}>
           <header>
             <div><h5>{worker.name}</h5><span>{worker.source === "tew" ? "Linked to TEW worker" : "Manual tracker worker"}</span></div>
             <div className="match-profile-actions">
+              <button className={key === activeKey ? "primary-button compact-button" : "secondary-button compact-button"} type="button" onClick={() => setActiveStrategyKey(key)}>{key === activeKey ? "Editing Strategy" : "Edit Strategy"}</button>
               {!profile ? <button className="secondary-button compact-button" type="button" onClick={() => { const created = ensureProfile(worker); setEditingProfileKey(created.workerKey); }}>Create Match Profile</button> : <button className="secondary-button compact-button" type="button" onClick={() => setEditingProfileKey(editingProfileKey === key ? "" : key)}>{editingProfileKey === key ? "Close Ratings" : "Edit Ratings"}</button>}
               <button className="primary-button compact-button" type="button" onClick={() => runAI(worker)}>Run Approach AI</button>
             </div>
@@ -291,40 +302,6 @@ export default function MatchApproachSetupEditor({
             })}
           </div>}
 
-          <section className="approach-selection-board" aria-label={`Approach Selection Board for ${worker.name}`}>
-            <header className="approach-selection-board__header">
-              <div><strong>Approach Selection Board</strong><span>All options ranked for {worker.name}</span></div>
-              <b>{plan.selectedApproachIds.length >= slots ? "All slots filled" : `${slots - plan.selectedApproachIds.length} selection${slots - plan.selectedApproachIds.length === 1 ? "" : "s"} remaining`}</b>
-            </header>
-            <div className="approach-candidate-list" aria-label={`Available approaches for ${worker.name}`}>
-              {approachCandidates.map(({ approach, score }) => {
-                const selectedIndex = plan.selectedApproachIds.indexOf(approach.id);
-                const selected = selectedIndex >= 0;
-                const slotsFilled = plan.selectedApproachIds.length >= slots;
-                return <article
-                  className={`approach-candidate approach-candidate--${resultTone(score.rating)}${selected ? " approach-candidate--selected" : ""}`}
-                  key={approach.id}
-                  aria-label={`${approach.name}, rating ${score.rating.toFixed(1)}, ${ratingLabel(score.rating)}${selected ? `, selected in slot ${selectedIndex + 1}` : ""}`}
-                >
-                  <div className="approach-rating-badge" aria-hidden="true">
-                    <span><b>{score.rating.toFixed(1)}</b><small>Rating</small></span>
-                  </div>
-                  <div className="approach-candidate__content">
-                    <div className="approach-candidate__title"><strong>{approach.name}</strong><span className={`approach-quality approach-quality--${resultTone(score.rating)}`}>{ratingLabel(score.rating)}</span>{recommendedApproachIds.has(approach.id) && <span className="approach-recommended">Recommended</span>}</div>
-                    <p>{approach.summary}</p>
-                    <div className="approach-candidate__fit">
-                      <span>Style <b>{score.styleBonus > 0 ? "Strong fit" : "Neutral"}</b></span>
-                      <span>Match aim <b>{score.aimCompatibility > 0 ? "Strong fit" : score.aimCompatibility < 0 ? "Clash" : "Neutral"}</b></span>
-                      <span>Pace <b>{score.paceBonus >= 5 ? "Ideal" : score.paceBonus >= 0 ? "Usable" : "Risk"}</b></span>
-                      <span>Stamina <b>{approach.staminaCost}</b></span>
-                    </div>
-                  </div>
-                  <button className={selected ? "primary-button compact-button approach-add-button" : "secondary-button compact-button approach-add-button"} type="button" aria-label={selected ? `${approach.name} selected for ${worker.name} in slot ${selectedIndex + 1}` : `Select ${approach.name} for ${worker.name}`} disabled={selected || slotsFilled} onClick={() => addManualApproach(worker, approach.id)}>{selected ? `Selected ${selectedIndex + 1}` : "Select"}</button>
-                </article>;
-              })}
-            </div>
-          </section>
-
           {result && <div className="approach-plan-explanation">{result.explanation.map((line) => <span key={line}>{line}</span>)}</div>}
           {plan.selectedApproachIds.length > slots && <div className="source-warning"><strong>Too many approaches</strong><span>This match length allows {slots}. Run the AI again or remove approaches manually.</span></div>}
         </article>;
@@ -333,6 +310,29 @@ export default function MatchApproachSetupEditor({
         {sideIndex < competitorSides.length - 1 && <div className="match-vs-divider" aria-hidden="true"><span>VS</span></div>}
       </Fragment>)}
     </div>}
+
+    {activeWorker && activePlan && <section className="approach-selection-board approach-selection-board--shared" aria-label={`Approach Selection Board for ${activeWorker.name}`}>
+      <header className="approach-selection-board__header">
+        <div><strong>Approach Selection Board</strong><span>Editing {activeWorker.name} · choose another competitor above to switch</span></div>
+        <b>{activePlan.selectedApproachIds.length >= slots ? "All slots filled" : `${slots - activePlan.selectedApproachIds.length} selection${slots - activePlan.selectedApproachIds.length === 1 ? "" : "s"} remaining`}</b>
+      </header>
+      <div className="approach-candidate-list" aria-label={`Available approaches for ${activeWorker.name}`}>
+        {activeCandidates.map(({ approach, score }) => {
+          const selectedIndex = activePlan.selectedApproachIds.indexOf(approach.id);
+          const selected = selectedIndex >= 0;
+          const slotsFilled = activePlan.selectedApproachIds.length >= slots;
+          return <article className={`approach-candidate approach-candidate--${resultTone(score.rating)}${selected ? " approach-candidate--selected" : ""}`} key={approach.id} aria-label={`${approach.name}, rating ${score.rating.toFixed(1)}, ${ratingLabel(score.rating)}${selected ? `, selected in slot ${selectedIndex + 1}` : ""}`}>
+            <div className="approach-rating-badge" aria-hidden="true"><span><b>{score.rating.toFixed(1)}</b><small>Rating</small></span></div>
+            <div className="approach-candidate__content">
+              <div className="approach-candidate__title"><strong>{approach.name}</strong><span className={`approach-quality approach-quality--${resultTone(score.rating)}`}>{ratingLabel(score.rating)}</span>{activeRecommendedIds.has(approach.id) && <span className="approach-recommended">Recommended</span>}</div>
+              <p>{approach.summary}</p>
+              <div className="approach-candidate__fit"><span>Style <b>{score.styleBonus > 0 ? "Strong fit" : "Neutral"}</b></span><span>Match aim <b>{score.aimCompatibility > 0 ? "Strong fit" : score.aimCompatibility < 0 ? "Clash" : "Neutral"}</b></span><span>Pace <b>{score.paceBonus >= 5 ? "Ideal" : score.paceBonus >= 0 ? "Usable" : "Risk"}</b></span><span>Stamina <b>{approach.staminaCost}</b></span></div>
+            </div>
+            <button className={selected ? "primary-button compact-button approach-add-button" : "secondary-button compact-button approach-add-button"} type="button" aria-label={selected ? `${approach.name} selected for ${activeWorker.name} in slot ${selectedIndex + 1}` : `Select ${approach.name} for ${activeWorker.name}`} disabled={selected || slotsFilled} onClick={() => addManualApproach(activeWorker, approach.id)}>{selected ? `Selected ${selectedIndex + 1}` : "Select"}</button>
+          </article>;
+        })}
+      </div>
+    </section>}
 
     <label className="field match-approach-notes"><span>Approach and road-agent notes</span><textarea rows={3} value={segment.matchApproachSetup.notes} placeholder="Explain why an approach is locked, how the styles should interact, or what should be copied into TEW road-agent notes." onChange={(event) => updateSetup({ notes: event.target.value })} /></label>
 

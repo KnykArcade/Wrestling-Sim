@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("uses a compact TEW-style card and previews wrestler approach quality before selection", async ({ page }) => {
+test("uses one compact TEW-style strategy board and preserves each wrestler's selections", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Create First Show" }).first().click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
@@ -17,11 +17,11 @@ test("uses a compact TEW-style card and previews wrestler approach quality befor
   await expect(match.getByLabel("Segment name")).toHaveValue("Jay White vs PAC");
 
   const jay = match.locator('[data-match-worker="manual:jay white"]');
-  const choices = jay.getByLabel("Available approaches for Jay White");
-  await expect(jay.getByText("Approach Selection Board", { exact: true })).toBeVisible();
+  const choices = match.getByLabel("Available approaches for Jay White");
+  await expect(match.getByText("Approach Selection Board", { exact: true })).toHaveCount(1);
   await expect(choices.locator(".approach-candidate")).toHaveCount(16);
   const firstChoice = choices.locator(".approach-candidate").first();
-  await expect(firstChoice).toHaveCSS("min-height", "76px");
+  await expect(firstChoice).toHaveCSS("min-height", "68px");
   await expect(firstChoice.locator(".approach-rating-badge b")).toHaveText(/\d+\.\d/);
   const fitIndicators = firstChoice.locator(".approach-candidate__fit span");
   await expect(fitIndicators.filter({ hasText: /^Style / })).toHaveText(/^Style (Strong fit|Neutral)$/);
@@ -37,6 +37,11 @@ test("uses a compact TEW-style card and previews wrestler approach quality befor
   await expect(firstChoice.getByRole("button", { name: /selected for Jay White in slot 1/i })).toBeDisabled();
   await expect(jay.getByText(/stamina remaining/)).toBeVisible();
 
+  const pac = match.locator('[data-match-worker="manual:pac"]');
+  await pac.getByRole("button", { name: "Edit Strategy" }).click();
+  await expect(match.getByLabel("Available approaches for PAC").locator(".approach-candidate")).toHaveCount(16);
+  await expect(jay.locator(".selected-approach-row")).toHaveCount(1);
+
   await match.getByRole("button", { name: "Save and Close" }).click();
   await expect(page.locator('[data-segment-type="match"]')).toHaveCount(0);
   const card = page.getByLabel("Current card summary");
@@ -44,5 +49,34 @@ test("uses a compact TEW-style card and previews wrestler approach quality befor
   await card.getByRole("button", { name: /Jay White vs PAC/ }).click();
   await expect(page.locator('[data-segment-type="match"]')).toHaveCount(1);
   await expect(page.getByLabel("Segment name")).toHaveValue("Jay White vs PAC");
-  await expect(jay.locator(".selected-approach-row")).toHaveCount(1);
+  await expect(page.locator('[data-match-worker="manual:jay white"] .selected-approach-row')).toHaveCount(1);
+});
+
+test("defaults booking to the activated company roster and keeps outside talent optional", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    localStorage.clear();
+    localStorage.setItem("wrestling-sim:starting-universe-activation:v1", JSON.stringify({ activeUniverseId: "pwl", activeCompanyId: "pwl", activeCompanyName: "Pro Wrestling League", gameDate: "2019-01-02", activatedAt: "2019-01-02T00:00:00.000Z", nextShowId: "", ledger: {}, lastReport: null }));
+    localStorage.setItem("tew-story-tracker:workers:v1", JSON.stringify({ profiles: [
+      { id: "strong", displayName: "Roderick Strong", source: "tew", linkedTewWorkerId: "w1", linkedTewWorkerName: "Roderick Strong", currentRole: "Wrestler" },
+      { id: "ricochet", displayName: "Ricochet", source: "tew", linkedTewWorkerId: "w2", linkedTewWorkerName: "Trevor Mann", currentRole: "Wrestler" },
+      { id: "nigel", displayName: "Nigel McGuinness", source: "tew", linkedTewWorkerId: "w3", linkedTewWorkerName: "Nigel McGuinness", currentRole: "Announcer" },
+      { id: "cage", displayName: "Brian Cage", source: "tew", linkedTewWorkerId: "w4", linkedTewWorkerName: "Brian Cage", companyId: "impact", companyName: "Impact Wrestling", currentRole: "Wrestler" }
+    ], relationships: [] }));
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Create First Show" }).first().click();
+  await page.getByRole("button", { name: "Create Show" }).first().click();
+  await page.getByRole("button", { name: "Add Match" }).click();
+  const match = page.locator('[data-segment-type="match"]');
+
+  await expect(match.getByLabel("Booking Company")).toHaveValue("Pro Wrestling League");
+  await expect(match.getByLabel("Company wrestler").locator("option")).toHaveText(["Select a wrestler", "Ricochet", "Roderick Strong"]);
+  await expect(match.getByText("2 active wrestlers in this company roster.")).toBeVisible();
+  await expect(match.getByLabel("Length (minutes)")).toHaveCount(1);
+  await expect(match.getByLabel("Length (minutes)")).toBeVisible();
+  await expect(match.getByLabel("Match type")).toBeVisible();
+  await expect(match.getByText("Nigel McGuinness")).toHaveCount(0);
+  await match.getByLabel("Booking Company").selectOption("Impact Wrestling");
+  await expect(match.getByLabel("Company wrestler").locator("option")).toHaveText(["Select a wrestler", "Brian Cage"]);
 });
