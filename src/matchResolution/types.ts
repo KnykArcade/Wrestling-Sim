@@ -238,6 +238,7 @@ export interface MatchResolutionFinalResult {
   starRating: number;
   performanceRating?: number;
   audience?: LiveAudienceResult;
+  upset?: boolean;
   acceptedEngineResult: boolean;
   overrideReason: string;
   finalizedAt: string;

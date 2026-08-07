@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { calculateLiveMatchAudience, calculateMatchAnticipation, crowdHeatLabel, momentumLabel, projectedCrowdBeforeForSegment } from "../src/crowd/model";
 import { createMatchEngineProfile } from "../src/matchEngine/model";
-import type { MatchPerformancePreview } from "../src/matchEngine/types";
+import { generateMatchPerformancePreview } from "../src/matchEngine/performance";
 import { createPlannedSegment } from "../src/planner/model";
 
 describe("Phase 6B18 momentum, anticipation, and live crowd dynamics", () => {
@@ -63,13 +63,37 @@ describe("Phase 6B18 momentum, anticipation, and live crowd dynamics", () => {
       { id: "star", name: "Star", source: "manual", role: "Wrestler", side: "Side 1" },
       { id: "opponent", name: "Opponent", source: "manual", role: "Wrestler", side: "Side 2" },
     ];
-    opener.matchApproachSetup.performancePreview = { matchScore: 90 } as MatchPerformancePreview;
     const second = createPlannedSegment("match");
     second.id = "second";
     const star = createMatchEngineProfile(opener.workers[0]);
     const opponent = createMatchEngineProfile(opener.workers[1]);
     star.popularity = 85;
     opponent.popularity = 70;
+    opener.matchApproachSetup.workerPlans = [star, opponent].map((profile) => ({
+      workerKey: profile.workerKey,
+      workerName: profile.workerName,
+      selectedApproachIds: ["chain-technician"],
+      lockedApproachIds: [],
+      mode: "Manual" as const,
+      generatedAt: "",
+    }));
+    opener.matchApproachSetup.performancePreview = generateMatchPerformancePreview({
+      workers: [star, opponent].map((profile, index) => ({
+        profile,
+        plan: opener.matchApproachSetup.workerPlans[index],
+        teamId: `side ${index + 1}`,
+        teamName: profile.workerName,
+      })),
+      aimId: opener.matchApproachSetup.matchAimId,
+      durationMinutes: opener.durationMinutes,
+      plannedWinner: "",
+      settings: opener.matchApproachSetup.performanceSettings,
+      importance: "Television",
+      matchType: opener.matchType,
+      format: "Singles",
+      eliminationRules: false,
+      seed: "crowd-projection",
+    });
 
     const afterOpener = projectedCrowdBeforeForSegment({ segments: [opener, second], segmentId: second.id, profiles: [star, opponent], crowdStart: 50 });
     const whenOpening = projectedCrowdBeforeForSegment({ segments: [second, opener], segmentId: second.id, profiles: [star, opponent], crowdStart: 50 });

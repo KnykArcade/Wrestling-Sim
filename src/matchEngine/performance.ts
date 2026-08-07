@@ -1,7 +1,8 @@
 import { CALCULATION_SYSTEM_VERSION, calculateStarRating } from "../calculations/foundation";
 import { importedApproachIdForMatchEngineId } from "../startingUniverse/formulas";
 import { resolveMatch } from "../matchResolution/engine";
-import type { MatchResolutionSetup, MatchResolutionWorkerSettings, ResolutionApproachId } from "../matchResolution/types";
+import type { MatchResolutionImportance, MatchResolutionSetup, MatchResolutionWorkerSettings, ResolutionApproachId } from "../matchResolution/types";
+import type { StartingUniverseWorkbookMetrics } from "../startingUniverse/types";
 import { evaluateApproachPlan, normalizeApproachName } from "./model";
 import type {
   MatchEngineProfile,
@@ -10,10 +11,27 @@ import type {
   MatchWorkerApproachPlan,
   MatchAimId,
 } from "./types";
+import {
+  performancePreviewInputFingerprint,
+  performancePreviewProfileFingerprint,
+  performancePreviewSetupFingerprint,
+} from "./previewIntegrity";
+export {
+  currentPerformancePreview,
+  performancePreviewInputFingerprint,
+  performancePreviewIsCurrent,
+  performancePreviewProfileFingerprint,
+  performancePreviewSetupFingerprint,
+  resolveMatchFormat,
+  resolveMatchImportance,
+} from "./previewIntegrity";
 
 export interface MatchPerformanceWorkerInput {
   profile: MatchEngineProfile;
   plan: MatchWorkerApproachPlan;
+  workbookMetrics?: StartingUniverseWorkbookMetrics | null;
+  teamId?: string;
+  teamName?: string;
 }
 
 export interface GenerateMatchPerformanceInput {
@@ -23,53 +41,13 @@ export interface GenerateMatchPerformanceInput {
   approachLimit?: number | null;
   plannedWinner: string;
   settings: MatchPerformanceSettings;
+  importance?: MatchResolutionImportance;
+  matchType?: string;
+  format?: NonNullable<MatchResolutionSetup["format"]>;
+  eliminationRules?: boolean;
   seed?: string;
 }
 
-export interface PerformancePreviewFingerprintInput {
-  workerPlans: Array<Pick<MatchWorkerApproachPlan, "workerKey" | "selectedApproachIds">>;
-  aimId: MatchAimId;
-  durationMinutes: number;
-  approachLimit?: number | null;
-  plannedWinner: string;
-  settings: MatchPerformanceSettings;
-}
-
-function fingerprintHash(value: string): string {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
-}
-
-export function performancePreviewSetupFingerprint(input: PerformancePreviewFingerprintInput): string {
-  const workers = input.workerPlans.map((plan) => ({
-    workerKey: plan.workerKey,
-    selectedApproachIds: plan.selectedApproachIds.slice(0, 4),
-  })).sort((left, right) => left.workerKey.localeCompare(right.workerKey));
-  return fingerprintHash(JSON.stringify({
-    version: CALCULATION_SYSTEM_VERSION,
-    aimId: input.aimId,
-    durationMinutes: input.durationMinutes,
-    approachLimit: input.approachLimit ?? null,
-    plannedWinner: normalizeApproachName(input.plannedWinner),
-    settings: input.settings,
-    workers,
-  }));
-}
-
-export function performancePreviewInputFingerprint(input: Pick<GenerateMatchPerformanceInput, "workers" | "aimId" | "durationMinutes" | "approachLimit" | "plannedWinner" | "settings">): string {
-  return performancePreviewSetupFingerprint({
-    workerPlans: input.workers.map((worker) => worker.plan),
-    aimId: input.aimId,
-    durationMinutes: input.durationMinutes,
-    approachLimit: input.approachLimit,
-    plannedWinner: input.plannedWinner,
-    settings: input.settings,
-  });
-}
 
 function round(value: number, places = 2): number {
   const factor = 10 ** places;
@@ -102,8 +80,8 @@ function workerSettings(input: GenerateMatchPerformanceInput, worker: MatchPerfo
     storyNeed: 0,
     momentum: worker.profile.momentum,
     bookingBias: input.settings.authority === "competitive-preview" && isPlannedWinner ? input.settings.bookingInfluence * 2 : 0,
-    teamId: worker.profile.workerKey,
-    teamName: worker.profile.workerName,
+    teamId: worker.teamId || worker.profile.workerKey,
+    teamName: worker.teamName || worker.profile.workerName,
   };
 }
 
@@ -115,22 +93,22 @@ export function generateMatchPerformancePreview(input: GenerateMatchPerformanceI
     showDate: "",
     segmentId: "preview",
     segmentTitle: "Booking Preview",
-    matchType: input.workers.length === 2 ? "1 vs. 1" : "Multi Person",
+    matchType: input.matchType ?? (input.workers.length === 2 ? "1 vs. 1" : "Multi Person"),
     durationMinutes: input.durationMinutes,
     approachLimit: input.approachLimit,
     aimId: input.aimId,
-    importance: "Television",
+    importance: input.importance ?? "Television",
     championship: "",
     competitionRound: "",
-    chemistry: 0,
+    chemistry: input.settings.chemistry ?? 0,
     volatility: input.settings.volatility,
-    format: input.workers.length === 2 ? "Singles" : "Multi Person",
-    eliminationRules: false,
+    format: input.format ?? (input.workers.length === 2 ? "Singles" : "Multi Person"),
+    eliminationRules: input.eliminationRules ?? false,
     workers: input.workers.map((worker) => workerSettings(input, worker)),
   };
   const attempt = resolveMatch({
     setup,
-    workers: input.workers.map((worker) => ({ profile: worker.profile, workbookMetrics: null })),
+    workers: input.workers.map((worker) => ({ profile: worker.profile, workbookMetrics: worker.workbookMetrics ?? null })),
     seed: input.seed,
   });
   const planPaceByWorker = new Map(input.workers.map((worker) => {
@@ -197,6 +175,19 @@ export function generateMatchPerformancePreview(input: GenerateMatchPerformanceI
     seed: attempt.seed,
     authority: input.settings.authority,
     calculationVersion: attempt.calculationVersion,
+    setupFingerprint: performancePreviewSetupFingerprint({
+      workerPlans: input.workers.map((worker) => ({ ...worker.plan, teamId: worker.teamId, teamName: worker.teamName })),
+      aimId: input.aimId,
+      durationMinutes: input.durationMinutes,
+      approachLimit: input.approachLimit,
+      plannedWinner: input.plannedWinner,
+      settings: input.settings,
+      importance: input.importance ?? "Television",
+      matchType: input.matchType,
+      format: input.format,
+      eliminationRules: input.eliminationRules,
+    }),
+    profileFingerprint: performancePreviewProfileFingerprint(input.workers),
     inputFingerprint: performancePreviewInputFingerprint(input),
     matchScore: attempt.engineResult.matchScore,
     starRating: attempt.engineResult.starRating,

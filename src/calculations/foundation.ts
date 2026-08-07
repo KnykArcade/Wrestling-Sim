@@ -1,4 +1,4 @@
-export const CALCULATION_SYSTEM_VERSION = "wrestling-sim-calculations-6b20a-v1";
+export const CALCULATION_SYSTEM_VERSION = "wrestling-sim-calculations-6b20b-v2";
 
 export interface CalculationFormulaDefinition {
   id: string;
@@ -51,20 +51,9 @@ export const CALCULATION_FORMULAS = {
     capMaximum: 100,
     roundingPlaces: 2,
   },
-  resolutionApproachPlan: {
-    id: "approach.resolution-plan",
-    label: "Official approach-plan selection",
-    formula: "Recommendation totals + (stamina modifier x 4) + (pace modifier x 1.4) + pace-variety bonus",
-    staminaModifierWeight: 4,
-    paceModifierWeight: 1.4,
-    diversityBonus: 3,
-    capMinimum: null,
-    capMaximum: null,
-    roundingPlaces: 2,
-  },
-  workbenchApproachPlan: {
-    id: "approach.workbench-plan",
-    label: "Workbench approach-plan score",
+  approachPlan: {
+    id: "approach.plan",
+    label: "Approach-plan score",
     formula: "Recommendation totals + (pace modifier x 1.5) + (stamina modifier x 3) + variety + long-match bonus - over-budget penalty",
     paceModifierWeight: 1.5,
     staminaModifierWeight: 3,
@@ -119,9 +108,8 @@ export const CALCULATION_FORMULAS = {
   approachExecution: {
     id: "performance.approach-execution",
     label: "Approach execution",
-    formula: "Approach rating + mental + stamina + (pace x 25%) + consistency + (chemistry x 30%) + (fit x 18%) + incident",
+    formula: "Approach rating + mental + stamina + (pace x 25%) + consistency + (fit x 18%) + incident",
     paceModifierWeight: 0.25,
-    chemistryWeight: 0.3,
     fitWeight: 0.18,
     capMinimum: 0,
     capMaximum: 100,
@@ -175,12 +163,11 @@ export const CALCULATION_FORMULAS = {
   matchQuality: {
     id: "match.raw-quality",
     label: "Raw in-ring match score",
-    formula: "Average performance 80% + structure 12% + closeness 8% + chemistry bonus - incident penalties",
+    formula: "Average performance 80% + structure 12% + closeness 8% + chemistry bonus",
     performanceWeight: 0.8,
     structureWeight: 0.12,
     closenessWeight: 0.08,
     chemistryWeight: 0.5,
-    incidentPenalty: 3,
     structureBaseline: 72,
     structurePaceWeight: 1.2,
     structureStaminaWeight: 2,

@@ -220,6 +220,8 @@ export interface MatchPerformanceSettings {
   authority: MatchOutcomeAuthority;
   volatility: number;
   bookingInfluence: number;
+  importance?: "Auto" | "Television" | "Feature" | "Main Event" | "Championship" | "Tournament";
+  chemistry?: number;
 }
 
 export interface MatchWorkerPerformanceResult {
@@ -252,6 +254,8 @@ export interface MatchPerformancePreview {
   seed: string;
   authority: MatchOutcomeAuthority;
   calculationVersion: string;
+  setupFingerprint?: string;
+  profileFingerprint?: string;
   inputFingerprint: string;
   matchScore: number;
   starRating: number;

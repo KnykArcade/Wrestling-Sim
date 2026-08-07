@@ -217,6 +217,8 @@ export function createEmptyMatchApproachSetup(): MatchApproachSetup {
       authority: "tew-authoritative",
       volatility: 5,
       bookingInfluence: 0,
+      importance: "Auto",
+      chemistry: 0,
     },
     performancePreview: null,
     updatedAt: "",
@@ -274,6 +276,32 @@ export function scoreApproachCandidate(
   return { approachId: approach.id, rating, styleBonus, aimCompatibility, paceBonus, staminaEfficiency, opponentCompatibility, total, reasons };
 }
 
+export function calculateApproachPlanScore(input: {
+  recommendationTotal: number;
+  paceModifier: number;
+  staminaModifier: number;
+  selectedPaces: number[];
+  includesBigMatchPerformer: boolean;
+  durationMinutes: number;
+  staminaUsed: number;
+  staminaAvailable: number;
+}): { total: number; diversityBonus: number; longMatchBonus: number; overBudgetPoints: number; overBudgetPenalty: number } {
+  const formula = CALCULATION_FORMULAS.approachPlan;
+  const diversityBonus = input.selectedPaces.length >= 3 && new Set(input.selectedPaces).size >= 2 ? formula.diversityBonus : 0;
+  const longMatchBonus = input.durationMinutes >= 16 && input.includesBigMatchPerformer ? formula.longMatchBonus : 0;
+  const overBudgetPoints = Math.max(0, input.staminaUsed - input.staminaAvailable);
+  const overBudgetPenalty = overBudgetPoints * formula.staminaOverBudgetPenalty;
+  const total = Math.round((
+    input.recommendationTotal +
+    input.paceModifier * formula.paceModifierWeight +
+    input.staminaModifier * formula.staminaModifierWeight +
+    diversityBonus +
+    longMatchBonus -
+    overBudgetPenalty
+  ) * 100) / 100;
+  return { total, diversityBonus, longMatchBonus, overBudgetPoints, overBudgetPenalty };
+}
+
 function combinations<T>(items: T[], choose: number): T[][] {
   if (choose === 0) return [[]];
   if (choose < 0 || choose > items.length) return [];
@@ -292,7 +320,6 @@ export function evaluateApproachPlan(
   approachIds: MatchApproachId[],
   configuredLimit?: number | null,
 ): ApproachPlanResult {
-  const planFormula = CALCULATION_FORMULAS.workbenchApproachPlan;
   const aim = aimForId(aimId);
   const limit = approachLimitForSetup(durationMinutes, configuredLimit);
   const selected = Array.from(new Set(approachIds)).filter((id) => MATCH_APPROACHES.some((approach) => approach.id === id)).slice(0, limit);
@@ -302,22 +329,20 @@ export function evaluateApproachPlan(
   const stamina = evaluateStamina(usedStamina, availableStamina);
   const actualPace = totalApproachPace(selected);
   const pace = evaluatePace(aim.idealPace, actualPace);
-  const distinctPaces = new Set(selected.map((id) => getApproach(id)?.pace ?? 0)).size;
-  const diversityBonus = selected.length >= 3 && distinctPaces >= 2 ? planFormula.diversityBonus : 0;
-  const longMatchBonus = durationMinutes >= 16 && selected.includes("big-match-performer") ? planFormula.longMatchBonus : 0;
-  const overBudgetPenalty = Math.max(0, usedStamina - availableStamina) * planFormula.staminaOverBudgetPenalty;
-  const totalScore = Math.round((
-    candidateScores.reduce((sum, candidate) => sum + candidate.total, 0) +
-    pace.modifier * planFormula.paceModifierWeight +
-    stamina.modifier * planFormula.staminaModifierWeight +
-    diversityBonus +
-    longMatchBonus -
-    overBudgetPenalty
-  ) * 100) / 100;
+  const planScore = calculateApproachPlanScore({
+    recommendationTotal: candidateScores.reduce((sum, candidate) => sum + candidate.total, 0),
+    paceModifier: pace.modifier,
+    staminaModifier: stamina.modifier,
+    selectedPaces: selected.map((id) => getApproach(id)?.pace ?? 0),
+    includesBigMatchPerformer: selected.includes("big-match-performer"),
+    durationMinutes,
+    staminaUsed: usedStamina,
+    staminaAvailable: availableStamina,
+  });
   return {
     selectedApproachIds: selected,
     candidateScores,
-    totalScore,
+    totalScore: planScore.total,
     usedStamina,
     availableStamina,
     stamina,

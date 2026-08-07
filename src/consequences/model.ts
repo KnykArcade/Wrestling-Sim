@@ -150,7 +150,8 @@ function conditionForWorker(input: {
   const healthAfter = round(clamp(existing.health - baseHealthLoss - staminaPenalty - incident.healthPenalty, 0, 100));
   const fatigueAfter = round(clamp(existing.fatigue + fatigueGain, 0, 100));
   const momentumChange = momentumDelta(resultCode, workerResult.performanceScore, expectedPerformance, performanceLeader, upset);
-  const popularityChange = round(clamp((workerResult.performanceScore - existing.popularity) / 25 + (resultCode === "W" ? 0.3 : -0.1), -2, 2));
+  const resultPopularity = resultCode === "W" ? 0.3 : resultCode === "L" ? -0.1 : 0;
+  const popularityChange = round(clamp((workerResult.performanceScore - existing.popularity) / 25 + resultPopularity, -2, 2));
   const rankingChange = rankingDelta(resultCode, finalResult.matchScore, workerResult.winProbability, performanceLeader);
   const streak = updateStreak(existing, resultCode);
   const next: StandaloneWorkerRecord = {
@@ -222,17 +223,18 @@ function updateTeamRecords(
 ): StandaloneTeamRecord[] {
   const attempt = activeResolutionAttempt(resolution);
   if (!attempt?.finalResult || !attempt.engineResult.teamResults?.length) return existingRecords;
+  const noContest = attempt.finalResult.finishType === "No Contest";
   const winnerTeamId = attempt.finalResult.winnerTeamId || attempt.engineResult.winnerTeamId;
   let records = [...existingRecords];
   for (const team of attempt.engineResult.teamResults) {
-    const result: "W" | "L" = team.id === winnerTeamId ? "W" : "L";
+    const result: "W" | "L" | "NC" = noContest ? "NC" : team.id === winnerTeamId ? "W" : "L";
     const existing = records.find((record) => record.teamKey === team.id) ?? {
       teamKey: team.id, teamName: team.name, memberKeys: team.memberKeys, memberNames: team.memberNames,
       wins: 0, losses: 0, draws: 0, noContests: 0, rankingPoints: 0, rankingPosition: 0,
       previousRankingPosition: 0, momentum: 0, matchHistory: [], updatedAt: now(),
     };
     const quality = Math.max(0, attempt.finalResult.matchScore - 60) / 20;
-    const rankingDelta = result === "W" ? 3 + quality + (team.winProbability < 0.5 ? 2 : 0) : -1 + quality * 0.4;
+    const rankingDelta = result === "W" ? 3 + quality + (team.winProbability < 0.5 ? 2 : 0) : result === "L" ? -1 + quality * 0.4 : 0;
     const history = {
       id: createPlannerId(), resolutionRecordId: resolution.id, resolutionAttemptId: attempt.id,
       showId: show.id, showName: show.name, showDate: show.date, segmentId: segment.id, segmentTitle: segment.title,
@@ -242,9 +244,9 @@ function updateTeamRecords(
     } as const;
     const next: StandaloneTeamRecord = {
       ...existing, teamName: team.name, memberKeys: team.memberKeys, memberNames: team.memberNames,
-      wins: existing.wins + (result === "W" ? 1 : 0), losses: existing.losses + (result === "L" ? 1 : 0),
+      wins: existing.wins + (result === "W" ? 1 : 0), losses: existing.losses + (result === "L" ? 1 : 0), noContests: existing.noContests + (result === "NC" ? 1 : 0),
       rankingPoints: round(existing.rankingPoints + rankingDelta),
-      momentum: round(clamp(existing.momentum + (result === "W" ? 5 : -2), -100, 100)),
+      momentum: round(clamp(existing.momentum + (result === "W" ? 5 : result === "L" ? -2 : 0), -100, 100)),
       matchHistory: [history, ...existing.matchHistory], updatedAt: now(),
     };
     records = records.some((record) => record.teamKey === team.id)
@@ -262,9 +264,9 @@ function standaloneActualMatch(record: MatchResolutionRecord) {
   const seconds = Math.round((final.actualDurationMinutes - minutes) * 60).toString().padStart(2, "0");
   return {
     id: `wrestling-sim:${record.id}:${attempt.id}`,
-    description: `${final.winnerName} defeated ${final.loserName}`,
+    description: final.finishType === "No Contest" ? "Match ended in a No Contest" : `${final.winnerName} defeated ${final.loserName}`,
     rating: final.matchScore,
-    winner: final.winnerName,
+    winner: final.finishType === "No Contest" ? "No Contest" : final.winnerName,
     matchTime: `${minutes}:${seconds}`,
     notes: final.finishDescription,
     placement: "Main Show" as const,
@@ -284,8 +286,8 @@ function applyResultToShow(show: PlannedShow, segmentId: string, record: MatchRe
       reconciliation: {
         linkedMatchId: `wrestling-sim:${record.id}:${attempt.id}`,
         actualMatch: standaloneActualMatch(record),
-        happenedAsPlanned: segment.plannedWinner ? matchNames(segment.plannedWinner, final.winnerName) : null,
-        happenedAsPlannedDetail: segment.plannedWinner ? matchNames(segment.plannedWinner, final.winnerName) ? "Yes" : "No" : "Unresolved",
+        happenedAsPlanned: final.finishType === "No Contest" ? null : segment.plannedWinner ? matchNames(segment.plannedWinner, final.winnerName) : null,
+        happenedAsPlannedDetail: final.finishType === "No Contest" ? "No Contest" : segment.plannedWinner ? matchNames(segment.plannedWinner, final.winnerName) ? "Yes" : "No" : "Unresolved",
         actualRating: final.matchScore,
         finalNarrative: final.finishDescription,
         changes: final.acceptedEngineResult ? "" : `Booker override: ${final.overrideReason}`,
@@ -346,11 +348,31 @@ function participantForWinner(competition: Competition, winnerNames: string[]): 
   return competition.participants.filter((participant) => winnerNames.some((winnerName) => [participant.name, ...participant.memberNames].some((name) => matchNames(name, winnerName))));
 }
 
-function competitionProposal(applicationId: string, show: PlannedShow, segment: PlannedSegment, finalWinner: string, winnerMemberNames: string[], universe: CompetitionUniverse): CompetitionConsequenceProposal | null {
+function competitionProposal(applicationId: string, show: PlannedShow, segment: PlannedSegment, finalWinner: string, winnerMemberNames: string[], universe: CompetitionUniverse, noContest = false): CompetitionConsequenceProposal | null {
   if (!segment.competitionId || !segment.competitionFixtureId) return null;
   const competition = universe.competitions.find((item) => item.id === segment.competitionId);
   const fixture = competition?.fixtures.find((item) => item.id === segment.competitionFixtureId);
   if (!competition || !fixture) return null;
+  if (noContest) {
+    return {
+      id: createPlannerId(),
+      applicationId,
+      competitionId: competition.id,
+      competitionName: competition.name,
+      fixtureId: fixture.id,
+      roundLabel: fixture.roundLabel,
+      showId: show.id,
+      segmentId: segment.id,
+      finalWinner: "",
+      proposedWinnerParticipantId: "",
+      proposedWinnerParticipantName: "",
+      resultType: "No Contest",
+      status: "Pending",
+      reason: "The official Wrestling Sim result was a No Contest.",
+      preview: [`${fixture.roundLabel} is recorded as a No Contest.`, "No participant advances and no win or loss is awarded."],
+      confirmedAt: "",
+    };
+  }
   const candidates = participantForWinner(competition, [finalWinner, ...winnerMemberNames]).filter((participant) => [fixture.participantAId, fixture.participantBId].includes(participant.id));
   const winner = candidates.length === 1 ? candidates[0] : null;
   const beforeStandings = buildCompetitionStandings(competition);
@@ -416,23 +438,26 @@ function futureConflicts(show: PlannedShow, segment: PlannedSegment, winnerName:
 function groundedPrompts(show: PlannedShow, segment: PlannedSegment, record: MatchResolutionRecord): GroundedBookingPrompt[] {
   const attempt = activeResolutionAttempt(record)!;
   const final = attempt.finalResult!;
+  const noContest = final.finishType === "No Contest";
   const facts = [
-    `${final.winnerName} defeated ${final.loserName}.`,
+    noContest ? "The match ended in a No Contest with no winner or loser." : `${final.winnerName} defeated ${final.loserName}.`,
     final.finishDescription,
     `Match score: ${final.matchScore.toFixed(1)} (${final.starRating} stars).`,
-    attempt.engineResult.performanceLeaderName === final.loserName ? `${final.loserName} was the performance leader despite losing.` : `${attempt.engineResult.performanceLeaderName} was the performance leader.`,
+    noContest ? `${attempt.engineResult.performanceLeaderName} delivered the strongest individual performance.` : attempt.engineResult.performanceLeaderName === final.loserName ? `${final.loserName} was the performance leader despite losing.` : `${attempt.engineResult.performanceLeaderName} was the performance leader.`,
   ];
   const base = (kind: GroundedBookingPrompt["kind"], title: string, suggestedPurpose: string): GroundedBookingPrompt => ({
     id: createPlannerId(), kind, title, factualBasis: facts, suggestedPurpose, sourceShowId: show.id, sourceSegmentId: segment.id, dismissed: false, usedShowId: "", usedSegmentId: "",
   });
-  const prompts = [
+  const prompts = noContest ? [
+    base("Rematch Review", "Review the unresolved No Contest", "Decide whether the neutral result warrants a rematch without treating any participant as the winner or loser."),
+  ] : [
     base("Winner Celebration", `${final.winnerName} result reaction`, `Present ${final.winnerName}'s response to the official victory.`),
     base("Loser Reaction", `${final.loserName} responds to the loss`, `Record how ${final.loserName} reacts to the official defeat.`),
     base("Rematch Review", `Review whether ${final.winnerName} vs ${final.loserName} should continue`, "Evaluate a rematch only after considering rankings, finish, match quality, and future results."),
   ];
   if (!final.acceptedEngineResult) prompts.push(base("Disputed Finish", "Booker override consequence review", `Decide whether the explicit override should be acknowledged creatively. The engine originally selected ${attempt.engineResult.winnerName}.`));
-  if (segment.championship) prompts.push(base("Championship Reaction", `${segment.championship} result reaction`, "Create a response to the confirmed championship consequence after the title decision is applied."));
-  if (segment.competitionId) prompts.push(base("Competition Advancement", `${segment.competitionRoundLabel || "Competition"} result reaction`, "Create a response after the competition result is explicitly confirmed."));
+  if (segment.championship) prompts.push(base("Championship Reaction", `${segment.championship} result reaction`, noContest ? "Acknowledge that the championship did not change hands and no defense was credited." : "Create a response to the confirmed championship consequence after the title decision is applied."));
+  if (segment.competitionId) prompts.push(base("Competition Advancement", `${segment.competitionRoundLabel || "Competition"} result reaction`, noContest ? "Acknowledge that the fixture recorded a No Contest and nobody advanced." : "Create a response after the competition result is explicitly confirmed."));
   if (attempt.workerResults.some((worker) => worker.incident)) prompts.push(base("Incident Follow-Up", "Review the recorded match incident", "Decide whether the recorded incident requires a grounded medical or storyline follow-up."));
   return prompts;
 }
@@ -472,11 +497,12 @@ export function applyCoreResultConsequences(input: {
     const existing = savedRecord
       ? { ...savedRecord, momentum: profile?.momentum ?? savedRecord.momentum, popularity: profile?.popularity ?? savedRecord.popularity ?? 50 }
       : defaultWorkerRecord(workerResult.workerKey, workerResult.workerId, workerResult.workerName, profile);
-    const winningKeys = attempt.finalResult.winnerMemberKeys?.length ? attempt.finalResult.winnerMemberKeys : [attempt.finalResult.winnerKey];
-    const resultCode: "W" | "L" = winningKeys.includes(workerResult.workerKey) ? "W" : "L";
+    const noContest = attempt.finalResult.finishType === "No Contest";
+    const winningKeys = noContest ? [] : attempt.finalResult.winnerMemberKeys?.length ? attempt.finalResult.winnerMemberKeys : [attempt.finalResult.winnerKey];
+    const resultCode: "W" | "L" | "NC" = noContest ? "NC" : winningKeys.includes(workerResult.workerKey) ? "W" : "L";
     const isLeader = workerResult.workerKey === attempt.engineResult.performanceLeaderKey;
-    const condition = conditionForWorker({ existing, workerResult, resultCode, finalResult: attempt.finalResult, performanceLeader: isLeader, upset: attempt.engineResult.upset && resultCode === "W", expectedPerformance: profile?.overall ?? existing.popularity });
-    const opponents = attempt.workerResults.filter((item) => winningKeys.includes(item.workerKey) !== winningKeys.includes(workerResult.workerKey));
+    const condition = conditionForWorker({ existing, workerResult, resultCode, finalResult: attempt.finalResult, performanceLeader: isLeader, upset: Boolean(attempt.finalResult.upset) && resultCode === "W", expectedPerformance: profile?.overall ?? existing.popularity });
+    const opponents = noContest ? attempt.workerResults.filter((item) => item.workerKey !== workerResult.workerKey) : attempt.workerResults.filter((item) => winningKeys.includes(item.workerKey) !== winningKeys.includes(workerResult.workerKey));
     const history: StandaloneMatchHistoryEntry = {
       id: createPlannerId(),
       resolutionRecordId: input.resolution.id,
@@ -489,7 +515,7 @@ export function applyCoreResultConsequences(input: {
       opponentKeys: opponents.map((item) => item.workerKey),
       opponentNames: opponents.map((item) => item.workerName),
       result: resultCode,
-      winnerName: attempt.finalResult.winnerName,
+      winnerName: noContest ? "No Contest" : attempt.finalResult.winnerName,
       finishDescription: attempt.finalResult.finishDescription,
       durationMinutes: attempt.finalResult.actualDurationMinutes,
       matchScore: attempt.finalResult.matchScore,
@@ -513,13 +539,14 @@ export function applyCoreResultConsequences(input: {
   const updatedShow = applyResultToShow(show, segment.id, input.resolution);
   const shows = input.shows.map((item) => item.id === show.id ? updatedShow : item);
   const refreshedSegment = updatedShow.segments.find((item) => item.id === segment.id)!;
+  const noContest = attempt.finalResult.finishType === "No Contest";
   const winningNames = attempt.finalResult.winnerMemberNames?.length ? attempt.finalResult.winnerMemberNames : [attempt.finalResult.winnerName];
   const losingNames = attempt.finalResult.loserNames?.length ? attempt.finalResult.loserNames : [attempt.finalResult.loserName];
-  const conflicts = futureConflicts(updatedShow, refreshedSegment, attempt.finalResult.winnerName, attempt.finalResult.loserName, winningNames, losingNames, shows);
+  const conflicts = noContest ? [] : futureConflicts(updatedShow, refreshedSegment, attempt.finalResult.winnerName, attempt.finalResult.loserName, winningNames, losingNames, shows);
   const prompts = groundedPrompts(updatedShow, refreshedSegment, input.resolution);
   const winnerMemberNames = attempt.finalResult.winnerMemberNames?.length ? attempt.finalResult.winnerMemberNames : [attempt.finalResult.winnerName];
-  const titleProposal = championshipProposal(applicationId, updatedShow, refreshedSegment, attempt.finalResult.winnerName, winnerMemberNames, input.championships);
-  const competition = competitionProposal(applicationId, updatedShow, refreshedSegment, attempt.finalResult.winnerName, winnerMemberNames, input.competitions);
+  const titleProposal = noContest ? null : championshipProposal(applicationId, updatedShow, refreshedSegment, attempt.finalResult.winnerName, winnerMemberNames, input.championships);
+  const competition = competitionProposal(applicationId, updatedShow, refreshedSegment, attempt.finalResult.winnerName, winnerMemberNames, input.competitions, noContest);
   const application: ResultConsequenceApplication = {
     id: applicationId,
     resolutionRecordId: input.resolution.id,
@@ -555,7 +582,7 @@ export function applyCoreResultConsequences(input: {
       competitionProposals: competition ? [competition, ...input.universe.competitionProposals] : input.universe.competitionProposals,
       futureConflicts: [...conflicts, ...input.universe.futureConflicts],
       prompts: [...prompts, ...input.universe.prompts],
-      audit: [audit(application.id, "Core Consequences Applied", `${attempt.finalResult.winnerName} defeated ${attempt.finalResult.loserName}; individual and team records, rankings, momentum, condition, history, and future-plan review were updated.`), ...input.universe.audit],
+      audit: [audit(application.id, "Core Consequences Applied", noContest ? "No Contest applied; all participants and teams received NC records, no rankings or titles changed, and physical wear remained recorded." : `${attempt.finalResult.winnerName} defeated ${attempt.finalResult.loserName}; individual and team records, rankings, momentum, condition, history, and future-plan review were updated.`), ...input.universe.audit],
       settings: { ...input.universe.settings, selectedApplicationId: application.id },
     },
   };
@@ -653,7 +680,8 @@ export function confirmCompetitionConsequence(input: {
   if (proposal.resultType === "Decision" && !proposal.proposedWinnerParticipantId) throw new Error("Resolve the competition winner identity before confirmation.");
   const competition = input.competitions.competitions.find((item) => item.id === proposal.competitionId);
   if (!competition) throw new Error("The linked competition could not be found.");
-  const next = recordCompetitionResult(competition, proposal.fixtureId, proposal.resultType, proposal.proposedWinnerParticipantId, `${proposal.finalWinner} result confirmed from Wrestling Sim.`);
+  const scoreText = proposal.resultType === "No Contest" ? "No Contest confirmed from Wrestling Sim." : `${proposal.finalWinner} result confirmed from Wrestling Sim.`;
+  const next = recordCompetitionResult(competition, proposal.fixtureId, proposal.resultType, proposal.proposedWinnerParticipantId, scoreText);
   if (next === competition || JSON.stringify(next.fixtures) === JSON.stringify(competition.fixtures)) throw new Error("The competition result could not be applied. Review the fixture, winner identity, and format rules.");
   const timestamp = now();
   return {

@@ -150,7 +150,7 @@ describe("Phase 6B1 official singles match resolution", () => {
     expect(first.engineResult.starRating).toBeGreaterThanOrEqual(0);
   });
 
-  test("preserves a complete Phase 6B20A ledger without combining score lanes", () => {
+  test("preserves a complete Phase 6B20B ledger without combining score lanes", () => {
     const attempt = resolveSinglesMatch({ setup: setup(), workers: sources(), seed: "phase-6b20a-ledger" });
     expect(attempt.calculationLedger).toMatchObject({
       version: RESOLUTION_CALCULATION_VERSION,
@@ -161,7 +161,7 @@ describe("Phase 6B1 official singles match resolution", () => {
 
     attempt.workerResults.forEach((worker) => {
       expect(worker.calculationLedger).toMatchObject({
-        approachPlan: { formulaId: "approach.resolution-plan" },
+        approachPlan: { formulaId: "approach.plan" },
         mentalBase: { formulaId: "performance.mental-base" },
         mentalState: { formulaId: "performance.mental-score" },
         approachExecution: { formulaId: "performance.approach-execution", result: worker.approachExecution },
@@ -283,9 +283,34 @@ describe("Phase 6B1 official singles match resolution", () => {
     expect(active.engineResult.winnerKey).toBe(attempt.engineResult.winnerKey);
     expect(active.finalResult).toMatchObject({
       winnerKey: alternate.workerKey,
+      upset: alternate.winProbability < 0.5,
       acceptedEngineResult: false,
       overrideReason: "Protect the planned championship program.",
     });
+    const legacy = structuredClone(overridden);
+    delete legacy.attempts[0].finalResult!.upset;
+    expect(parseMatchResolutionUniverse({ records: [legacy], settings: {} }).records[0].attempts[0].finalResult?.upset).toBe(alternate.winProbability < 0.5);
+  });
+
+  test("records a No Contest without assigning any winner loser or upset", () => {
+    const attempt = resolveSinglesMatch({ setup: setup(), workers: sources(), seed: "no-contest" });
+    const overridden = overrideEngineResult(createMatchResolutionRecord(setup(), attempt), "", "No Contest", "", "Closing chaos forced the referee to throw the match out.");
+    expect(activeResolutionAttempt(overridden)?.finalResult).toMatchObject({
+      winnerKey: "", winnerName: "", loserKey: "", loserName: "", winnerMemberKeys: [], loserKeys: [],
+      finishType: "No Contest", upset: false, acceptedEngineResult: false,
+    });
+  });
+
+  test("counts chemistry once at match level and incidents once through individual execution", () => {
+    const neutral = setup();
+    neutral.chemistry = 0;
+    const strong = { ...neutral, chemistry: 10, workers: neutral.workers.map((worker) => ({ ...worker })) };
+    const baseline = resolveSinglesMatch({ setup: neutral, workers: sources(), seed: "chemistry-single-count" });
+    const adjusted = resolveSinglesMatch({ setup: strong, workers: sources(), seed: "chemistry-single-count" });
+    expect(adjusted.workerResults.map((worker) => worker.performanceScore)).toEqual(baseline.workerResults.map((worker) => worker.performanceScore));
+    expect(adjusted.engineResult.matchScore - baseline.engineResult.matchScore).toBeCloseTo(5, 2);
+    expect(adjusted.calculationLedger?.matchQuality.terms.some((term) => term.id === "incidents")).toBe(false);
+    expect(adjusted.workerResults.every((worker) => worker.calculationLedger?.approachExecution.terms.some((term) => term.id === "incident"))).toBe(true);
   });
 
   test("requires a material setup change before adding another official calculation", () => {
@@ -405,5 +430,13 @@ describe("Phase 6B4 team and multi-person match resolution", () => {
     expect(overridden.engineResult.winnerTeamId).toBe(attempt.engineResult.winnerTeamId);
     expect(overridden.finalResult?.winnerTeamId).not.toBe(attempt.engineResult.winnerTeamId);
     expect(overridden.finalResult?.winnerMemberKeys).toHaveLength(2);
+  });
+
+  test("a team No Contest clears the whole winning and losing side", () => {
+    const names = ["Alex Shelley", "Chris Sabin", "Mark Davis", "Kyle Fletcher"];
+    const matchSetup = multiSetup("Team", names, ["side-a", "side-a", "side-b", "side-b"]);
+    const attempt = resolveMatch({ setup: matchSetup, workers: multiSources(names), seed: "phase-6b20b-team-nc" });
+    const overridden = activeResolutionAttempt(overrideEngineResult(createMatchResolutionRecord(matchSetup, attempt), "", "No Contest", "", "The referee stopped the match after outside chaos."))!;
+    expect(overridden.finalResult).toMatchObject({ finishType: "No Contest", winnerMemberKeys: [], winnerMemberNames: [], loserKeys: [], loserNames: [] });
   });
 });

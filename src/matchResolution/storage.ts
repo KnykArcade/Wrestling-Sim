@@ -51,7 +51,23 @@ function normalizeSettings(value: unknown): MatchResolutionSettings {
 
 function normalizeAttempt(value: unknown): MatchResolutionAttempt | null {
   if (!isRecord(value) || !text(value.id) || !isRecord(value.engineResult) || !Array.isArray(value.workerResults)) return null;
-  return value as unknown as MatchResolutionAttempt;
+  const attempt = value as unknown as MatchResolutionAttempt;
+  if (!attempt.finalResult) return attempt;
+  const teamProbability = attempt.engineResult.teamResults?.find((team) => team.id === attempt.finalResult?.winnerTeamId)?.winProbability;
+  const workerProbability = attempt.workerResults.find((worker) => worker.workerKey === attempt.finalResult?.winnerKey)?.winProbability;
+  const outcomeCount = teamProbability === undefined ? attempt.workerResults.length : attempt.engineResult.teamResults?.length ?? attempt.workerResults.length;
+  const migratedUpset = attempt.finalResult.finishType === "No Contest"
+    ? false
+    : attempt.finalResult.acceptedEngineResult
+      ? Boolean(attempt.engineResult.upset)
+      : (teamProbability ?? workerProbability ?? 1) < 1 / Math.max(1, outcomeCount);
+  return {
+    ...attempt,
+    finalResult: {
+      ...attempt.finalResult,
+      upset: typeof attempt.finalResult.upset === "boolean" ? attempt.finalResult.upset : migratedUpset,
+    },
+  };
 }
 
 function normalizeResolutionRecord(value: unknown): MatchResolutionRecord | null {

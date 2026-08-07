@@ -1,9 +1,11 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CALCULATION_SYSTEM_VERSION } from "../calculations/foundation";
 import { calculateLiveMatchAudience, calculateMatchAnticipation } from "../crowd/model";
 import type { PlannedSegment, PlannedWorkerReference } from "../planner/types";
-import { advisoryStarRating, generateMatchPerformancePreview, formatStarRating, performancePreviewInputFingerprint } from "./performance";
-import { workerProfileKey } from "./model";
+import { advisoryStarRating, generateMatchPerformancePreview, formatStarRating, performancePreviewInputFingerprint, resolveMatchFormat, resolveMatchImportance } from "./performance";
+import { loadActiveStartingUniverse, loadStartingUniverseState } from "../startingUniverse/storage";
+import type { StartingUniverseRecord } from "../startingUniverse/types";
+import { normalizeApproachName, workerProfileKey } from "./model";
 import type {
   MatchEngineProfile,
   MatchEngineUniverse,
@@ -32,13 +34,26 @@ export default function MatchPerformancePreviewEditor({
   segment,
   universe,
   projectedCrowdBefore,
+  cardSegments,
   onChange,
 }: {
   segment: PlannedSegment;
   universe: MatchEngineUniverse;
   projectedCrowdBefore: number;
+  cardSegments: PlannedSegment[];
   onChange: (segment: PlannedSegment) => void;
 }) {
+  const [startingUniverse, setStartingUniverse] = useState<StartingUniverseRecord | null>(null);
+  const [sourceReady, setSourceReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void loadActiveStartingUniverse(loadStartingUniverseState(window.localStorage)).then((record) => {
+      if (alive) { setStartingUniverse(record); setSourceReady(true); }
+    }).catch(() => {
+      if (alive) setSourceReady(true);
+    });
+    return () => { alive = false; };
+  }, []);
   const competitors = useMemo(() => segment.workers.filter(isLikelyCompetitor), [segment.workers]);
   const readyWorkers = competitors.map((worker) => {
     const key = workerProfileKey(worker);
@@ -47,9 +62,19 @@ export default function MatchPerformancePreviewEditor({
     return { worker, profile, plan };
   });
   const incompleteWorkers = readyWorkers.filter((item) => !item.profile || !item.plan || item.plan.selectedApproachIds.length === 0);
-  const canGenerate = readyWorkers.length > 0 && incompleteWorkers.length === 0;
+  const canGenerate = sourceReady && readyWorkers.length > 0 && incompleteWorkers.length === 0;
   const settings = segment.matchApproachSetup.performanceSettings;
-  const previewWorkers = readyWorkers.filter((item): item is typeof item & { profile: MatchEngineProfile; plan: MatchWorkerApproachPlan } => Boolean(item.profile && item.plan)).map((item) => ({ profile: item.profile, plan: item.plan }));
+  const previewWorkers = readyWorkers.filter((item): item is typeof item & { profile: MatchEngineProfile; plan: MatchWorkerApproachPlan } => Boolean(item.profile && item.plan)).map((item) => ({
+    profile: item.profile,
+    plan: item.plan,
+    workbookMetrics: startingUniverse?.review.roster.find((decision) => decision.workerId === item.worker.id)?.workbookMetrics ?? null,
+    teamId: normalizeApproachName(item.worker.side) || item.profile.workerKey,
+    teamName: (normalizeApproachName(item.worker.side)
+      ? competitors.filter((candidate) => normalizeApproachName(candidate.side) === normalizeApproachName(item.worker.side))
+      : [item.worker]).map((candidate) => candidate.name).join(" & ") || item.profile.workerName,
+  }));
+  const importance = resolveMatchImportance(segment.matchApproachSetup.performanceSettings.importance, segment, cardSegments.length ? cardSegments : [segment]);
+  const format = resolveMatchFormat(segment);
   const storedPreview = segment.matchApproachSetup.performancePreview;
   const expectedFingerprint = canGenerate ? performancePreviewInputFingerprint({
     workers: previewWorkers,
@@ -58,8 +83,16 @@ export default function MatchPerformancePreviewEditor({
     approachLimit: segment.matchApproachSetup.approachLimit,
     plannedWinner: segment.plannedWinner,
     settings,
+    importance,
+    matchType: segment.matchType,
+    format,
+    eliminationRules: format === "Elimination" || format === "Battle Royal",
   }) : "";
   const preview = storedPreview?.calculationVersion === CALCULATION_SYSTEM_VERSION && storedPreview.inputFingerprint === expectedFingerprint ? storedPreview : null;
+  useEffect(() => {
+    if (!sourceReady || !storedPreview || preview) return;
+    onChange({ ...segment, matchApproachSetup: { ...segment.matchApproachSetup, performancePreview: null, updatedAt: new Date().toISOString() } });
+  }, [sourceReady, storedPreview?.id, expectedFingerprint]);
   const anticipation = calculateMatchAnticipation({
     profiles: previewWorkers.map((worker) => worker.profile),
     plans: previewWorkers.map((worker) => worker.plan),
@@ -88,6 +121,10 @@ export default function MatchPerformancePreviewEditor({
       approachLimit: segment.matchApproachSetup.approachLimit,
       plannedWinner: segment.plannedWinner,
       settings,
+      importance,
+      matchType: segment.matchType,
+      format,
+      eliminationRules: format === "Elimination" || format === "Battle Royal",
       seed: reuseSeed ? preview?.seed : undefined,
     });
     onChange({
@@ -117,6 +154,8 @@ export default function MatchPerformancePreviewEditor({
       <label className="field"><span>Result authority</span><select aria-label="Performance preview authority" value={settings.authority} onChange={(event) => updateSettings({ authority: event.target.value as MatchOutcomeAuthority })}><option value="tew-authoritative">TEW authoritative — no winner selected here</option><option value="booker-selected">Booker-selected winner remains fixed</option><option value="competitive-preview">Optional competitive winner preview</option></select></label>
       <label className="field"><span>Night volatility (1–10)</span><input aria-label="Performance preview volatility" type="number" min={1} max={10} value={settings.volatility} onChange={(event) => updateSettings({ volatility: Math.max(1, Math.min(10, Number(event.target.value) || 1)) })} /></label>
       <label className="field"><span>Booking influence (0–10)</span><input aria-label="Performance preview booking influence" type="number" min={0} max={10} disabled={settings.authority !== "competitive-preview"} value={settings.bookingInfluence} onChange={(event) => updateSettings({ bookingInfluence: Math.max(0, Math.min(10, Number(event.target.value) || 0)) })} /></label>
+      <label className="field"><span>Importance</span><select aria-label="Performance preview importance" value={settings.importance} onChange={(event) => updateSettings({ importance: event.target.value as MatchPerformanceSettings["importance"] })}><option>Auto</option><option>Television</option><option>Feature</option><option>Main Event</option><option>Championship</option><option>Tournament</option></select><small>Applied as {importance}</small></label>
+      <label className="field"><span>Chemistry (-10 to +10)</span><input aria-label="Performance preview chemistry" type="number" min={-10} max={10} value={settings.chemistry} onChange={(event) => updateSettings({ chemistry: Math.max(-10, Math.min(10, Number(event.target.value) || 0)) })} /></label>
       <div className="performance-authority-card"><span>Current mode</span><strong>{authorityLabel(settings.authority)}</strong><small>{settings.authority === "tew-authoritative" ? "The preview will not name a winner." : settings.authority === "booker-selected" ? "The planned winner stays fixed." : "A projected winner is advisory only."}</small></div>
     </div>
 

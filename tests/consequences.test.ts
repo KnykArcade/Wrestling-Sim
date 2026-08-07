@@ -13,7 +13,7 @@ import {
 } from "../src/consequences/model";
 import { parseResultConsequenceUniverse } from "../src/consequences/storage";
 import { createMatchEngineProfile } from "../src/matchEngine/model";
-import { acceptEngineResult, createMatchResolutionRecord, resolveMatch } from "../src/matchResolution/engine";
+import { acceptEngineResult, createMatchResolutionRecord, overrideEngineResult, resolveMatch } from "../src/matchResolution/engine";
 import type { MatchResolutionRecord } from "../src/matchResolution/types";
 import { createPlannedSegment, createPlannedShow } from "../src/planner/model";
 
@@ -214,7 +214,7 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(pac.health).toBeLessThan(95);
     expect(result.profiles.find((profile) => profile.workerName === "PAC")?.momentum).toBe(pac.momentum);
     expect(result.profiles.find((profile) => profile.workerName === "PAC")?.popularity).toBe(pac.popularity);
-    expect(result.universe.applications[0]).toMatchObject({ calculationVersion: "wrestling-sim-calculations-6b20a-v1", idempotencyKey: expect.stringContaining("match-consequences") });
+    expect(result.universe.applications[0]).toMatchObject({ calculationVersion: "wrestling-sim-calculations-6b20b-v2", idempotencyKey: expect.stringContaining("match-consequences") });
     expect(pac.matchHistory[0].result).toBe("W");
     expect(result.shows[0].segments[0]).toMatchObject({ workflowStatus: "Reconciled", reconciliation: { actualMatch: { winner: "PAC", rating: 86 }, finalNarrative: "PAC forced Jay White to submit." } });
     expect(() => applyCoreResultConsequences({
@@ -320,6 +320,55 @@ describe("Phase 6B3 standalone result consequences", () => {
     const updatedFixture = confirmed.competitions.competitions[0].fixtures.find((item) => item.id === fixture.id)!;
     expect(updatedFixture).toMatchObject({ winnerId: pac.id, status: "Completed" });
     expect(confirmed.universe.competitionProposals[0].status).toBe("Confirmed");
+  });
+
+  test("applies a No Contest as neutral records while preserving wear and blocking title or tournament advancement", () => {
+    const { show, segment } = showWithMatch();
+    const championship = createChampionship(1);
+    championship.id = "title-nc";
+    championship.name = "PWL World Championship";
+    championship.status = "Active";
+    championship.currentChampions = [{ id: "white", name: "Jay White" }];
+    championship.defenses = 2;
+    segment.championshipId = championship.id;
+    segment.championship = championship.name;
+    segment.championEntering = "Jay White";
+    segment.challenger = "PAC";
+
+    let competition = createCompetition(1);
+    competition.id = "cup-nc";
+    competition.name = "PWL Cup";
+    competition.format = "Single Elimination";
+    const white = createCompetitionParticipant("Jay White", "Singles", { source: "manual" });
+    const pac = createCompetitionParticipant("PAC", "Singles", { source: "manual" });
+    competition = generateCompetitionStructure({ ...competition, participants: [white, pac] });
+    segment.competitionId = competition.id;
+    segment.competitionFixtureId = competition.fixtures[0].id;
+    segment.competitionRoundLabel = competition.fixtures[0].roundLabel;
+
+    const noContest = resolution(show.id, segment.id, "PAC", false);
+    const final = noContest.attempts[0].finalResult!;
+    Object.assign(final, {
+      winnerKey: "", winnerName: "", loserKey: "", loserName: "", winnerMemberKeys: [], winnerMemberNames: [], loserKeys: [], loserNames: [],
+      finishType: "No Contest", finishDescription: "The referee threw the match out.", upset: false,
+    });
+    const sourceProfiles = profiles();
+    const applied = applyCoreResultConsequences({
+      universe: emptyResultConsequenceUniverse(), resolution: noContest, shows: [show], profiles: sourceProfiles,
+      championships: { championships: [championship] }, competitions: { competitions: [competition] },
+    });
+    expect(applied.universe.workerRecords.every((record) => record.noContests === 1 && record.wins === 0 && record.losses === 0 && record.rankingPoints === 0)).toBe(true);
+    expect(applied.universe.workerRecords.every((record) => record.fatigue > 0 && record.health < sourceProfiles.find((profile) => profile.workerKey === record.workerKey)!.health)).toBe(true);
+    expect(applied.universe.teamRecords).toEqual([]);
+    expect(applied.universe.championshipProposals).toEqual([]);
+    expect(applied.universe.competitionProposals[0]).toMatchObject({ resultType: "No Contest", status: "Pending", proposedWinnerParticipantId: "" });
+    expect(applied.shows[0].segments[0].reconciliation).toMatchObject({ happenedAsPlannedDetail: "No Contest", actualMatch: { winner: "No Contest" } });
+    expect(applied.universe.prompts.some((prompt) => prompt.kind === "Winner Celebration" || prompt.kind === "Loser Reaction")).toBe(false);
+    const confirmed = confirmCompetitionConsequence({ universe: applied.universe, proposalId: applied.universe.competitionProposals[0].id, competitions: { competitions: [competition] } });
+    expect(confirmed.competitions.competitions[0].fixtures[0]).toMatchObject({ resultType: "No Contest", winnerId: "", loserId: "", status: "Completed" });
+    expect(confirmed.competitions.competitions[0].fixtures.some((fixture) => Boolean(fixture.winnerId))).toBe(false);
+    expect(championship.currentChampions[0].name).toBe("Jay White");
+    expect(championship.defenses).toBe(2);
   });
 
   test("flags future booking that conflicts with the actual result and requires a manual resolution note", () => {
@@ -456,5 +505,35 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(confirmedTitle.championships.championships[0].currentChampions.map((champion) => champion.name)).toEqual(winningTeam.memberNames);
     const confirmedCompetition = confirmCompetitionConsequence({ universe: applied.universe, proposalId: applied.universe.competitionProposals[0].id, competitions: { competitions: [competition] } });
     expect(confirmedCompetition.competitions.competitions[0].fixtures[0].winnerId).toBe(firstTeam.id);
+  });
+
+  test("applies a tag-team No Contest to every wrestler and both team records", () => {
+    const show = createPlannedShow(1);
+    show.id = "show-tag-nc";
+    show.date = "2019-02-12";
+    const segment = createPlannedSegment("match");
+    segment.id = "tag-nc";
+    segment.matchType = "Tag Team";
+    const names = ["Alex Shelley", "Chris Sabin", "Mark Davis", "Kyle Fletcher"];
+    segment.workers = names.map((name, index) => ({ id: `tag-${index}`, name, role: "Competitor", side: index < 2 ? "Side 1" : "Side 2", source: "tew" as const }));
+    show.segments = [segment];
+    const workerProfiles = segment.workers.map((worker) => createMatchEngineProfile(worker));
+    const setup = {
+      showId: show.id, showName: show.name, showDate: show.date, segmentId: segment.id, segmentTitle: "MCMG vs Aussie Open",
+      matchType: "Tag Team", durationMinutes: 15, aimId: "competitive-tv-match" as const, importance: "Feature" as const,
+      championship: "", competitionRound: "", chemistry: 0, volatility: 5, format: "Team" as const,
+      workers: workerProfiles.map((profile, index) => ({
+        workerKey: profile.workerKey, workerId: profile.workerId, workerName: profile.workerName, approachMode: "AI" as const,
+        lockedApproachIds: [], manualApproachIds: [], storyNeed: 0, momentum: 50, bookingBias: 0,
+        teamId: index < 2 ? "mcmg" : "aussie-open", teamName: index < 2 ? "Motor City Machine Guns" : "Aussie Open",
+      })),
+    };
+    const attempt = resolveMatch({ setup, workers: workerProfiles.map((profile) => ({ profile, workbookMetrics: null })), seed: "tag-no-contest-consequences" });
+    const calculated = createMatchResolutionRecord(setup, attempt);
+    const noContest = overrideEngineResult(calculated, "", "No Contest", "", "The referee threw the match out.");
+    const applied = applyCoreResultConsequences({ universe: emptyResultConsequenceUniverse(), resolution: noContest, shows: [show], profiles: workerProfiles, championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+    expect(applied.universe.workerRecords.every((record) => record.noContests === 1 && record.wins === 0 && record.losses === 0 && record.rankingPoints === 0)).toBe(true);
+    expect(applied.universe.teamRecords).toHaveLength(2);
+    expect(applied.universe.teamRecords.every((record) => record.noContests === 1 && record.wins === 0 && record.losses === 0 && record.rankingPoints === 0)).toBe(true);
   });
 });

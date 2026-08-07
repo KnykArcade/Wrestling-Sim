@@ -17,6 +17,7 @@ test("books wrestlers without a winner, runs one official result, and preserves 
   await match.getByLabel("Manual worker name").fill("PAC");
   await match.getByRole("button", { name: "Add Manual Worker" }).click();
   await match.getByRole("button", { name: "Run AI for All Competitors" }).click();
+  await match.getByLabel("Performance preview chemistry").fill("2");
   await expect(match.locator(".tew-strategy-row")).toHaveCount(2);
   await expect(match.getByLabel("Planned winner")).toHaveValue("");
   await expect(page.locator(".save-state")).toHaveText("Saved");
@@ -37,6 +38,8 @@ test("books wrestlers without a winner, runs one official result, and preserves 
   await expect(pac.getByLabel("PAC approach mode")).toHaveValue("Manual");
   await expect(jay.locator('.match-resolution-approach-grid input:checked')).toHaveCount(3);
   await expect(pac.locator('.match-resolution-approach-grid input:checked')).toHaveCount(3);
+  await expect(page.locator(".match-resolution-context-grid")).toContainText("Main Event");
+  await expect(page.locator(".match-resolution-context-grid")).toContainText("+2");
 
   await jay.getByText("Dirty Rulebreaker", { exact: true }).click();
   await pac.getByText("Counter Specialist", { exact: true }).click();
@@ -58,10 +61,13 @@ test("books wrestlers without a winner, runs one official result, and preserves 
   const engineWinnerText = await page.locator(".match-resolution-result > header h2").textContent();
   expect(engineWinnerText).toMatch(/defeated/);
 
-  await page.getByLabel("Resolution override reason").fill("Use the surprising engine performance as the story, but protect the planned championship direction.");
-  await page.getByLabel("Resolution override description").fill("The alternate winner stole the match with a sudden counter.");
+  await page.getByLabel("Resolution override finish type").selectOption("No Contest");
+  await expect(page.getByLabel("Resolution override winner")).toBeDisabled();
+  await page.getByLabel("Resolution override reason").fill("Closing chaos forced the referee to throw the match out.");
+  await page.getByLabel("Resolution override description").fill("The match ended without a winner after the referee lost control.");
   await page.getByRole("button", { name: "Confirm Booker Override" }).click();
   await expect(page.locator(".match-resolution-final--overridden")).toBeVisible();
+  await expect(page.locator(".match-resolution-final--overridden")).toContainText("Match ended in a No Contest");
   await expect(page.locator(".match-resolution-final--overridden")).toContainText("Override reason");
   await expect(page.locator(".match-resolution-audit")).toContainText("Attempt 1 · Overridden");
 
@@ -74,14 +80,17 @@ test("books wrestlers without a winner, runs one official result, and preserves 
 
   const stored = await page.evaluate(() => {
     const raw = window.localStorage.getItem("wrestling-sim:match-resolution:v1");
-    return raw ? JSON.parse(raw) as { records?: Array<{ status?: string; attempts?: Array<{ status?: string; engineResult?: { winnerName?: string }; finalResult?: { acceptedEngineResult?: boolean; overrideReason?: string } }> }> } : {};
+    return raw ? JSON.parse(raw) as { records?: Array<{ status?: string; attempts?: Array<{ status?: string; engineResult?: { winnerName?: string }; finalResult?: { winnerName?: string; loserName?: string; finishType?: string; acceptedEngineResult?: boolean; overrideReason?: string } }> }> } : {};
   });
   expect(stored.records).toHaveLength(1);
   expect(stored.records?.[0]?.status).toBe("Overridden");
   expect(stored.records?.[0]?.attempts).toHaveLength(1);
   expect(stored.records?.[0]?.attempts?.[0]?.engineResult?.winnerName).toBeTruthy();
   expect(stored.records?.[0]?.attempts?.[0]?.finalResult).toMatchObject({
+    winnerName: "",
+    loserName: "",
+    finishType: "No Contest",
     acceptedEngineResult: false,
-    overrideReason: "Use the surprising engine performance as the story, but protect the planned championship direction.",
+    overrideReason: "Closing chaos forced the referee to throw the match out.",
   });
 });

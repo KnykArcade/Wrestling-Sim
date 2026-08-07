@@ -299,7 +299,7 @@ export default function MatchApproachSetupEditor({
     </div>}
 
     <label className="field match-approach-notes"><span>Approach and road-agent notes</span><textarea rows={2} value={segment.matchApproachSetup.notes} placeholder="Optional notes for the road agent or TEW handoff" onChange={(event) => updateSetup({ notes: event.target.value })} /></label>
-    <MatchPerformancePreviewEditor segment={segment} universe={universe} projectedCrowdBefore={projectedCrowdBefore} onChange={onChange} />
+    <MatchPerformancePreviewEditor segment={segment} universe={universe} projectedCrowdBefore={projectedCrowdBefore} cardSegments={cardSegments.length ? cardSegments : [segment]} onChange={onChange} />
     {editingWorker && editingProfile && <RatingsDialog profile={editingProfile} worker={editingWorker} onClose={() => setEditingProfileKey("")} onProfileChange={upsertProfile} />}
   </section>;
 }

@@ -18,6 +18,7 @@ import {
   classifyMentalState,
   createMatchEngineProfile,
   evaluatePace,
+  evaluateApproachPlan,
   evaluateStamina,
   mentalSwingProbability,
   profileStaminaCapacity,
@@ -30,7 +31,14 @@ import {
   advisoryStarRating,
   formatStarRating,
   generateMatchPerformancePreview,
+  performancePreviewInputFingerprint,
+  resolveMatchImportance,
 } from "../src/matchEngine/performance";
+import { resolveMatch } from "../src/matchResolution/engine";
+import type { ResolutionApproachId } from "../src/matchResolution/types";
+import { importedApproachIdForMatchEngineId } from "../src/startingUniverse/formulas";
+import type { StartingUniverseWorkbookMetrics } from "../src/startingUniverse/types";
+import { createPlannedSegment } from "../src/planner/model";
 import { WRESTLER_STYLES } from "../src/matchEngine/profileCatalog";
 import {
   MATCH_ENGINE_STORAGE_KEY,
@@ -127,7 +135,7 @@ describe("native match engine data foundation", () => {
     expect(normalizeRating(-4)).toBe(0);
     expect(calculationQualityLabel(85)).toBe("Elite");
     expect(calculationQualityLabel(49.99)).toBe("Weak");
-    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b20a-v1");
+    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b20b-v2");
   });
 
   test("migrates saved resolver IDs without losing selected or locked approaches", () => {
@@ -409,5 +417,96 @@ describe("Phase 4C3 advisory match performance preview", () => {
     expect(advisoryStarRating(80)).toBe(4);
     expect(advisoryStarRating(95)).toBe(5);
     expect(formatStarRating(4)).toBe("4★");
+  });
+
+  test("matches the official resolver raw score when seed wrestlers and settings are identical", () => {
+    const first = testProfile("Jay White", "white");
+    const second = testProfile("PAC", "pac");
+    const workers = [
+      { profile: first, plan: testPlan(first, ["dirty-rulebreaker", "big-match-performer", "chain-technician"]) },
+      { profile: second, plan: testPlan(second, ["counter-specialist", "aerial-showstopper", "high-tempo-hybrid"]) },
+    ];
+    const settings = { authority: "tew-authoritative" as const, volatility: 5, bookingInfluence: 0, importance: "Feature" as const, chemistry: 3 };
+    const seed = "phase-6b20b-preview-parity";
+    const preview = generateMatchPerformancePreview({ workers, aimId: "competitive-tv-match", durationMinutes: 20, plannedWinner: "", settings, importance: "Feature", seed })!;
+    const setup = {
+      showId: "show", showName: "PWL", showDate: "2019-01-01", segmentId: "match", segmentTitle: "Jay White vs PAC",
+      matchType: "1 vs. 1", durationMinutes: 20, aimId: "competitive-tv-match" as const, importance: "Feature" as const,
+      championship: "", competitionRound: "", chemistry: 3, volatility: 5, format: "Singles" as const,
+      workers: workers.map(({ profile, plan }) => ({
+        workerKey: profile.workerKey, workerId: profile.workerId, workerName: profile.workerName, approachMode: "Manual" as const,
+        lockedApproachIds: [], manualApproachIds: plan.selectedApproachIds.map(importedApproachIdForMatchEngineId).filter((id): id is ResolutionApproachId => id !== null),
+        storyNeed: 0, momentum: profile.momentum, bookingBias: 0, teamId: profile.workerKey, teamName: profile.workerName,
+      })),
+    };
+    const official = resolveMatch({ setup, workers: workers.map(({ profile }) => ({ profile, workbookMetrics: null })), seed });
+    expect(preview.matchScore).toBe(official.engineResult.matchScore);
+    expect(preview.workerResults.map((worker) => worker.performanceScore)).toEqual(official.workerResults.map((worker) => worker.performanceScore));
+  });
+
+  test("preserves preview and resolver parity for team assignments", () => {
+    const profiles = [
+      testProfile("Jay White", "white"), testProfile("PAC", "pac"),
+      testProfile("Kyle Fletcher", "fletcher"), testProfile("Mark Davis", "davis"),
+    ];
+    const workers = profiles.map((profile, index) => ({
+      profile,
+      plan: testPlan(profile, index % 2 ? ["counter-specialist", "aerial-showstopper"] : ["dirty-rulebreaker", "chain-technician"]),
+      teamId: index < 2 ? "team-1" : "team-2",
+      teamName: index < 2 ? "White & PAC" : "Aussie Open",
+    }));
+    const settings = { authority: "competitive-preview" as const, volatility: 7, bookingInfluence: 0, importance: "Feature" as const, chemistry: -2 };
+    const seed = "phase-6b20b-team-preview-parity";
+    const preview = generateMatchPerformancePreview({
+      workers, aimId: "competitive-tv-match", durationMinutes: 18, plannedWinner: "", settings,
+      importance: "Feature", matchType: "Tag Team", format: "Team", eliminationRules: false, seed,
+    })!;
+    const setup = {
+      showId: "show", showName: "PWL", showDate: "2019-01-01", segmentId: "match", segmentTitle: "Tag Team Match",
+      matchType: "Tag Team", durationMinutes: 18, aimId: "competitive-tv-match" as const, importance: "Feature" as const,
+      championship: "", competitionRound: "", chemistry: -2, volatility: 7, format: "Team" as const, eliminationRules: false,
+      workers: workers.map(({ profile, plan, teamId, teamName }) => ({
+        workerKey: profile.workerKey, workerId: profile.workerId, workerName: profile.workerName, approachMode: "Manual" as const,
+        lockedApproachIds: [], manualApproachIds: plan.selectedApproachIds.map(importedApproachIdForMatchEngineId).filter((id): id is ResolutionApproachId => id !== null),
+        storyNeed: 0, momentum: profile.momentum, bookingBias: 0, teamId, teamName,
+      })),
+    };
+    const official = resolveMatch({ setup, workers: workers.map(({ profile }) => ({ profile, workbookMetrics: null })), seed });
+    expect(preview.matchScore).toBe(official.engineResult.matchScore);
+    expect(preview.workerResults.map((worker) => worker.performanceScore)).toEqual(official.workerResults.map((worker) => worker.performanceScore));
+    expect(preview.workerResults.map((worker) => worker.winProbability)).toEqual(official.workerResults.map((worker) => worker.winProbability));
+  });
+
+  test("fingerprints rating changes and recognizes the last Main Show segment before a post-show angle", () => {
+    const first = testProfile("Jay White", "white");
+    const second = testProfile("PAC", "pac");
+    const workers = [
+      { profile: first, plan: testPlan(first, ["dirty-rulebreaker"]), workbookMetrics: null as StartingUniverseWorkbookMetrics | null },
+      { profile: second, plan: testPlan(second, ["counter-specialist"]), workbookMetrics: null as StartingUniverseWorkbookMetrics | null },
+    ];
+    const settings = { authority: "tew-authoritative" as const, volatility: 5, bookingInfluence: 0, importance: "Auto" as const, chemistry: 0 };
+    const input = { workers, aimId: "competitive-tv-match" as const, durationMinutes: 12, plannedWinner: "", settings, importance: "Main Event" as const };
+    const before = performancePreviewInputFingerprint(input);
+    first.health -= 1;
+    expect(performancePreviewInputFingerprint(input)).not.toBe(before);
+    const workbookMetrics = { botchRisk: 4, staminaCapacity: 8 } as StartingUniverseWorkbookMetrics;
+    workers[0].workbookMetrics = workbookMetrics;
+    const withWorkbook = performancePreviewInputFingerprint(input);
+    workbookMetrics.botchRisk = 5;
+    expect(performancePreviewInputFingerprint(input)).not.toBe(withWorkbook);
+    const match = createPlannedSegment("match");
+    match.section = "Main Show";
+    const postShow = createPlannedSegment("angle");
+    postShow.section = "Post-Show";
+    expect(resolveMatchImportance("Auto", match, [match, postShow])).toBe("Main Event");
+  });
+
+  test("uses the same complete approach-plan formula in the workbench", () => {
+    const worker = testProfile();
+    const result = evaluateApproachPlan(worker, "competitive-tv-match", 20, ["big-match-performer", "aerial-showstopper", "hardcore-daredevil", "power-dominance"]);
+    const recommendationTotal = result.candidateScores.reduce((sum, score) => sum + score.total, 0);
+    const expected = recommendationTotal + result.pace.modifier * 1.5 + result.stamina.modifier * 3
+      + 3 + 4 - Math.max(0, result.usedStamina - result.availableStamina) * 25;
+    expect(result.totalScore).toBeCloseTo(expected, 2);
   });
 });
