@@ -214,7 +214,7 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(pac.health).toBeLessThan(95);
     expect(result.profiles.find((profile) => profile.workerName === "PAC")?.momentum).toBe(pac.momentum);
     expect(result.profiles.find((profile) => profile.workerName === "PAC")?.popularity).toBe(pac.popularity);
-    expect(result.universe.applications[0]).toMatchObject({ calculationVersion: "wrestling-sim-calculations-6b18-v1", idempotencyKey: expect.stringContaining("match-consequences") });
+    expect(result.universe.applications[0]).toMatchObject({ calculationVersion: "wrestling-sim-calculations-6b20a-v1", idempotencyKey: expect.stringContaining("match-consequences") });
     expect(pac.matchHistory[0].result).toBe("W");
     expect(result.shows[0].segments[0]).toMatchObject({ workflowStatus: "Reconciled", reconciliation: { actualMatch: { winner: "PAC", rating: 86 }, finalNarrative: "PAC forced Jay White to submit." } });
     expect(() => applyCoreResultConsequences({

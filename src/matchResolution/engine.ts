@@ -11,7 +11,14 @@ import {
   scoreApproachCandidate,
 } from "../matchEngine/model";
 import { MATCH_APPROACHES } from "../matchEngine/catalog";
-import { calculateStarRating } from "../calculations/foundation";
+import {
+  CALCULATION_FORMULAS,
+  calculateStarRating,
+  calculateSuitabilityBreakdown,
+  createCalculationStage,
+  createCalculationTerm,
+  roundCalculation,
+} from "../calculations/foundation";
 import { calculateLiveMatchAudience } from "../crowd/model";
 import type { MatchAnticipation } from "../crowd/types";
 import type { MatchEngineProfile } from "../matchEngine/types";
@@ -38,6 +45,7 @@ import type {
   MatchResolutionWorkerResult,
   MatchResolutionWorkerSettings,
   MatchResolutionWorkerSource,
+  MatchResolutionOutcomeLedger,
   ResolveSinglesMatchInput,
   ResolveMatchInput,
   ResolutionApproachId,
@@ -155,6 +163,14 @@ function scoreApproach(
   const canonicalId = matchEngineIdForImportedApproachId(approachId);
   const canonical = MATCH_APPROACHES.find((item) => item.id === canonicalId)!;
   const candidate = scoreApproachCandidate(source.profile, setup.aimId, canonical, { ratingOverride: rating, opponentCompatibility: opponentFit });
+  const suitability = calculateSuitabilityBreakdown(rating, {
+    style: candidate.styleBonus,
+    aim: candidate.aimCompatibility,
+    pace: candidate.paceBonus,
+    stamina: candidate.staminaEfficiency,
+    opponent: candidate.opponentCompatibility,
+  });
+  const formula = CALCULATION_FORMULAS.approachSuitability;
   return {
     approachId,
     approachName: approach.name,
@@ -165,6 +181,15 @@ function scoreApproach(
     paceFit: candidate.paceBonus,
     staminaEfficiency: candidate.staminaEfficiency,
     total: candidate.total,
+    calculation: createCalculationStage(formula, [
+      createCalculationTerm("raw-rating", "Raw approach rating", rating, formula.abilityWeight, "The wrestler's ability in this approach."),
+      createCalculationTerm("match-suitability", "Normalized match suitability", suitability.contextualScore, formula.suitabilityWeight, `Style ${candidate.styleBonus >= 0 ? "+" : ""}${candidate.styleBonus}; aim ${candidate.aimCompatibility >= 0 ? "+" : ""}${candidate.aimCompatibility}; pace ${candidate.paceBonus >= 0 ? "+" : ""}${candidate.paceBonus}; stamina +${candidate.staminaEfficiency}; opponent ${candidate.opponentCompatibility >= 0 ? "+" : ""}${candidate.opponentCompatibility}.`),
+    ], {
+      notes: [
+        `Context total ${suitability.contextualTotal} is normalized with (context + ${formula.contextualOffset}) / ${formula.contextualRange} x 100 before its 25% weight.`,
+        "This recommendation score helps select an approach. The official performance calculation later uses the raw approach rating and recalculates match fit separately.",
+      ],
+    }),
     reasons: [
       ...candidate.reasons,
       `${rating.toFixed(1)} ${source.workbookMetrics ? "workbook-derived" : "profile-derived"} rating source`,
@@ -192,7 +217,8 @@ function selectedApproaches(
   source: MatchResolutionWorkerSource,
   opponents: MatchResolutionWorkerSource[],
   setup: MatchResolutionSetup,
-): { ids: ResolutionApproachId[]; scores: MatchResolutionApproachScore[] } {
+): { ids: ResolutionApproachId[]; scores: MatchResolutionApproachScore[]; plan: ReturnType<typeof createCalculationStage> } {
+  const planFormula = CALCULATION_FORMULAS.resolutionApproachPlan;
   const slots = approachLimitForSetup(setup.durationMinutes, setup.approachLimit);
   const locked = worker.approachMode === "AI" ? uniqueApproaches(worker.lockedApproachIds).slice(0, slots) : [];
   const manual = uniqueApproaches(worker.manualApproachIds).filter((id) => !locked.includes(id));
@@ -209,15 +235,36 @@ function selectedApproaches(
     const stamina = evaluateStamina(staminaUsed, staminaAvailable);
     const actualPace = ids.reduce((total, id) => total + resolutionApproach(id).pace, 0);
     const pace = evaluatePace(idealPaceForAim(setup.aimId), actualPace);
-    const diversity = new Set(ids.map((id) => resolutionApproach(id).pace)).size >= 2 && ids.length >= 3 ? 3 : 0;
-    const total = scores.reduce((sum, item) => sum + item.total, 0) + stamina.modifier * 4 + pace.modifier * 1.4 + diversity;
+    const diversity = new Set(ids.map((id) => resolutionApproach(id).pace)).size >= 2 && ids.length >= 3 ? planFormula.diversityBonus : 0;
+    const total = scores.reduce((sum, item) => sum + item.total, 0) + stamina.modifier * planFormula.staminaModifierWeight + pace.modifier * planFormula.paceModifierWeight + diversity;
     if (total > bestScore || (total === bestScore && staminaUsed < bestIds.reduce((sum, id) => sum + resolutionApproach(id).staminaCost, 0))) {
       bestScore = total;
       bestIds = ids;
       bestScores = scores;
     }
   }
-  return { ids: bestIds, scores: bestScores };
+  const staminaUsed = bestIds.reduce((total, id) => total + resolutionApproach(id).staminaCost, 0);
+  const staminaAvailable = source.workbookMetrics?.staminaCapacity ?? profileStaminaCapacity(source.profile);
+  const stamina = evaluateStamina(staminaUsed, staminaAvailable);
+  const actualPace = bestIds.reduce((total, id) => total + resolutionApproach(id).pace, 0);
+  const pace = evaluatePace(idealPaceForAim(setup.aimId), actualPace);
+  const diversity = new Set(bestIds.map((id) => resolutionApproach(id).pace)).size >= 2 && bestIds.length >= 3 ? planFormula.diversityBonus : 0;
+  const terms = [
+    ...bestScores.map((score) => createCalculationTerm(`recommendation-${score.approachId}`, `${score.approachName} recommendation`, score.total, 1, "Selection-only recommendation score.")),
+    createCalculationTerm("stamina", "Stamina modifier", stamina.modifier, planFormula.staminaModifierWeight, `${staminaUsed}/${staminaAvailable} stamina: ${stamina.status}.`),
+    createCalculationTerm("pace", "Pace modifier", pace.modifier, planFormula.paceModifierWeight, `Pace ${actualPace} against ideal ${idealPaceForAim(setup.aimId)}: ${pace.status}.`),
+    createCalculationTerm("variety", "Pace-variety bonus", diversity, 1, diversity ? "Three or more approaches use at least two pace levels." : "No pace-variety bonus applied."),
+  ];
+  return {
+    ids: bestIds,
+    scores: bestScores,
+    plan: createCalculationStage(planFormula, terms, {
+      notes: [
+        worker.approachMode === "AI" ? "The AI selected the highest-scoring eligible combination after honoring locked approaches." : "Manual approaches were preserved; the AI filled any unused slots.",
+        "This plan score selects approaches only and is not added directly to in-ring performance.",
+      ],
+    }),
+  };
 }
 
 function pairInteraction(own: ResolutionApproachId[], opponent: ResolutionApproachId[]): number {
@@ -225,20 +272,25 @@ function pairInteraction(own: ResolutionApproachId[], opponent: ResolutionApproa
   return round(average(own.flatMap((ownId) => opponent.map((opponentId) => APPROACH_INTERACTIONS[ownId]?.[opponentId] ?? 0))), 2);
 }
 
-function presentationScore(profile: MatchEngineProfile): number {
-  return clamp(
-    profile.overall * 0.24 +
-    profile.popularity * 0.18 +
-    profile.experience * 0.1 +
-    profile.skills.Charisma * 0.14 +
-    profile.skills.Psychology * 0.14 +
-    profile.skills.Selling * 0.1 +
-    profile.fanReaction * 20 * 0.06 +
-    profile.gimmick * 20 * 0.04,
-  );
+function presentationScore(profile: MatchEngineProfile) {
+  const formula = CALCULATION_FORMULAS.presentation;
+  const terms = [
+    createCalculationTerm("overall", "Overall", profile.overall, formula.weights.overall),
+    createCalculationTerm("popularity", "Popularity", profile.popularity, formula.weights.popularity),
+    createCalculationTerm("experience", "Experience", profile.experience, formula.weights.experience),
+    createCalculationTerm("charisma", "Charisma", profile.skills.Charisma, formula.weights.charisma),
+    createCalculationTerm("psychology", "Psychology", profile.skills.Psychology, formula.weights.psychology),
+    createCalculationTerm("selling", "Selling", profile.skills.Selling, formula.weights.selling),
+    createCalculationTerm("fan-reaction", "Fan reaction (five-star value x 20)", profile.fanReaction * 20, formula.weights.fanReaction),
+    createCalculationTerm("gimmick", "Gimmick (five-star value x 20)", profile.gimmick * 20, formula.weights.gimmick),
+  ];
+  const ledger = createCalculationStage(formula, terms);
+  return { value: ledger.cappedSubtotal, ledger };
 }
 
 function mentalState(profile: MatchEngineProfile, pressure: number, random: () => number) {
+  const baseFormula = CALCULATION_FORMULAS.mentalBase;
+  const randomness = CALCULATION_FORMULAS.executionRandomness;
   const inputs = {
     health: profile.health,
     consistency: profile.skills.Consistency,
@@ -246,16 +298,35 @@ function mentalState(profile: MatchEngineProfile, pressure: number, random: () =
     overall: profile.overall,
   };
   const base = calculateMentalStateBase(inputs);
-  const luck = round(random() * 24 - 12);
-  const swingChance = mentalSwingProbability(profile.skills.Consistency) + pressure * 0.002;
-  const swing = random() < swingChance ? (random() < 0.5 ? -18 : 18) : 0;
+  const luckRoll = random();
+  const luck = round(luckRoll * (randomness.luckMaximum - randomness.luckMinimum) + randomness.luckMinimum);
+  const swingChance = mentalSwingProbability(profile.skills.Consistency) + pressure * randomness.swingPressureWeight;
+  const swingOccurrenceRoll = random();
+  const swingDirectionRoll = swingOccurrenceRoll < swingChance ? random() : null;
+  const swing = swingDirectionRoll === null ? 0 : swingDirectionRoll < 0.5 ? -randomness.swingMagnitude : randomness.swingMagnitude;
   const score = calculateMentalStateScore({
     ...inputs,
     luck,
     swing,
   });
   const state = classifyMentalState(score);
-  return { base: round(base), luck, swing, score: round(score), state };
+  const baseLedger = createCalculationStage(baseFormula, [
+    createCalculationTerm("baseline", "Baseline", baseFormula.baseline),
+    createCalculationTerm("health", "Health above/below 75", profile.health - baseFormula.healthReference, baseFormula.healthWeight),
+    createCalculationTerm("consistency", "Consistency above/below 60", profile.skills.Consistency - baseFormula.consistencyReference, baseFormula.consistencyWeight),
+    createCalculationTerm("experience", "Experience above/below 60", profile.experience - baseFormula.experienceReference, baseFormula.experienceWeight),
+    createCalculationTerm("overall", "Overall above/below 60", profile.overall - baseFormula.overallReference, baseFormula.overallWeight),
+  ]);
+  const scoreFormula = CALCULATION_FORMULAS.mentalScore;
+  const scoreLedger = createCalculationStage(scoreFormula, [
+    createCalculationTerm("base", "Mental-state base", base),
+    createCalculationTerm("luck", "Random luck", luck, 1, `Roll ${roundCalculation(luckRoll, 6)} mapped to ${randomness.luckMinimum} through +${randomness.luckMaximum}.`),
+    createCalculationTerm("swing", "Rare swing", swing, 1, swingDirectionRoll === null ? `Occurrence roll ${roundCalculation(swingOccurrenceRoll, 6)} did not beat the ${roundCalculation(swingChance * 100, 3)}% chance.` : `Occurrence roll ${roundCalculation(swingOccurrenceRoll, 6)} triggered the swing; direction roll ${roundCalculation(swingDirectionRoll, 6)} selected ${swing > 0 ? "positive" : "negative"}.`),
+  ], { notes: [
+    `${state.name} maps the ${round(score)} mental score to a ${state.modifier >= 0 ? "+" : ""}${state.modifier} performance modifier.`,
+    `Rare-swing chance includes consistency plus the ${pressure} pressure rating for ${roundCalculation(swingChance * 100, 3)}%.`,
+  ] });
+  return { base: round(base), luck, swing, score: round(score), state, baseLedger, scoreLedger };
 }
 
 function botchRisk(profile: MatchEngineProfile, metrics: StartingUniverseWorkbookMetrics | null): number {
@@ -269,28 +340,32 @@ function botchRisk(profile: MatchEngineProfile, metrics: StartingUniverseWorkboo
   ])));
 }
 
-function incidentForWorker(risk: number, random: () => number): { label: string; penalty: number } {
-  const chance = clamp(risk * 0.22, 0, 18) / 100;
-  if (random() >= chance) return { label: "", penalty: 0 };
-  const severity = random();
-  if (severity > 0.9) return { label: "A major execution mistake disrupted the closing stretch.", penalty: -10 };
-  if (severity > 0.55) return { label: "A visible botch forced the wrestlers to recover the sequence.", penalty: -6 };
-  return { label: "A minor timing mistake briefly interrupted the flow.", penalty: -3 };
+function incidentForWorker(risk: number, random: () => number) {
+  const formula = CALCULATION_FORMULAS.executionRandomness;
+  const chance = clamp(risk * formula.botchChanceWeight, 0, formula.botchChanceMaximumPercent) / 100;
+  const occurrenceRoll = random();
+  if (occurrenceRoll >= chance) return { label: "", penalty: 0, chance, occurrenceRoll, severityRoll: null };
+  const severityRoll = random();
+  if (severityRoll > formula.majorIncidentThreshold) return { label: "A major execution mistake disrupted the closing stretch.", penalty: formula.majorIncidentPenalty, chance, occurrenceRoll, severityRoll };
+  if (severityRoll > formula.visibleIncidentThreshold) return { label: "A visible botch forced the wrestlers to recover the sequence.", penalty: formula.visibleIncidentPenalty, chance, occurrenceRoll, severityRoll };
+  return { label: "A minor timing mistake briefly interrupted the flow.", penalty: formula.minorIncidentPenalty, chance, occurrenceRoll, severityRoll };
 }
 
 function workerResult(
   source: MatchResolutionWorkerSource,
   settings: MatchResolutionWorkerSettings,
   setup: MatchResolutionSetup,
-  approaches: { ids: ResolutionApproachId[]; scores: MatchResolutionApproachScore[] },
+  approaches: { ids: ResolutionApproachId[]; scores: MatchResolutionApproachScore[]; plan: ReturnType<typeof createCalculationStage> },
   opponentApproaches: ResolutionApproachId[][],
   random: () => number,
 ): MatchResolutionWorkerResult {
   const profile = source.profile;
   const importance = IMPORTANCE_MODIFIERS[setup.importance];
   const mental = mentalState(profile, importance.pressure, random);
-  const consistencyRange = ((100 - profile.skills.Consistency) / 100) * setup.volatility * 1.5;
-  const consistencyVariance = round((random() * 2 - 1) * consistencyRange);
+  const randomness = CALCULATION_FORMULAS.executionRandomness;
+  const consistencyRange = ((100 - profile.skills.Consistency) / 100) * setup.volatility * randomness.consistencyRangeWeight;
+  const consistencyRoll = random();
+  const consistencyVariance = round((consistencyRoll * 2 - 1) * consistencyRange);
   const staminaUsed = approaches.ids.reduce((total, id) => total + resolutionApproach(id).staminaCost, 0);
   const staminaAvailable = source.workbookMetrics?.staminaCapacity ?? profileStaminaCapacity(profile);
   const stamina = evaluateStamina(staminaUsed, staminaAvailable);
@@ -301,33 +376,74 @@ function workerResult(
   const incident = incidentForWorker(risk, random);
   const averageApproachRating = approaches.scores.length ? average(approaches.scores.map((score) => score.rating)) : profile.overall * 0.6;
   const averageAimFit = average(approaches.scores.map((score) => score.aimFit + score.styleFit + score.opponentFit));
+  const executionFormula = CALCULATION_FORMULAS.approachExecution;
+  const executionTerms = [
+    createCalculationTerm("approach-rating", "Average raw approach rating", averageApproachRating),
+    createCalculationTerm("mental", "Mental-state modifier", mental.state.modifier),
+    createCalculationTerm("stamina", "Stamina modifier", stamina.modifier, 1, `${staminaUsed}/${staminaAvailable}: ${stamina.status}.`),
+    createCalculationTerm("pace", "Pace modifier", pace.modifier, executionFormula.paceModifierWeight, `Actual ${actualPace}; ideal ${idealPaceForAim(setup.aimId)}: ${pace.status}.`),
+    createCalculationTerm("consistency", "Random consistency variance", consistencyVariance, 1, `Roll ${roundCalculation(consistencyRoll, 6)} within the ${roundCalculation(-consistencyRange, 3)} to +${roundCalculation(consistencyRange, 3)} range created by consistency ${profile.skills.Consistency} and volatility ${setup.volatility}.`),
+    createCalculationTerm("chemistry", "Chemistry", setup.chemistry, executionFormula.chemistryWeight),
+    createCalculationTerm("fit", "Average aim, style, and opponent fit", averageAimFit, executionFormula.fitWeight),
+    createCalculationTerm("incident", "Execution-incident penalty", incident.penalty, 1, `${incident.label || "No incident occurred."} Botch risk ${risk} created a ${roundCalculation(incident.chance * 100, 3)}% incident chance; occurrence roll ${roundCalculation(incident.occurrenceRoll, 6)}${incident.severityRoll === null ? "." : `; severity roll ${roundCalculation(incident.severityRoll, 6)}.`}`),
+  ];
   const approachExecution = clamp(
     averageApproachRating +
     mental.state.modifier +
     stamina.modifier +
-    pace.modifier * 0.25 +
+    pace.modifier * executionFormula.paceModifierWeight +
     consistencyVariance +
-    setup.chemistry * 0.3 +
-    averageAimFit * 0.18 +
+    setup.chemistry * executionFormula.chemistryWeight +
+    averageAimFit * executionFormula.fitWeight +
     incident.penalty,
   );
+  const executionLedger = createCalculationStage(executionFormula, executionTerms);
   const presentation = presentationScore(profile);
-  const performanceScore = clamp(approachExecution * 0.72 + presentation * 0.28 + importance.performance);
-  const storyNeedModifier = settings.storyNeed * 0.4;
-  const momentumModifier = (clamp(settings.momentum) - 50) * 0.12;
-  const bookingModifier = settings.bookingBias * 0.4;
-  const volatilityNoise = round((random() * 2 - 1) * setup.volatility);
+  const performanceFormula = CALCULATION_FORMULAS.performance;
+  const performanceTerms = [
+    createCalculationTerm("approach-execution", "Approach execution", approachExecution, performanceFormula.approachExecutionWeight),
+    createCalculationTerm("presentation", "Presentation", presentation.value, performanceFormula.presentationWeight),
+    createCalculationTerm("importance", `${setup.importance} importance bonus`, importance.performance),
+  ];
+  const performanceScore = clamp(
+    approachExecution * performanceFormula.approachExecutionWeight +
+    presentation.value * performanceFormula.presentationWeight +
+    importance.performance,
+  );
+  const performanceLedger = createCalculationStage(performanceFormula, performanceTerms);
+  const competitiveFormula = CALCULATION_FORMULAS.competitive;
+  const storyNeedModifier = settings.storyNeed * competitiveFormula.storyNeedWeight;
+  const momentumModifier = (clamp(settings.momentum) - 50) * competitiveFormula.momentumWeight;
+  const bookingModifier = settings.bookingBias * competitiveFormula.bookingWeight;
+  const volatilityRoll = random();
+  const volatilityNoise = round((volatilityRoll * 2 - 1) * setup.volatility);
   const finishingEdge = average(approaches.ids.map((id) => {
     if (["dirty-rulebreaker", "opportunistic-schemer", "counter-specialist", "submission-specialist"].includes(id)) return 4;
     if (["power-dominance", "strong-style-specialist", "heavy-striker-brawler"].includes(id)) return 3;
     return 1;
   }));
   const finishingRating = finishingEdge * 25;
-  const performanceComponent = performanceScore * 0.55;
-  const psychologyExperienceComponent = profile.skills.Psychology * 0.12 + profile.experience * 0.08;
-  const resilienceComponent = average([profile.skills.Resilience, profile.skills.Toughness]) * 0.08;
-  const finishingComponent = finishingRating * 0.07;
-  const healthComponent = profile.health * 0.1;
+  const performanceComponent = performanceScore * competitiveFormula.performanceWeight;
+  const psychologyComponent = profile.skills.Psychology * competitiveFormula.psychologyWeight;
+  const experienceComponent = profile.experience * competitiveFormula.experienceWeight;
+  const psychologyExperienceComponent = psychologyComponent + experienceComponent;
+  const resilienceRating = average([profile.skills.Resilience, profile.skills.Toughness]);
+  const resilienceComponent = resilienceRating * competitiveFormula.resilienceWeight;
+  const finishingComponent = finishingRating * competitiveFormula.finishingWeight;
+  const healthComponent = profile.health * competitiveFormula.healthWeight;
+  const competitiveTerms = [
+    createCalculationTerm("performance", "Individual performance", performanceScore, competitiveFormula.performanceWeight),
+    createCalculationTerm("psychology", "Psychology", profile.skills.Psychology, competitiveFormula.psychologyWeight),
+    createCalculationTerm("experience", "Experience", profile.experience, competitiveFormula.experienceWeight),
+    createCalculationTerm("resilience", "Average resilience and toughness", resilienceRating, competitiveFormula.resilienceWeight),
+    createCalculationTerm("finishing", "Normalized finishing-style rating", finishingRating, competitiveFormula.finishingWeight),
+    createCalculationTerm("health", "Health", profile.health, competitiveFormula.healthWeight),
+    createCalculationTerm("interaction", "Opponent approach interaction", interactionModifier),
+    createCalculationTerm("story-need", "Story need", settings.storyNeed, competitiveFormula.storyNeedWeight),
+    createCalculationTerm("momentum", "Momentum above/below 50", clamp(settings.momentum) - 50, competitiveFormula.momentumWeight),
+    createCalculationTerm("booker", "Booker influence", settings.bookingBias, competitiveFormula.bookingWeight),
+    createCalculationTerm("volatility", "Random competitive volatility", volatilityNoise, 1, `Roll ${roundCalculation(volatilityRoll, 6)} mapped to -${setup.volatility} through +${setup.volatility}.`),
+  ];
   const competitiveScore = clamp(
     performanceComponent +
     psychologyExperienceComponent +
@@ -342,6 +458,7 @@ function workerResult(
     0,
     120,
   );
+  const competitiveLedger = createCalculationStage(competitiveFormula, competitiveTerms);
   return {
     workerKey: profile.workerKey,
     workerId: profile.workerId,
@@ -351,7 +468,7 @@ function workerResult(
     approachScores: approaches.scores,
     averageApproachRating: round(averageApproachRating),
     approachExecution: round(approachExecution),
-    presentationScore: round(presentation),
+    presentationScore: round(presentation.value),
     performanceScore: round(performanceScore),
     competitiveScore: round(competitiveScore),
     winProbability: 0,
@@ -388,11 +505,21 @@ function workerResult(
       { label: "Booker influence", value: round(bookingModifier) },
       { label: "Competitive volatility", value: round(volatilityNoise) },
     ],
+    calculationLedger: {
+      approachPlan: approaches.plan,
+      mentalBase: mental.baseLedger,
+      mentalState: mental.scoreLedger,
+      approachExecution: executionLedger,
+      presentation: presentation.ledger,
+      performance: performanceLedger,
+      competitive: competitiveLedger,
+    },
   };
 }
 
 function applyProbabilities(results: MatchResolutionWorkerResult[], volatility: number): MatchResolutionWorkerResult[] {
-  const temperature = 8 + volatility * 0.8;
+  const formula = CALCULATION_FORMULAS.outcomeProbability;
+  const temperature = formula.temperatureBase + volatility * formula.volatilityWeight;
   const minimum = Math.min(...results.map((result) => result.competitiveScore));
   const weights = results.map((result) => Math.exp((result.competitiveScore - minimum) / temperature));
   const total = weights.reduce((sum, value) => sum + value, 0) || 1;
@@ -439,10 +566,69 @@ function teamResultsFor(
     winProbability: 0,
   }));
   const minimum = Math.min(...teams.map((team) => team.competitiveScore));
-  const temperature = 8 + setup.volatility * 0.8;
+  const probabilityFormula = CALCULATION_FORMULAS.outcomeProbability;
+  const temperature = probabilityFormula.temperatureBase + setup.volatility * probabilityFormula.volatilityWeight;
   const weights = teams.map((team) => Math.exp((team.competitiveScore - minimum) / temperature));
   const total = weights.reduce((sum, value) => sum + value, 0) || 1;
   return teams.map((team, index) => ({ ...team, winProbability: weights[index] / total }));
+}
+
+function outcomeLedgerFor(
+  setup: MatchResolutionSetup,
+  workerResults: MatchResolutionWorkerResult[],
+  teams: MatchResolutionTeamResult[],
+  resultRoll: number,
+  selectedKey: string,
+  selectedLabel: string,
+): MatchResolutionOutcomeLedger {
+  const formula = CALCULATION_FORMULAS.outcomeProbability;
+  const teamOutcome = teams.length > 0;
+  const items = teamOutcome ? teams : workerResults.map((worker) => ({
+    id: worker.workerKey,
+    name: worker.workerName,
+    memberKeys: [worker.workerKey],
+    memberNames: [worker.workerName],
+    competitiveScore: worker.competitiveScore,
+    winProbability: worker.winProbability,
+  }));
+  const temperature = formula.temperatureBase + setup.volatility * formula.volatilityWeight;
+  const fieldMinimum = Math.min(...items.map((item) => item.competitiveScore));
+  const rawEntries = items.map((item) => {
+    const memberScores = item.memberKeys.map((key) => workerResults.find((worker) => worker.workerKey === key)?.competitiveScore ?? 0);
+    const teamSizeBonus = teamOutcome ? Math.min(4, Math.max(0, memberScores.length - 1)) : 0;
+    const scoreAboveMinimum = item.competitiveScore - fieldMinimum;
+    const exponentialWeight = Math.exp(scoreAboveMinimum / temperature);
+    return { item, memberScores, teamSizeBonus, scoreAboveMinimum, exponentialWeight };
+  });
+  const totalExponentialWeight = rawEntries.reduce((total, entry) => total + entry.exponentialWeight, 0) || 1;
+  return {
+    formulaId: formula.id,
+    label: formula.label,
+    formula: formula.formula,
+    volatility: setup.volatility,
+    temperature: roundCalculation(temperature, 6),
+    fieldMinimum: roundCalculation(fieldMinimum, 6),
+    totalExponentialWeight: roundCalculation(totalExponentialWeight, 6),
+    entries: rawEntries.map(({ item, memberScores, teamSizeBonus, scoreAboveMinimum, exponentialWeight }) => ({
+      key: item.id,
+      label: item.name,
+      memberScores,
+      teamSizeBonus,
+      competitiveScore: item.competitiveScore,
+      scoreAboveMinimum: roundCalculation(scoreAboveMinimum, 6),
+      exponentialWeight: roundCalculation(exponentialWeight, 6),
+      probability: roundCalculation(exponentialWeight / totalExponentialWeight, formula.roundingPlaces),
+    })),
+    resultRoll,
+    selectedKey,
+    selectedLabel,
+    roundingPlaces: formula.roundingPlaces,
+    notes: [
+      `Temperature = ${formula.temperatureBase} + (volatility ${setup.volatility} x ${formula.volatilityWeight}) = ${roundCalculation(temperature, 2)}.`,
+      teamOutcome ? "Each team's competitive score is the average of its members plus up to four points for team size." : "Each wrestler's competitive score is converted directly into a probability weight.",
+      "The result roll is compared with cumulative probabilities in displayed order; it does not alter any score.",
+    ],
+  };
 }
 
 function selectByProbability<T extends { winProbability: number }>(items: T[], roll: number): T {
@@ -537,9 +723,10 @@ function actualDuration(setup: MatchResolutionSetup, results: MatchResolutionWor
   return round(Math.max(1, setup.durationMinutes * (1 + (random() * 2 - 1) * variance + paceAdjustment)), 2);
 }
 
-function matchScore(results: MatchResolutionWorkerResult[], setup: MatchResolutionSetup): number {
+function matchScore(results: MatchResolutionWorkerResult[], setup: MatchResolutionSetup) {
+  const formula = CALCULATION_FORMULAS.matchQuality;
   const performanceAverage = average(results.map((result) => result.performanceScore));
-  const structure = average(results.map((result) => clamp(72 + result.paceModifier * 1.2 + result.staminaModifier * 2)));
+  const structure = average(results.map((result) => clamp(formula.structureBaseline + result.paceModifier * formula.structurePaceWeight + result.staminaModifier * formula.structureStaminaWeight)));
   const meanPerformance = average(results.map((result) => result.performanceScore));
   const meanDeviation = average(results.map((result) => Math.abs(result.performanceScore - meanPerformance)));
   const ordered = [...results].sort((left, right) => right.performanceScore - left.performanceScore);
@@ -547,8 +734,26 @@ function matchScore(results: MatchResolutionWorkerResult[], setup: MatchResoluti
   const closeness = setup.aimId === "squash-dominant-showcase" || normalize(setup.matchType).includes("squash")
     ? clamp(60 + dominanceGap * 2)
     : clamp(100 - meanDeviation * 2);
-  const incidentPenalty = results.reduce((total, result) => total + (result.incident ? 3 : 0), 0);
-  return round(clamp(performanceAverage * 0.8 + structure * 0.12 + closeness * 0.08 + setup.chemistry * 0.5 - incidentPenalty));
+  const incidentCount = results.filter((result) => result.incident).length;
+  const incidentPenalty = incidentCount * formula.incidentPenalty;
+  const terms = [
+    createCalculationTerm("performance", "Average individual performance", performanceAverage, formula.performanceWeight),
+    createCalculationTerm("structure", "Average pace/stamina structure", structure, formula.structureWeight, `Per wrestler: ${formula.structureBaseline} + pace modifier x ${formula.structurePaceWeight} + stamina modifier x ${formula.structureStaminaWeight}, capped 0-100.`),
+    createCalculationTerm("closeness", setup.aimId === "squash-dominant-showcase" || normalize(setup.matchType).includes("squash") ? "Squash dominance" : "Competitive closeness", closeness, formula.closenessWeight),
+    createCalculationTerm("chemistry", "Chemistry bonus", setup.chemistry, formula.chemistryWeight),
+    createCalculationTerm("incidents", "Flat match-level incident penalty", incidentCount, -formula.incidentPenalty, `${incidentCount} wrestler incident${incidentCount === 1 ? "" : "s"}.`),
+  ];
+  const raw = performanceAverage * formula.performanceWeight + structure * formula.structureWeight + closeness * formula.closenessWeight + setup.chemistry * formula.chemistryWeight - incidentPenalty;
+  const ledger = createCalculationStage(formula, terms, {
+    rawSubtotal: raw,
+    notes: [
+      setup.aimId === "squash-dominant-showcase" || normalize(setup.matchType).includes("squash")
+        ? `Squash closeness uses 60 + (performance dominance gap x 2) = ${round(closeness)}.`
+        : `Regular-match closeness uses 100 - (mean performance deviation x 2) = ${round(closeness)}.`,
+      "This is the raw in-ring performance rating. Live crowd response is calculated separately when the result is locked into the card.",
+    ],
+  });
+  return { score: ledger.result, ledger };
 }
 
 export function resolveMatch(input: ResolveMatchInput): MatchResolutionAttempt {
@@ -646,8 +851,8 @@ export function resolveMatch(input: ResolveMatchInput): MatchResolutionAttempt {
           ? `${fallWinner.workerName} survived the elimination match and secured the final elimination over ${fallLoser.workerName}.`
           : finishDescription(finishType, fallWinner, fallLoser),
     actualDurationMinutes: duration,
-    matchScore: score,
-    starRating: calculateStarRating(score),
+    matchScore: score.score,
+    starRating: calculateStarRating(score.score),
     performanceLeaderKey: performanceLeader.workerKey,
     performanceLeaderName: performanceLeader.workerName,
     winnerProbability: winningTeam.winProbability,
@@ -663,6 +868,7 @@ export function resolveMatch(input: ResolveMatchInput): MatchResolutionAttempt {
       ...workerResults.flatMap((item) => item.incident ? [`${item.workerName}: ${item.incident}`] : []),
     ],
   };
+  const outcomeLedger = outcomeLedgerFor(input.setup, workerResults, teams, roll, winningTeam.id, winnerName);
   return {
     id: createMatchEngineId(), number: 1, seed,
     setupFingerprint: matchResolutionSetupFingerprint(input.setup, input.workers),
@@ -670,6 +876,7 @@ export function resolveMatch(input: ResolveMatchInput): MatchResolutionAttempt {
     calculationVersion: RESOLUTION_CALCULATION_VERSION,
     generatedAt: new Date().toISOString(), status: "Calculated", workerResults,
     engineResult: result, finalResult: null,
+    calculationLedger: { version: RESOLUTION_CALCULATION_VERSION, matchQuality: score.ledger, outcome: outcomeLedger },
   };
 }
 
@@ -698,8 +905,8 @@ export function resolveSinglesMatch(input: ResolveSinglesMatchInput): MatchResol
     finishType,
     finishDescription: finishDescription(finishType, winner, loser),
     actualDurationMinutes: duration,
-    matchScore: score,
-    starRating: calculateStarRating(score),
+    matchScore: score.score,
+    starRating: calculateStarRating(score.score),
     performanceLeaderKey: performanceLeader.workerKey,
     performanceLeaderName: performanceLeader.workerName,
     winnerProbability: winner.winProbability,
@@ -718,6 +925,7 @@ export function resolveSinglesMatch(input: ResolveSinglesMatchInput): MatchResol
       ...workerResults.flatMap((item) => item.incident ? [`${item.workerName}: ${item.incident}`] : []),
     ],
   };
+  const outcomeLedger = outcomeLedgerFor(input.setup, workerResults, [], roll, winner.workerKey, winner.workerName);
   return {
     id: createMatchEngineId(),
     number: 1,
@@ -730,6 +938,7 @@ export function resolveSinglesMatch(input: ResolveSinglesMatchInput): MatchResol
     workerResults,
     engineResult: result,
     finalResult: null,
+    calculationLedger: { version: RESOLUTION_CALCULATION_VERSION, matchQuality: score.ledger, outcome: outcomeLedger },
   };
 }
 

@@ -44,6 +44,15 @@ test("books wrestlers without a winner, runs one official result, and preserves 
   await expect(page.locator(".match-resolution-result").getByText("OFFICIAL ENGINE RESULT", { exact: true })).toBeVisible();
   await expect(page.getByText("Result roll", { exact: true })).toBeVisible();
   await expect(page.getByText("Performance MVP", { exact: true })).toBeVisible();
+  const ledger = page.getByLabel("Complete match calculation ledger");
+  await expect(ledger.getByRole("heading", { name: "Every score stays in its own lane" })).toBeVisible();
+  await expect(ledger.getByText("Recommendation", { exact: true })).toBeVisible();
+  await expect(ledger.getByText("Raw match", { exact: true })).toBeVisible();
+  await expect(ledger.getByText("Crowd response", { exact: true })).toBeVisible();
+  await expect(ledger.getByText("Final rating", { exact: true })).toBeVisible();
+  await ledger.getByText("Open full input, weight, bonus, penalty, cap, and rounding breakdown", { exact: true }).click();
+  await expect(ledger.getByText("Raw in-ring match score", { exact: true }).first()).toBeVisible();
+  await expect(ledger.getByText("Win probability and result roll", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Create New Calculation After Material Change" })).toBeDisabled();
 
   const engineWinnerText = await page.locator(".match-resolution-result > header h2").textContent();

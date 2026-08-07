@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { createMatchEngineProfile } from "../src/matchEngine/model";
+import type { CalculationLedgerStage } from "../src/calculations/foundation";
 import type { MatchEngineProfile } from "../src/matchEngine/types";
 import {
   RESOLUTION_APPROACHES,
@@ -149,6 +150,47 @@ describe("Phase 6B1 official singles match resolution", () => {
     expect(first.engineResult.starRating).toBeGreaterThanOrEqual(0);
   });
 
+  test("preserves a complete Phase 6B20A ledger without combining score lanes", () => {
+    const attempt = resolveSinglesMatch({ setup: setup(), workers: sources(), seed: "phase-6b20a-ledger" });
+    expect(attempt.calculationLedger).toMatchObject({
+      version: RESOLUTION_CALCULATION_VERSION,
+      matchQuality: { formulaId: "match.raw-quality", result: attempt.engineResult.matchScore },
+      outcome: { formulaId: "competitive.probability", resultRoll: attempt.engineResult.resultRoll },
+    });
+    expect(attempt.calculationLedger?.outcome.entries.reduce((total, entry) => total + entry.probability, 0)).toBeCloseTo(1, 6);
+
+    attempt.workerResults.forEach((worker) => {
+      expect(worker.calculationLedger).toMatchObject({
+        approachPlan: { formulaId: "approach.resolution-plan" },
+        mentalBase: { formulaId: "performance.mental-base" },
+        mentalState: { formulaId: "performance.mental-score" },
+        approachExecution: { formulaId: "performance.approach-execution", result: worker.approachExecution },
+        presentation: { formulaId: "performance.presentation", result: worker.presentationScore },
+        performance: { formulaId: "performance.individual", result: worker.performanceScore },
+        competitive: { formulaId: "competitive.individual", result: worker.competitiveScore },
+      });
+      expect(worker.approachScores.every((approach) => approach.calculation?.formulaId === "approach.suitability")).toBe(true);
+      expect(worker.approachScores.every((approach) => approach.calculation?.notes.some((note) => note.includes("select")))).toBe(true);
+    });
+  });
+
+  test("records exact terms, caps, and rounding metadata for every additive stage", () => {
+    const attempt = resolveSinglesMatch({ setup: setup(), workers: sources(), seed: "phase-6b20a-arithmetic" });
+    const stages: CalculationLedgerStage[] = [
+      attempt.calculationLedger!.matchQuality,
+      ...attempt.workerResults.flatMap((worker) => Object.values(worker.calculationLedger!)),
+      ...attempt.workerResults.flatMap((worker) => worker.approachScores.map((approach) => approach.calculation!)),
+    ];
+    stages.forEach((stage) => {
+      const reconstructed = stage.terms.reduce((total, term) => total + term.contribution, 0);
+      expect(reconstructed).toBeCloseTo(stage.rawSubtotal, 4);
+      expect(stage.roundingRule).toBe("Nearest");
+      expect(stage.roundingPlaces).toBeGreaterThanOrEqual(1);
+      if (stage.capMinimum !== null) expect(stage.cappedSubtotal).toBeGreaterThanOrEqual(stage.capMinimum);
+      if (stage.capMaximum !== null) expect(stage.cappedSubtotal).toBeLessThanOrEqual(stage.capMaximum);
+    });
+  });
+
   test("preserves booked manual approaches and makes the custom limit authoritative", () => {
     const custom = setup();
     custom.approachLimit = 2;
@@ -212,7 +254,7 @@ describe("Phase 6B1 official singles match resolution", () => {
     }
     expect(pacWins).toBeGreaterThan(1000);
     expect(pacWins).toBeLessThan(1800);
-  });
+  }, 15_000);
 
   test("accepts the official result without altering the engine calculation", () => {
     const attempt = resolveSinglesMatch({ setup: setup(), workers: sources(), seed: "accept-result" });

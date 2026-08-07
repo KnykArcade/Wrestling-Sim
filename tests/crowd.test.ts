@@ -25,7 +25,8 @@ describe("Phase 6B18 momentum, anticipation, and live crowd dynamics", () => {
   });
 
   test("turns performance, anticipation, and incoming heat into one official live rating", () => {
-    expect(calculateLiveMatchAudience(78, 70, 60)).toEqual({
+    const result = calculateLiveMatchAudience(78, 70, 60);
+    expect(result).toMatchObject({
       performanceRating: 78,
       anticipation: 70,
       anticipationLabel: "Hot",
@@ -37,6 +38,14 @@ describe("Phase 6B18 momentum, anticipation, and live crowd dynamics", () => {
       crowdAfter: 64.5,
       crowdAfterLabel: "Hot",
     });
+    expect(result.calculationLedger?.crowdResponse).toMatchObject({
+      formulaId: "crowd.match-response",
+      rawSubtotal: 73.6,
+      result: 73.6,
+      capApplied: false,
+      roundingPlaces: 1,
+    });
+    expect(result.calculationLedger?.finalRating.terms.map((term) => term.contribution)).toEqual([54.6, 22.08]);
   });
 
   test("caps crowd movement and exposes the approved momentum and heat labels", () => {
