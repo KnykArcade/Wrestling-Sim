@@ -340,9 +340,9 @@
 
 .basic-match-booking {
   display: grid;
-  gap: 12px;
-  margin-top: 14px;
-  padding: 14px;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 8px;
   border: 1px solid #4f7daf;
   background: #0d2038;
 }
@@ -351,40 +351,48 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 18px;
+  gap: 10px;
 }
 
-.basic-match-booking h4 { margin: 4px 0; color: #fff; }
+.basic-match-booking h4 { margin: 2px 0; color: #fff; font-size: .95rem; }
 .basic-match-booking header p { margin: 0; color: #afc0da; }
 .match-format-field { max-width: 360px; }
 .booking-roster-controls {
   display: grid;
-  grid-template-columns: minmax(230px, 1fr) minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(180px, 1.1fr) minmax(140px, .8fr) minmax(180px, 1fr) auto minmax(150px, .75fr);
   align-items: end;
-  gap: 10px;
-  padding: 10px;
+  gap: 6px;
+  padding: 6px;
   border: 1px solid #395b82;
   background: #08182b;
 }
-.outside-talent-toggle { display: flex; align-items: center; gap: 7px; min-height: 39px; color: #d7e2f3; font-size: .78rem; font-weight: 800; white-space: nowrap; }
-.outside-talent-toggle input { width: 17px; height: 17px; }
+.booking-roster-controls .field { gap: 3px; }
+.booking-roster-controls input,
+.booking-roster-controls select { min-height: 32px; padding: 5px 7px; }
+.booking-roster-controls small { font-size: .62rem; }
+.booking-add-worker { align-self: end; }
+.manual-worker-inline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; }
+.manual-worker-inline input { min-width: 0; }
 .booking-ready, .booking-needed { padding: 7px 10px; border: 1px solid; font-size: .78rem; font-weight: 800; }
 .booking-ready { color: #82eba4; border-color: #3e8a58; }
 .booking-needed { color: #ffd37d; border-color: #a87932; }
 
-.basic-participant-list { display: grid; gap: 8px; }
+.basic-participant-list { display: grid; gap: 3px; }
 .basic-participant-list article {
   display: grid;
   grid-template-columns: auto minmax(150px, 1fr) minmax(180px, 1fr) auto;
   align-items: end;
-  gap: 10px;
-  padding: 10px;
+  gap: 6px;
+  padding: 5px 7px;
   border: 1px solid #395270;
   background: #071526;
 }
 .basic-participant-list article > b { align-self: center; color: #fff200; }
 .basic-participant-list article > div { display: grid; gap: 3px; align-self: center; }
 .basic-participant-list article small { color: #91a4c2; }
+.basic-participant-list .field { gap: 2px; }
+.basic-participant-list input { min-height: 29px; padding: 4px 7px; }
+.basic-participant-list .compact-button { min-height: 29px; }
 
 .planned-segment-list {
   display: grid;

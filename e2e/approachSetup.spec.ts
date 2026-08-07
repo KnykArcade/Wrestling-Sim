@@ -23,23 +23,22 @@ test("selects and persists wrestler approaches inside a planned TEW match", asyn
   await match.getByRole("button", { name: "Auto-Name Match" }).click();
   await expect(match.getByLabel("Segment name")).toHaveValue("Jay White vs PAC");
 
-  await expect(match.locator(".match-competitor-card")).toHaveCount(2);
+  await expect(match.locator(".tew-strategy-row")).toHaveCount(2);
   await match.getByLabel("Match aim").selectOption("competitive-tv-match");
   await match.getByRole("button", { name: "Run AI for All Competitors" }).click();
 
   const jay = match.locator('[data-match-worker="manual:jay white"]');
   const pac = match.locator('[data-match-worker="manual:pac"]');
-  await expect(jay.getByText("2/2 · AI", { exact: true })).toBeVisible();
-  await expect(pac.getByText("2/2 · AI", { exact: true })).toBeVisible();
-  await expect(jay.locator(".selected-approach-row")).toHaveCount(2);
-  await expect(pac.locator(".selected-approach-row")).toHaveCount(2);
-  await expect(jay.getByText(/stamina/).first()).toBeVisible();
+  await expect(jay.getByRole("button", { name: "Jay White approach 1" })).toContainText(/Cost \d+ · Pace \d+/);
+  await expect(pac.getByRole("button", { name: "PAC approach 1" })).toContainText(/Cost \d+ · Pace \d+/);
+  await expect(jay.locator(".tew-strategy-result")).toContainText(/Pace \d+ ·/);
 
-  const lockedName = await jay.locator(".selected-approach-row strong").first().textContent();
-  await jay.locator(".approach-lock input").first().check();
+  const lockedName = await jay.getByRole("button", { name: "Jay White approach 1" }).locator("span").textContent() ?? "";
+  await jay.getByRole("button", { name: `Lock ${lockedName} for Jay White` }).click();
   await match.getByLabel("Match aim").selectOption("technical-showcase");
-  await jay.getByRole("button", { name: "Run Approach AI" }).click();
-  await expect(jay.locator(".selected-approach-row strong").filter({ hasText: lockedName ?? "" })).toBeVisible();
+  await jay.getByRole("button", { name: "Run Approach AI for Jay White" }).click();
+  await expect(jay.getByRole("button", { name: "Jay White approach 1" })).toContainText(lockedName ?? "");
+  await expect(jay.getByRole("button", { name: `Unlock ${lockedName} for Jay White` })).toHaveAttribute("aria-pressed", "true");
 
   await page.reload();
   await openAdvancedTools(page);
@@ -49,7 +48,7 @@ test("selects and persists wrestler approaches inside a planned TEW match", asyn
   await expect(page.getByLabel("Show name")).toHaveValue("PWL Approach Test");
   await expect(persistedMatch.getByLabel("Match aim")).toHaveValue("technical-showcase");
   await expect(persistedMatch.getByLabel("Approach limit per wrestler")).toHaveValue("2");
-  await expect(persistedMatch.locator(".match-competitor-card")).toHaveCount(2);
-  await expect(persistedMatch.locator('[data-match-worker="manual:jay white"] .selected-approach-row')).toHaveCount(2);
-  await expect(persistedMatch.locator('[data-match-worker="manual:jay white"] .approach-lock input:checked')).toHaveCount(1);
+  await expect(persistedMatch.locator(".tew-strategy-row")).toHaveCount(2);
+  await expect(persistedMatch.locator('[data-match-worker="manual:jay white"] .approach-slot-trigger--strong, [data-match-worker="manual:jay white"] .approach-slot-trigger--balanced, [data-match-worker="manual:jay white"] .approach-slot-trigger--risk')).toHaveCount(2);
+  await expect(persistedMatch.locator('[data-match-worker="manual:jay white"] .approach-slot-lock--active')).toHaveCount(1);
 });

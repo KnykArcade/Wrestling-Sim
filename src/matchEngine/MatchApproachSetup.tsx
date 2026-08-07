@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import type { PlannedSegment, PlannedWorkerReference } from "../planner/types";
 import { assignAutomaticMatchSides, isMatchCompetitor, MATCH_FORMATS, normalizeMatchFormat } from "../planner/model";
 import { MATCH_AIMS, MATCH_APPROACHES } from "./catalog";
@@ -10,11 +10,9 @@ import {
   chooseApproachPlan,
   createMatchEngineProfile,
   evaluateApproachPlan,
-  evaluatePace,
   getApproach,
-  profileStaminaCapacity,
   profileApproachRatingInputs,
-  scoreApproachCandidate,
+  profileStaminaCapacity,
   workerProfileKey,
 } from "./model";
 import { MATCH_ENGINE_SKILLS, WRESTLER_STYLES } from "./profileCatalog";
@@ -43,45 +41,112 @@ function profileForWorker(universe: MatchEngineUniverse, worker: PlannedWorkerRe
   return universe.profiles.find((profile) => profile.workerKey === key) ?? null;
 }
 
-function ratingLabel(value: number): string {
-  if (value >= 85) return "Elite";
-  if (value >= 75) return "Strong";
-  if (value >= 65) return "Capable";
-  if (value >= 50) return "Developing";
-  return "Weak";
-}
-
-function resultTone(value: number): string {
+function ratingTone(value: number): "strong" | "balanced" | "risk" {
   if (value >= 75) return "strong";
   if (value >= 55) return "balanced";
   return "risk";
 }
 
-export function MatchSettingsEditor({ segment, universe, onChange }: { segment: PlannedSegment; universe: MatchEngineUniverse; onChange: (segment: PlannedSegment) => void }) {
-  const competitors = segment.workers.filter(isMatchCompetitor);
+export function MatchSettingsEditor({ segment, onChange }: { segment: PlannedSegment; onChange: (segment: PlannedSegment) => void }) {
   const recommendedSlots = approachSlotsForDuration(segment.durationMinutes);
   const slots = segment.matchApproachSetup.approachLimit ?? recommendedSlots;
   const aim = MATCH_AIMS.find((item) => item.id === segment.matchApproachSetup.matchAimId) ?? MATCH_AIMS[0];
-  const results = competitors.map((worker) => {
-    const profile = profileForWorker(universe, worker);
-    const plan = planForWorker(segment, worker);
-    return profile ? evaluateApproachPlan(profile, aim.id, segment.durationMinutes, plan.selectedApproachIds, slots) : null;
-  }).filter((result) => result !== null);
-  const projectedPace = results.length ? Math.round(results.reduce((sum, result) => sum + result.actualPace, 0) / results.length) : 0;
-  const paceEvaluation = evaluatePace(aim.idealPace, projectedPace);
   const updateSetup = (patch: Partial<PlannedSegment["matchApproachSetup"]>) => onChange({ ...segment, matchApproachSetup: { ...segment.matchApproachSetup, ...patch, performancePreview: null, updatedAt: new Date().toISOString() } });
 
   return <section className="match-settings-panel" aria-label="Match Settings">
-    <div className="match-settings-heading"><p className="eyebrow">MATCH SETTINGS</p><strong>Set the match before choosing the roster and individual strategies</strong></div>
+    <div className="match-settings-heading"><p className="eyebrow">MATCH SETTINGS</p><strong>Core match instructions</strong></div>
     <div className="match-approach-controls">
-      <label className="field"><span>Match type</span><select aria-label="Match type" value={normalizeMatchFormat(segment.matchType)} onChange={(event) => onChange(assignAutomaticMatchSides(segment, event.target.value as ReturnType<typeof normalizeMatchFormat>))}>{MATCH_FORMATS.map((item) => <option key={item}>{item}</option>)}</select></label>
-      <label className="field"><span>Length (minutes)</span><input aria-label="Length (minutes)" type="number" min={1} max={180} value={segment.durationMinutes} onChange={(event) => onChange({ ...segment, durationMinutes: Math.max(1, Number(event.target.value) || 1), matchApproachSetup: { ...segment.matchApproachSetup, performancePreview: null } })} /></label>
-      <label className="field"><span>Match aim</span><select aria-label="Match aim" value={aim.id} onChange={(event) => updateSetup({ matchAimId: event.target.value as PlannedSegment["matchApproachSetup"]["matchAimId"] })}>{MATCH_AIMS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <label className="field"><span>Approach limit</span><input aria-label="Approach limit per wrestler" type="number" min={1} max={8} value={slots} onChange={(event) => updateSetup({ approachLimit: Math.max(1, Math.min(8, Number(event.target.value) || recommendedSlots)) })} /><small>Recommended: {recommendedSlots}</small></label>
-      <div><span>Ideal pace</span><strong>{aim.idealPace === 0 ? "Open" : aim.idealPace}</strong></div>
-      <div className={`match-pace-result match-pace-result--${projectedPace && paceEvaluation.modifier < 0 ? "risk" : "balanced"}`}><span>Projected pace</span><strong>{projectedPace || "—"}</strong><small>{!projectedPace ? "Choose approaches" : paceEvaluation.status}</small></div>
+      <label className="field match-setting-type"><span>Match type</span><select aria-label="Match type" value={normalizeMatchFormat(segment.matchType)} onChange={(event) => onChange(assignAutomaticMatchSides(segment, event.target.value as ReturnType<typeof normalizeMatchFormat>))}>{MATCH_FORMATS.map((item) => <option key={item}>{item}</option>)}</select></label>
+      <label className="field match-setting-length"><span>Length</span><input aria-label="Length (minutes)" type="number" min={1} max={180} value={segment.durationMinutes} onChange={(event) => onChange({ ...segment, durationMinutes: Math.max(1, Number(event.target.value) || 1), matchApproachSetup: { ...segment.matchApproachSetup, performancePreview: null } })} /></label>
+      <label className="field match-setting-aim"><span>Match aim</span><select aria-label="Match aim" value={aim.id} onChange={(event) => updateSetup({ matchAimId: event.target.value as PlannedSegment["matchApproachSetup"]["matchAimId"] })}>{MATCH_AIMS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <label className="field match-setting-limit"><span>Approaches</span><input aria-label="Approach limit per wrestler" type="number" min={1} max={8} value={slots} onChange={(event) => updateSetup({ approachLimit: Math.max(1, Math.min(8, Number(event.target.value) || recommendedSlots)) })} /><small>Recommended: {recommendedSlots}</small></label>
+      <div className="match-setting-pace"><span>Ideal pace</span><strong>{aim.idealPace === 0 ? "Open" : aim.idealPace}</strong></div>
     </div>
   </section>;
+}
+
+function ApproachSlotDropdown({
+  worker,
+  profile,
+  slotIndex,
+  selectedId,
+  selectedIds,
+  locked,
+  open,
+  onToggle,
+  onSelect,
+  onLock,
+}: {
+  worker: PlannedWorkerReference;
+  profile: MatchEngineProfile;
+  slotIndex: number;
+  selectedId: MatchApproachId | undefined;
+  selectedIds: MatchApproachId[];
+  locked: boolean;
+  open: boolean;
+  onToggle: () => void;
+  onSelect: (id: MatchApproachId | null) => void;
+  onLock: () => void;
+}) {
+  const choices = useMemo(() => MATCH_APPROACHES.map((approach) => ({
+    approach,
+    rating: calculateApproachRating(approach, profileApproachRatingInputs(profile)),
+  })).sort((left, right) => right.rating - left.rating || left.approach.name.localeCompare(right.approach.name)), [profile]);
+  const selected = selectedId ? getApproach(selectedId) : null;
+  const selectedRating = selected ? calculateApproachRating(selected, profileApproachRatingInputs(profile)) : 0;
+
+  return <div className="approach-slot">
+    <button
+      className={`approach-slot-trigger${selected ? ` approach-slot-trigger--${ratingTone(selectedRating)}` : ""}`}
+      type="button"
+      aria-label={`${worker.name} approach ${slotIndex + 1}`}
+      aria-haspopup="listbox"
+      aria-expanded={open}
+      onClick={onToggle}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowDown") { event.preventDefault(); onToggle(); }
+        if (event.key === "Escape" && open) { event.preventDefault(); onToggle(); }
+      }}
+    >
+      <span>{selected?.name ?? `Approach ${slotIndex + 1}`}</span>
+      <small>{selected ? `${selectedRating.toFixed(1)} · Cost ${selected.staminaCost} · Pace ${selected.pace}` : "Select"}</small>
+    </button>
+    {selected && <button className={`approach-slot-lock${locked ? " approach-slot-lock--active" : ""}`} type="button" aria-label={`${locked ? "Unlock" : "Lock"} ${selected.name} for ${worker.name}`} aria-pressed={locked} onClick={onLock}>{locked ? "LOCKED" : "LOCK"}</button>}
+    {open && <div className="approach-slot-menu" role="listbox" aria-label={`Approach choices for ${worker.name}, slot ${slotIndex + 1}`}>
+      <button className="approach-slot-option approach-slot-option--clear" type="button" role="option" aria-selected={!selectedId} onClick={() => onSelect(null)}>Clear selection</button>
+      {choices.map(({ approach, rating }) => <button
+        className={`approach-slot-option approach-slot-option--${ratingTone(rating)}`}
+        type="button"
+        role="option"
+        aria-selected={selectedId === approach.id}
+        disabled={selectedIds.includes(approach.id) && selectedId !== approach.id}
+        title={approach.summary}
+        key={approach.id}
+        onClick={() => onSelect(approach.id)}
+      ><span>{approach.name}</span><b>{rating.toFixed(1)}</b><small>Cost {approach.staminaCost} · Pace {approach.pace}</small></button>)}
+    </div>}
+  </div>;
+}
+
+function RatingsDialog({ profile, worker, onClose, onProfileChange }: { profile: MatchEngineProfile; worker: PlannedWorkerReference; onClose: () => void; onProfileChange: (profile: MatchEngineProfile) => void }) {
+  function updateNumber(field: "overall" | "health" | "popularity" | "momentum" | "experience" | "fanReaction" | "gimmick", value: number): void {
+    const max = field === "fanReaction" || field === "gimmick" ? 5 : 100;
+    const min = field === "momentum" ? -20 : field === "fanReaction" || field === "gimmick" ? 1 : 0;
+    onProfileChange({ ...profile, [field]: Math.max(min, Math.min(max, Number.isFinite(value) ? value : min)) });
+  }
+
+  return <div className="match-ratings-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="match-ratings-dialog" role="dialog" aria-modal="true" aria-label={`Edit ratings for ${worker.name}`}>
+      <header><div><p className="eyebrow">MATCH PROFILE</p><h4>{worker.name}</h4></div><button type="button" onClick={onClose}>Close</button></header>
+      <div className="match-profile-core-grid">
+        <label className="field"><span>Wrestler style</span><select aria-label={`${worker.name} style`} value={profile.styleId} onChange={(event) => onProfileChange({ ...profile, styleId: event.target.value as MatchEngineProfile["styleId"] })}>{WRESTLER_STYLES.map((style) => <option key={style.id} value={style.id}>{style.name}</option>)}</select></label>
+        {(["overall", "health", "popularity", "momentum", "experience", "fanReaction", "gimmick"] as const).map((field) => <label className="field" key={field}><span>{field === "fanReaction" ? "Fan reaction" : field[0].toUpperCase() + field.slice(1)}</span><input aria-label={`${worker.name} ${field} rating`} type="number" min={field === "momentum" ? -20 : field === "fanReaction" || field === "gimmick" ? 1 : 0} max={field === "fanReaction" || field === "gimmick" ? 5 : field === "momentum" ? 20 : 100} value={profile[field]} onChange={(event) => updateNumber(field, Number(event.target.value))} /></label>)}
+      </div>
+      <div className="match-profile-preset-row"><span>Quick rating baseline</span>{[50, 60, 75].map((value) => <button key={value} type="button" onClick={() => onProfileChange({ ...profile, skills: Object.fromEntries(MATCH_ENGINE_SKILLS.map((skill) => [skill, value])) as Record<WrestlerSkill, number> })}>Set all {value}</button>)}</div>
+      <div className="match-profile-skill-grid">{MATCH_ENGINE_SKILLS.map((skill) => <label className="field" key={skill}><span>{skill}</span><input aria-label={`${worker.name} ${skill} rating`} type="number" min={0} max={100} value={profile.skills[skill]} onChange={(event) => onProfileChange({ ...profile, skills: { ...profile.skills, [skill]: Math.max(0, Math.min(100, Number(event.target.value) || 0)) } })} /></label>)}</div>
+      <label className="field"><span>Profile notes</span><textarea aria-label={`${worker.name} match profile notes`} rows={2} value={profile.notes} onChange={(event) => onProfileChange({ ...profile, notes: event.target.value })} /></label>
+    </section>
+  </div>;
 }
 
 export default function MatchApproachSetupEditor({
@@ -96,50 +161,26 @@ export default function MatchApproachSetupEditor({
   onChange: (segment: PlannedSegment) => void;
 }) {
   const [editingProfileKey, setEditingProfileKey] = useState("");
-  const [activeStrategyKey, setActiveStrategyKey] = useState("");
+  const [openSlotKey, setOpenSlotKey] = useState("");
   const competitors = useMemo(() => segment.workers.filter(isMatchCompetitor), [segment.workers]);
-  const competitorSides = useMemo(() => {
-    const groups = new Map<string, PlannedWorkerReference[]>();
-    competitors.forEach((worker, index) => {
-      const side = worker.side.trim() || `Side ${index + 1}`;
-      groups.set(side, [...(groups.get(side) ?? []), worker]);
-    });
-    return [...groups.entries()];
-  }, [competitors]);
   const recommendedSlots = approachSlotsForDuration(segment.durationMinutes);
   const slots = segment.matchApproachSetup.approachLimit ?? recommendedSlots;
   const aim = MATCH_AIMS.find((item) => item.id === segment.matchApproachSetup.matchAimId) ?? MATCH_AIMS[0];
 
   function updateSetup(patch: Partial<PlannedSegment["matchApproachSetup"]>): void {
-    onChange({
-      ...segment,
-      matchApproachSetup: {
-        ...segment.matchApproachSetup,
-        ...patch,
-        performancePreview: patch.performancePreview === undefined ? null : patch.performancePreview,
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    onChange({ ...segment, matchApproachSetup: { ...segment.matchApproachSetup, ...patch, performancePreview: patch.performancePreview === undefined ? null : patch.performancePreview, updatedAt: new Date().toISOString() } });
   }
 
   function savePlan(worker: PlannedWorkerReference, plan: MatchWorkerApproachPlan): void {
     const workerKey = workerProfileKey(worker);
     const nextPlan = { ...plan, workerKey, workerName: worker.name };
     const exists = segment.matchApproachSetup.workerPlans.some((item) => item.workerKey === workerKey);
-    updateSetup({
-      workerPlans: exists
-        ? segment.matchApproachSetup.workerPlans.map((item) => item.workerKey === workerKey ? nextPlan : item)
-        : [...segment.matchApproachSetup.workerPlans, nextPlan],
-    });
+    updateSetup({ workerPlans: exists ? segment.matchApproachSetup.workerPlans.map((item) => item.workerKey === workerKey ? nextPlan : item) : [...segment.matchApproachSetup.workerPlans, nextPlan] });
   }
 
   function upsertProfile(profile: MatchEngineProfile): void {
     const exists = universe.profiles.some((item) => item.workerKey === profile.workerKey);
-    onUniverseChange({
-      profiles: exists
-        ? universe.profiles.map((item) => item.workerKey === profile.workerKey ? { ...profile, updatedAt: new Date().toISOString() } : item)
-        : [...universe.profiles, profile],
-    });
+    onUniverseChange({ profiles: exists ? universe.profiles.map((item) => item.workerKey === profile.workerKey ? { ...profile, updatedAt: new Date().toISOString() } : item) : [...universe.profiles, profile] });
     if (segment.matchApproachSetup.performancePreview) updateSetup({ performancePreview: null });
   }
 
@@ -154,188 +195,82 @@ export default function MatchApproachSetupEditor({
   function runAI(worker: PlannedWorkerReference): void {
     const profile = ensureProfile(worker);
     const current = planForWorker(segment, worker);
-    const result = chooseApproachPlan(
-      profile,
-      segment.matchApproachSetup.matchAimId,
-      segment.durationMinutes,
-      current.lockedApproachIds,
-      slots,
-    );
-    savePlan(worker, {
-      ...current,
-      selectedApproachIds: result.selectedApproachIds,
-      lockedApproachIds: current.lockedApproachIds.filter((id) => result.selectedApproachIds.includes(id)),
-      mode: "AI",
-      generatedAt: new Date().toISOString(),
-    });
+    const result = chooseApproachPlan(profile, aim.id, segment.durationMinutes, current.lockedApproachIds, slots);
+    savePlan(worker, { ...current, selectedApproachIds: result.selectedApproachIds, lockedApproachIds: current.lockedApproachIds.filter((id) => result.selectedApproachIds.includes(id)), mode: "AI", generatedAt: new Date().toISOString() });
   }
 
   function runAll(): void {
     let nextPlans = [...segment.matchApproachSetup.workerPlans];
     let nextProfiles = [...universe.profiles];
     for (const worker of competitors) {
-      const workerKey = workerProfileKey(worker);
-      let profile = nextProfiles.find((item) => item.workerKey === workerKey);
-      if (!profile) {
-        profile = createMatchEngineProfile(worker);
-        nextProfiles.push(profile);
-      }
-      const current = nextPlans.find((item) => item.workerKey === workerKey) ?? planForWorker(segment, worker);
-      const result = chooseApproachPlan(profile, segment.matchApproachSetup.matchAimId, segment.durationMinutes, current.lockedApproachIds, slots);
-      const replacement: MatchWorkerApproachPlan = {
-        ...current,
-        workerKey,
-        workerName: worker.name,
-        selectedApproachIds: result.selectedApproachIds,
-        lockedApproachIds: current.lockedApproachIds.filter((id) => result.selectedApproachIds.includes(id)),
-        mode: "AI",
-        generatedAt: new Date().toISOString(),
-      };
-      nextPlans = nextPlans.some((item) => item.workerKey === workerKey)
-        ? nextPlans.map((item) => item.workerKey === workerKey ? replacement : item)
-        : [...nextPlans, replacement];
+      const key = workerProfileKey(worker);
+      let profile = nextProfiles.find((item) => item.workerKey === key);
+      if (!profile) { profile = createMatchEngineProfile(worker); nextProfiles.push(profile); }
+      const current = nextPlans.find((item) => item.workerKey === key) ?? planForWorker(segment, worker);
+      const result = chooseApproachPlan(profile, aim.id, segment.durationMinutes, current.lockedApproachIds, slots);
+      const replacement: MatchWorkerApproachPlan = { ...current, workerKey: key, workerName: worker.name, selectedApproachIds: result.selectedApproachIds, lockedApproachIds: current.lockedApproachIds.filter((id) => result.selectedApproachIds.includes(id)), mode: "AI", generatedAt: new Date().toISOString() };
+      nextPlans = nextPlans.some((item) => item.workerKey === key) ? nextPlans.map((item) => item.workerKey === key ? replacement : item) : [...nextPlans, replacement];
     }
     onUniverseChange({ profiles: nextProfiles });
     updateSetup({ workerPlans: nextPlans });
   }
 
-  function addManualApproach(worker: PlannedWorkerReference, approachId: MatchApproachId): void {
+  function selectApproach(worker: PlannedWorkerReference, slotIndex: number, approachId: MatchApproachId | null): void {
     ensureProfile(worker);
     const current = planForWorker(segment, worker);
-    if (current.selectedApproachIds.includes(approachId) || current.selectedApproachIds.length >= slots) return;
-    savePlan(worker, {
-      ...current,
-      selectedApproachIds: [...current.selectedApproachIds, approachId],
-      mode: "Manual",
-      generatedAt: "",
-    });
+    const next = [...current.selectedApproachIds];
+    const previous = next[slotIndex];
+    if (!approachId) next.splice(slotIndex, 1);
+    else if (slotIndex >= next.length) next.push(approachId);
+    else {
+      const duplicateIndex = next.indexOf(approachId);
+      if (duplicateIndex >= 0 && duplicateIndex !== slotIndex) next[duplicateIndex] = previous;
+      next[slotIndex] = approachId;
+    }
+    const selectedApproachIds = next.filter((id): id is MatchApproachId => Boolean(id)).slice(0, slots);
+    savePlan(worker, { ...current, selectedApproachIds, lockedApproachIds: current.lockedApproachIds.filter((id) => selectedApproachIds.includes(id)), mode: "Manual", generatedAt: "" });
+    setOpenSlotKey("");
   }
 
-  function updateProfileNumber(profile: MatchEngineProfile, field: "overall" | "health" | "popularity" | "momentum" | "experience" | "fanReaction" | "gimmick", value: number): void {
-    const max = field === "fanReaction" || field === "gimmick" ? 5 : 100;
-    const min = field === "momentum" ? -20 : field === "fanReaction" || field === "gimmick" ? 1 : 0;
-    upsertProfile({ ...profile, [field]: Math.max(min, Math.min(max, Number.isFinite(value) ? value : min)) });
+  function toggleLock(worker: PlannedWorkerReference, approachId: MatchApproachId): void {
+    const current = planForWorker(segment, worker);
+    savePlan(worker, { ...current, lockedApproachIds: current.lockedApproachIds.includes(approachId) ? current.lockedApproachIds.filter((id) => id !== approachId) : [...current.lockedApproachIds, approachId] });
   }
 
-  const activeWorker = competitors.find((worker) => workerProfileKey(worker) === activeStrategyKey) ?? competitors[0] ?? null;
-  const activeKey = activeWorker ? workerProfileKey(activeWorker) : "";
-  const activePreviewProfile = activeWorker ? profileForWorker(universe, activeWorker) ?? createMatchEngineProfile(activeWorker) : null;
-  const activePlan = activeWorker ? planForWorker(segment, activeWorker) : null;
-  const activeCandidates = activePreviewProfile ? MATCH_APPROACHES.map((approach) => ({ approach, score: scoreApproachCandidate(activePreviewProfile, aim.id, approach) })).sort((left, right) => right.score.total - left.score.total || right.score.rating - left.score.rating || left.approach.name.localeCompare(right.approach.name)) : [];
-  const activeRecommendedIds = new Set(activeCandidates.slice(0, Math.min(3, activeCandidates.length)).map(({ approach }) => approach.id));
+  const editingWorker = competitors.find((worker) => workerProfileKey(worker) === editingProfileKey) ?? null;
+  const editingProfile = editingWorker ? profileForWorker(universe, editingWorker) : null;
+  const tableStyle = { "--approach-slots": slots } as CSSProperties;
 
-  return <section className="match-approach-setup" aria-label="Match approach setup">
-    <header className="match-approach-setup__header">
-      <div>
-        <p className="eyebrow">TEW COMPANION MATCH SETUP</p>
-        <h4>Match approaches and wrestler strategy</h4>
-        <p>TEW remains the game. This tracker chooses and records the approaches that feed your Match Story, road-agent notes, and TEW handoff.</p>
-      </div>
-      <button className="primary-button" type="button" onClick={runAll} disabled={competitors.length === 0}>Run AI for All Competitors</button>
-    </header>
+  return <section className="match-approach-setup match-approach-setup--compact" aria-label="Match approach setup">
+    <header className="match-strategy-header"><div><p className="eyebrow">MATCH APPROACHES</p><h4>Wrestler strategy</h4></div><button className="primary-button compact-button" type="button" aria-label="Run AI for All Competitors" onClick={runAll} disabled={competitors.length === 0}>AI All</button></header>
 
-    {competitors.length === 0 ? <div className="match-approach-empty">
-      Add the wrestlers to this match above. Managers, referees, announcers, and commentators are excluded from approach selection.
-    </div> : <div className={`match-side-board match-side-board--${Math.min(competitorSides.length, 4)}`}>
-      {competitorSides.map(([side, sideWorkers], sideIndex) => <Fragment key={side}>
-        <section className="match-side-column">
-          <header className="match-side-heading"><span>{side}</span><strong>{sideWorkers.map((worker) => worker.name).join(" & ")}</strong></header>
-          {sideWorkers.map((worker) => {
+    {competitors.length === 0 ? <div className="match-approach-empty">Add wrestlers above to choose their match approaches.</div> : <div className="tew-strategy-table" style={tableStyle} aria-label="Compact wrestler approach table">
+      <div className="tew-strategy-table__header"><span>Wrestler</span><span>Style</span><span>OVR</span><span>Stamina</span>{Array.from({ length: slots }, (_, index) => <span key={index}>Approach {index + 1}</span>)}<span>Individual result</span><span>Actions</span></div>
+      {competitors.map((worker) => {
         const key = workerProfileKey(worker);
-        const profile = profileForWorker(universe, worker);
+        const savedProfile = profileForWorker(universe, worker);
+        const profile = savedProfile ?? createMatchEngineProfile(worker);
         const plan = planForWorker(segment, worker);
-        const result = profile ? evaluateApproachPlan(profile, aim.id, segment.durationMinutes, plan.selectedApproachIds, slots) : null;
-        const averageApproachRating = result?.candidateScores.length ? result.candidateScores.reduce((total, score) => total + score.rating, 0) / result.candidateScores.length : 0;
-        return <article className={`match-competitor-card${key === activeKey ? " match-competitor-card--active" : ""}`} key={key} data-match-worker={key}>
-          <header>
-            <div><h5>{worker.name}</h5><span>{worker.source === "tew" ? "Linked to TEW worker" : "Manual tracker worker"}</span></div>
-            <div className="match-profile-actions">
-              <button className={key === activeKey ? "primary-button compact-button" : "secondary-button compact-button"} type="button" onClick={() => setActiveStrategyKey(key)}>{key === activeKey ? "Editing Strategy" : "Edit Strategy"}</button>
-              {!profile ? <button className="secondary-button compact-button" type="button" onClick={() => { const created = ensureProfile(worker); setEditingProfileKey(created.workerKey); }}>Create Match Profile</button> : <button className="secondary-button compact-button" type="button" onClick={() => setEditingProfileKey(editingProfileKey === key ? "" : key)}>{editingProfileKey === key ? "Close Ratings" : "Edit Ratings"}</button>}
-              <button className="primary-button compact-button" type="button" onClick={() => runAI(worker)}>Run Approach AI</button>
-            </div>
-          </header>
-
-          {profile ? <div className="match-profile-summary">
-            <div><span>Style</span><strong>{WRESTLER_STYLES.find((style) => style.id === profile.styleId)?.name ?? "All-Rounder"}</strong></div>
-            <div><span>Overall</span><strong>{profile.overall}</strong></div>
-            <div><span>Stamina rating</span><strong>{calculateProfileStaminaRating(profile).toFixed(1)}</strong></div>
-            <div><span>Available stamina</span><strong>{profileStaminaCapacity(profile)}</strong></div>
-          </div> : <p className="match-profile-placeholder">Create the tracker-side match profile once, using ratings copied from TEW or your workbook. No TEW data is changed.</p>}
-
-          {profile && editingProfileKey === key && <div className="match-profile-editor">
-            <div className="match-profile-core-grid">
-              <label className="field"><span>Wrestler style</span><select aria-label={`${worker.name} style`} value={profile.styleId} onChange={(event) => upsertProfile({ ...profile, styleId: event.target.value as MatchEngineProfile["styleId"] })}>{WRESTLER_STYLES.map((style) => <option key={style.id} value={style.id}>{style.name}</option>)}</select></label>
-              <label className="field"><span>Overall</span><input aria-label={`${worker.name} overall rating`} type="number" min={0} max={100} value={profile.overall} onChange={(event) => updateProfileNumber(profile, "overall", Number(event.target.value))} /></label>
-              <label className="field"><span>Health</span><input aria-label={`${worker.name} health rating`} type="number" min={0} max={100} value={profile.health} onChange={(event) => updateProfileNumber(profile, "health", Number(event.target.value))} /></label>
-              <label className="field"><span>Popularity</span><input aria-label={`${worker.name} popularity rating`} type="number" min={0} max={100} value={profile.popularity} onChange={(event) => updateProfileNumber(profile, "popularity", Number(event.target.value))} /></label>
-              <label className="field"><span>Momentum</span><input aria-label={`${worker.name} momentum rating`} type="number" min={-20} max={20} value={profile.momentum} onChange={(event) => updateProfileNumber(profile, "momentum", Number(event.target.value))} /></label>
-              <label className="field"><span>Experience</span><input aria-label={`${worker.name} experience rating`} type="number" min={0} max={100} value={profile.experience} onChange={(event) => updateProfileNumber(profile, "experience", Number(event.target.value))} /></label>
-              <label className="field"><span>Fan reaction (1–5)</span><input aria-label={`${worker.name} fan reaction`} type="number" min={1} max={5} value={profile.fanReaction} onChange={(event) => updateProfileNumber(profile, "fanReaction", Number(event.target.value))} /></label>
-              <label className="field"><span>Gimmick (1–5)</span><input aria-label={`${worker.name} gimmick rating`} type="number" min={1} max={5} value={profile.gimmick} onChange={(event) => updateProfileNumber(profile, "gimmick", Number(event.target.value))} /></label>
-            </div>
-            <div className="match-profile-preset-row">
-              <span>Quick rating baseline</span>
-              {[50, 60, 75].map((value) => <button key={value} type="button" onClick={() => upsertProfile({ ...profile, skills: Object.fromEntries(MATCH_ENGINE_SKILLS.map((skill) => [skill, value])) as Record<WrestlerSkill, number> })}>Set all {value}</button>)}
-            </div>
-            <div className="match-profile-skill-grid">
-              {MATCH_ENGINE_SKILLS.map((skill) => <label className="field" key={skill}><span>{skill}</span><input aria-label={`${worker.name} ${skill} rating`} type="number" min={0} max={100} value={profile.skills[skill]} onChange={(event) => upsertProfile({ ...profile, skills: { ...profile.skills, [skill]: Math.max(0, Math.min(100, Number(event.target.value) || 0)) } })} /></label>)}
-            </div>
-            <label className="field"><span>Profile notes</span><textarea aria-label={`${worker.name} match profile notes`} rows={2} value={profile.notes} onChange={(event) => upsertProfile({ ...profile, notes: event.target.value })} /></label>
-          </div>}
-
-          <div className="selected-approach-heading">
-            <div><strong>Selected approaches</strong><span>{plan.selectedApproachIds.length}/{slots} · {plan.mode}</span></div>
-            {result && <div className={`strategy-status strategy-status--${result.stamina.status.toLowerCase()} strategy-status--tone-${resultTone(averageApproachRating)}`}><b>{Math.max(0, result.availableStamina - result.usedStamina)} stamina remaining</b><span>{result.usedStamina}/{result.availableStamina} used · {result.stamina.status} · Pace {result.actualPace} · Rating {averageApproachRating.toFixed(1)}</span></div>}
-          </div>
-
-          {plan.selectedApproachIds.length === 0 ? <p className="match-profile-placeholder">No approaches selected. Run the AI or add an approach manually.</p> : <div className="selected-approach-list">
-            {plan.selectedApproachIds.map((approachId) => {
-              const approach = getApproach(approachId)!;
-              const approachRating = profile ? calculateApproachRating(approach, profileApproachRatingInputs(profile)) : null;
-              return <div className={`selected-approach-row ${approachRating === null ? "" : `selected-approach-row--${resultTone(approachRating)}`}`} key={approachId}>
-                <div><strong>{approach.name}</strong><span>{approach.summary}</span></div>
-                <div className="selected-approach-numbers"><span>Rating <b>{approachRating?.toFixed(1) ?? "—"}</b></span><span>Cost <b>{approach.staminaCost}</b></span><span>Pace <b>{approach.pace}</b></span></div>
-                <label className="approach-lock"><input type="checkbox" checked={plan.lockedApproachIds.includes(approachId)} onChange={(event) => savePlan(worker, { ...plan, lockedApproachIds: event.target.checked ? [...plan.lockedApproachIds, approachId] : plan.lockedApproachIds.filter((id) => id !== approachId) })} /><span>Lock</span></label>
-                <button className="danger-button compact-button" type="button" aria-label={`Remove ${approach.name} from ${worker.name}`} onClick={() => savePlan(worker, { ...plan, selectedApproachIds: plan.selectedApproachIds.filter((id) => id !== approachId), lockedApproachIds: plan.lockedApproachIds.filter((id) => id !== approachId), mode: "Manual", generatedAt: "" })}>Remove</button>
-              </div>;
-            })}
-          </div>}
-
-          {result && <div className="approach-plan-explanation">{result.explanation.map((line) => <span key={line}>{line}</span>)}</div>}
-          {plan.selectedApproachIds.length > slots && <div className="source-warning"><strong>Too many approaches</strong><span>This match length allows {slots}. Run the AI again or remove approaches manually.</span></div>}
-        </article>;
+        const result = evaluateApproachPlan(profile, aim.id, segment.durationMinutes, plan.selectedApproachIds, slots);
+        const averageRating = result.candidateScores.length ? result.candidateScores.reduce((total, score) => total + score.rating, 0) / result.candidateScores.length : 0;
+        return <article className="tew-strategy-row" key={key} data-match-worker={key}>
+          <div className="tew-strategy-worker"><strong>{worker.name}</strong><small>{worker.side || "Competitor"}</small></div>
+          <span>{WRESTLER_STYLES.find((style) => style.id === profile.styleId)?.name ?? "All-Rounder"}</span>
+          <b>{profile.overall}</b>
+          <span>{calculateProfileStaminaRating(profile).toFixed(1)} / {profileStaminaCapacity(profile)}</span>
+          {Array.from({ length: slots }, (_, slotIndex) => {
+            const selectedId = plan.selectedApproachIds[slotIndex];
+            const slotKey = `${key}:${slotIndex}`;
+            return <ApproachSlotDropdown key={slotKey} worker={worker} profile={profile} slotIndex={slotIndex} selectedId={selectedId} selectedIds={plan.selectedApproachIds} locked={Boolean(selectedId && plan.lockedApproachIds.includes(selectedId))} open={openSlotKey === slotKey} onToggle={() => setOpenSlotKey(openSlotKey === slotKey ? "" : slotKey)} onSelect={(id) => selectApproach(worker, slotIndex, id)} onLock={() => { if (selectedId) toggleLock(worker, selectedId); }} />;
           })}
-        </section>
-        {sideIndex < competitorSides.length - 1 && <div className="match-vs-divider" aria-hidden="true"><span>VS</span></div>}
-      </Fragment>)}
+          <div className={`tew-strategy-result tew-strategy-result--${plan.selectedApproachIds.length ? ratingTone(averageRating) : "empty"}`}><strong>{plan.selectedApproachIds.length ? `Pace ${result.actualPace} · ${result.pace.status}` : "Not set"}</strong><small>{plan.selectedApproachIds.length ? `Rating ${averageRating.toFixed(1)} · Cost ${result.usedStamina}/${result.availableStamina} · ${result.stamina.status}` : `${slots} approach slots`}</small></div>
+          <div className="tew-strategy-actions"><button className="secondary-button compact-button" type="button" onClick={() => { const created = ensureProfile(worker); setEditingProfileKey(created.workerKey); }}>Ratings</button><button className="primary-button compact-button" type="button" aria-label={`Run Approach AI for ${worker.name}`} onClick={() => runAI(worker)}>AI</button></div>
+        </article>;
+      })}
     </div>}
 
-    {activeWorker && activePlan && <section className="approach-selection-board approach-selection-board--shared" aria-label={`Approach Selection Board for ${activeWorker.name}`}>
-      <header className="approach-selection-board__header">
-        <div><strong>Approach Selection Board</strong><span>Editing {activeWorker.name} · choose another competitor above to switch</span></div>
-        <b>{activePlan.selectedApproachIds.length >= slots ? "All slots filled" : `${slots - activePlan.selectedApproachIds.length} selection${slots - activePlan.selectedApproachIds.length === 1 ? "" : "s"} remaining`}</b>
-      </header>
-      <div className="approach-candidate-list" aria-label={`Available approaches for ${activeWorker.name}`}>
-        {activeCandidates.map(({ approach, score }) => {
-          const selectedIndex = activePlan.selectedApproachIds.indexOf(approach.id);
-          const selected = selectedIndex >= 0;
-          const slotsFilled = activePlan.selectedApproachIds.length >= slots;
-          return <article className={`approach-candidate approach-candidate--${resultTone(score.rating)}${selected ? " approach-candidate--selected" : ""}`} key={approach.id} aria-label={`${approach.name}, rating ${score.rating.toFixed(1)}, ${ratingLabel(score.rating)}${selected ? `, selected in slot ${selectedIndex + 1}` : ""}`}>
-            <div className="approach-rating-badge" aria-hidden="true"><span><b>{score.rating.toFixed(1)}</b><small>Rating</small></span></div>
-            <div className="approach-candidate__content">
-              <div className="approach-candidate__title"><strong>{approach.name}</strong><span className={`approach-quality approach-quality--${resultTone(score.rating)}`}>{ratingLabel(score.rating)}</span>{activeRecommendedIds.has(approach.id) && <span className="approach-recommended">Recommended</span>}</div>
-              <p>{approach.summary}</p>
-              <div className="approach-candidate__fit"><span>Style <b>{score.styleBonus > 0 ? "Strong fit" : "Neutral"}</b></span><span>Match aim <b>{score.aimCompatibility > 0 ? "Strong fit" : score.aimCompatibility < 0 ? "Clash" : "Neutral"}</b></span><span>Pace <b>{score.paceBonus >= 5 ? "Ideal" : score.paceBonus >= 0 ? "Usable" : "Risk"}</b></span><span>Stamina <b>{approach.staminaCost}</b></span></div>
-            </div>
-            <button className={selected ? "primary-button compact-button approach-add-button" : "secondary-button compact-button approach-add-button"} type="button" aria-label={selected ? `${approach.name} selected for ${activeWorker.name} in slot ${selectedIndex + 1}` : `Select ${approach.name} for ${activeWorker.name}`} disabled={selected || slotsFilled} onClick={() => addManualApproach(activeWorker, approach.id)}>{selected ? `Selected ${selectedIndex + 1}` : "Select"}</button>
-          </article>;
-        })}
-      </div>
-    </section>}
-
-    <label className="field match-approach-notes"><span>Approach and road-agent notes</span><textarea rows={3} value={segment.matchApproachSetup.notes} placeholder="Explain why an approach is locked, how the styles should interact, or what should be copied into TEW road-agent notes." onChange={(event) => updateSetup({ notes: event.target.value })} /></label>
-
+    <label className="field match-approach-notes"><span>Approach and road-agent notes</span><textarea rows={2} value={segment.matchApproachSetup.notes} placeholder="Optional notes for the road agent or TEW handoff" onChange={(event) => updateSetup({ notes: event.target.value })} /></label>
     <MatchPerformancePreviewEditor segment={segment} universe={universe} onChange={onChange} />
+    {editingWorker && editingProfile && <RatingsDialog profile={editingProfile} worker={editingWorker} onClose={() => setEditingProfileKey("")} onProfileChange={upsertProfile} />}
   </section>;
 }

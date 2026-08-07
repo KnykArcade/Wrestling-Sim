@@ -22,7 +22,7 @@ test("resolves a tag match as teams and preserves the deciding fall", async ({ p
   await sides.nth(2).fill("Aussie Open");
   await sides.nth(3).fill("Aussie Open");
   await match.getByRole("button", { name: "Run AI for All Competitors" }).click();
-  await expect(match.locator(".match-competitor-card")).toHaveCount(4);
+  await expect(match.locator(".tew-strategy-row")).toHaveCount(4);
 
   await page.getByRole("button", { name: "Run Matches", exact: true }).click();
   await expect(page.getByText("OFFICIAL MATCH", { exact: true })).toBeVisible();
