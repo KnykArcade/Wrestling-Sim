@@ -352,9 +352,9 @@ export const MATCH_AIMS: MatchAimDefinition[] = [
 ];
 
 export const MENTAL_STATES: MentalStateDefinition[] = [
-  { id: "hot-night", name: "HOT NIGHT", modifier: 5, minimumScore: 85 },
-  { id: "focused", name: "FOCUSED", modifier: 2.5, minimumScore: 70 },
-  { id: "neutral", name: "NEUTRAL", modifier: 0, minimumScore: 55 },
+  { id: "hot-night", name: "HOT NIGHT", modifier: 5, minimumScore: 82 },
+  { id: "focused", name: "FOCUSED", modifier: 2.5, minimumScore: 68 },
+  { id: "neutral", name: "NEUTRAL", modifier: 0, minimumScore: 52 },
   { id: "distracted", name: "DISTRACTED", modifier: -5, minimumScore: 40 },
   { id: "off-night", name: "OFF NIGHT", modifier: -10, minimumScore: null },
 ];

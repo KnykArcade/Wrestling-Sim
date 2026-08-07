@@ -132,7 +132,7 @@ export default function MatchEngineFoundation() {
         <div className="state-list">
           {MENTAL_STATES.map((state) => <div key={state.id}><strong>{state.name}</strong><span>{state.minimumScore === null ? "Below 40" : `${state.minimumScore}+ score`}</span><b>{state.modifier > 0 ? "+" : ""}{state.modifier}</b></div>)}
         </div>
-        <p className="source-note">The source score uses 20% health, 20% popularity, 15% experience, 15% fan reaction, 10% gimmick, 20% overall, plus luck and a rare swing.</p>
+        <p className="source-note">Ordinary form centers on Neutral. Health, consistency, experience, and overall make modest baseline adjustments; nightly luck creates normal variation, while Hot Night and Off Night require a rare swing.</p>
       </section>
       <section className="match-engine-panel">
         <header><div><p className="eyebrow">PACE RESULT</p><h3>Distance from the match aim</h3></div></header>

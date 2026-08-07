@@ -159,6 +159,8 @@ describe("Phase 6B1 official singles match resolution", () => {
     const attempt = resolveSinglesMatch({ setup: custom, workers: sources(), seed: "booked-approaches" });
     expect(attempt.workerResults[0].selectedApproachIds).toEqual(custom.workers[0].manualApproachIds);
     expect(attempt.workerResults[1].selectedApproachIds).toEqual(custom.workers[1].manualApproachIds);
+    expect(attempt.workerResults[0].actualPace).toBe(2);
+    expect(attempt.workerResults[1].actualPace).toBe(6);
   });
 
   test("normalizes finishing ability and exposes components that reconstruct the competitive score", () => {

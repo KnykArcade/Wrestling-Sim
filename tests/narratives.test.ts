@@ -60,6 +60,7 @@ describe("Phase 4C4 generated narrative outputs", () => {
       seed: "seed",
       authority: "competitive-preview",
       calculationVersion: "test",
+      inputFingerprint: "fixture",
       matchScore: 80,
       starRating: 4,
       performanceLeaderKey: "manual:pac",

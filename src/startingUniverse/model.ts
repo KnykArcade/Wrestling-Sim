@@ -183,10 +183,11 @@ function mapCompanies(tables: RawTewTables): StartingUniverseCompany[] {
   return (tables.Companies ?? []).map((row) => {
     const id = text(rowValue(row, "UID"));
     const initials = text(rowValue(row, "Initials"));
+    const importedName = text(rowValue(row, "Name"));
     const profile = text(rowValue(row, "Profile"));
     return {
       id,
-      name: names.get(id) || profile || initials || `Company ${id}`,
+      name: importedName || names.get(id) || initials || `Company ${id}`,
       initials,
       profile,
       active: booleanValue(rowValue(row, "Currently_Open")),

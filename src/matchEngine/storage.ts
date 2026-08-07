@@ -3,8 +3,10 @@ import { MATCH_ENGINE_SKILLS, WRESTLER_STYLES } from "./profileCatalog";
 import {
   createEmptyMatchApproachSetup,
   createMatchEngineProfile,
+  MAX_MATCH_APPROACHES,
   normalizeProfileRatings,
 } from "./model";
+import { CALCULATION_SYSTEM_VERSION } from "../calculations/foundation";
 import type {
   MatchApproachId,
   MatchApproachSetup,
@@ -83,8 +85,8 @@ function normalizeProfile(value: unknown): MatchEngineProfile | null {
 
 function normalizeWorkerPlan(value: unknown): MatchWorkerApproachPlan | null {
   if (!isRecord(value) || typeof value.workerKey !== "string" || !value.workerKey) return null;
-  const selectedApproachIds = validApproachIds(value.selectedApproachIds);
-  const lockedApproachIds = validApproachIds(value.lockedApproachIds).filter((id) => selectedApproachIds.includes(id));
+  const selectedApproachIds = validApproachIds(value.selectedApproachIds).slice(0, MAX_MATCH_APPROACHES);
+  const lockedApproachIds = validApproachIds(value.lockedApproachIds).filter((id) => selectedApproachIds.includes(id)).slice(0, MAX_MATCH_APPROACHES);
   return {
     workerKey: value.workerKey,
     workerName: text(value.workerName),
@@ -119,6 +121,7 @@ function normalizeWorkerPerformance(value: unknown): MatchWorkerPerformanceResul
     workerName: value.workerName,
     mentalStateId: mentalState.id,
     mentalStateName: mentalState.name,
+    mentalBase: finiteNumber(value.mentalBase, finiteNumber(value.mentalStateScore, 0) - finiteNumber(value.luck, 0) - finiteNumber(value.swing, 0)),
     mentalStateScore: finiteNumber(value.mentalStateScore, 0),
     mentalModifier: finiteNumber(value.mentalModifier, mentalState.modifier),
     luck: finiteNumber(value.luck, 0),
@@ -151,6 +154,7 @@ function normalizePerformancePreview(value: unknown): MatchPerformancePreview | 
     seed: text(value.seed),
     authority: settings.authority,
     calculationVersion: text(value.calculationVersion, "legacy-unversioned"),
+    inputFingerprint: text(value.inputFingerprint),
     matchScore: clamp(finiteNumber(value.matchScore, 0), 0, 100),
     starRating: clamp(finiteNumber(value.starRating, 0), 0, 5),
     performanceLeaderKey: text(value.performanceLeaderKey),
@@ -174,11 +178,14 @@ export function normalizeMatchApproachSetup(value: unknown): MatchApproachSetup 
     : [];
   return {
     matchAimId,
-    approachLimit: value.approachLimit === null || value.approachLimit === undefined ? null : clamp(Math.round(finiteNumber(value.approachLimit, 1)), 1, 8),
+    approachLimit: value.approachLimit === null || value.approachLimit === undefined ? null : clamp(Math.round(finiteNumber(value.approachLimit, 1)), 1, MAX_MATCH_APPROACHES),
     workerPlans,
     notes: text(value.notes),
     performanceSettings: normalizePerformanceSettings(value.performanceSettings),
-    performancePreview: normalizePerformancePreview(value.performancePreview),
+    performancePreview: (() => {
+      const preview = normalizePerformancePreview(value.performancePreview);
+      return preview?.calculationVersion === CALCULATION_SYSTEM_VERSION && preview.inputFingerprint ? preview : null;
+    })(),
     updatedAt: text(value.updatedAt),
   };
 }

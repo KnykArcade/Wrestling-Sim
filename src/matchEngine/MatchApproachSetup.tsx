@@ -4,6 +4,7 @@ import { assignAutomaticMatchSides, isMatchCompetitor, MATCH_FORMATS, normalizeM
 import { MATCH_AIMS, MATCH_APPROACHES } from "./catalog";
 import MatchPerformancePreviewEditor from "./MatchPerformancePreview";
 import {
+  approachLimitForSetup,
   approachSlotsForDuration,
   calculateApproachRating,
   calculateProfileStaminaRating,
@@ -11,6 +12,7 @@ import {
   createMatchEngineProfile,
   evaluateApproachPlan,
   getApproach,
+  MAX_MATCH_APPROACHES,
   profileApproachRatingInputs,
   profileStaminaCapacity,
   workerProfileKey,
@@ -49,9 +51,19 @@ function ratingTone(value: number): "strong" | "balanced" | "risk" {
 
 export function MatchSettingsEditor({ segment, onChange }: { segment: PlannedSegment; onChange: (segment: PlannedSegment) => void }) {
   const recommendedSlots = approachSlotsForDuration(segment.durationMinutes);
-  const slots = segment.matchApproachSetup.approachLimit ?? recommendedSlots;
+  const slots = approachLimitForSetup(segment.durationMinutes, segment.matchApproachSetup.approachLimit);
   const aim = MATCH_AIMS.find((item) => item.id === segment.matchApproachSetup.matchAimId) ?? MATCH_AIMS[0];
   const updateSetup = (patch: Partial<PlannedSegment["matchApproachSetup"]>) => onChange({ ...segment, matchApproachSetup: { ...segment.matchApproachSetup, ...patch, performancePreview: null, updatedAt: new Date().toISOString() } });
+  const setApproachLimit = (value: number) => {
+    const limit = Math.max(1, Math.min(MAX_MATCH_APPROACHES, value || recommendedSlots));
+    updateSetup({
+      approachLimit: limit,
+      workerPlans: segment.matchApproachSetup.workerPlans.map((plan) => {
+        const selectedApproachIds = plan.selectedApproachIds.slice(0, limit);
+        return { ...plan, selectedApproachIds, lockedApproachIds: plan.lockedApproachIds.filter((id) => selectedApproachIds.includes(id)) };
+      }),
+    });
+  };
 
   return <section className="match-settings-panel" aria-label="Match Settings">
     <div className="match-settings-heading"><p className="eyebrow">MATCH SETTINGS</p><strong>Core match instructions</strong></div>
@@ -59,7 +71,7 @@ export function MatchSettingsEditor({ segment, onChange }: { segment: PlannedSeg
       <label className="field match-setting-type"><span>Match type</span><select aria-label="Match type" value={normalizeMatchFormat(segment.matchType)} onChange={(event) => onChange(assignAutomaticMatchSides(segment, event.target.value as ReturnType<typeof normalizeMatchFormat>))}>{MATCH_FORMATS.map((item) => <option key={item}>{item}</option>)}</select></label>
       <label className="field match-setting-length"><span>Length</span><input aria-label="Length (minutes)" type="number" min={1} max={180} value={segment.durationMinutes} onChange={(event) => onChange({ ...segment, durationMinutes: Math.max(1, Number(event.target.value) || 1), matchApproachSetup: { ...segment.matchApproachSetup, performancePreview: null } })} /></label>
       <label className="field match-setting-aim"><span>Match aim</span><select aria-label="Match aim" value={aim.id} onChange={(event) => updateSetup({ matchAimId: event.target.value as PlannedSegment["matchApproachSetup"]["matchAimId"] })}>{MATCH_AIMS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <label className="field match-setting-limit"><span>Approaches</span><input aria-label="Approach limit per wrestler" type="number" min={1} max={8} value={slots} onChange={(event) => updateSetup({ approachLimit: Math.max(1, Math.min(8, Number(event.target.value) || recommendedSlots)) })} /><small>Recommended: {recommendedSlots}</small></label>
+      <label className="field match-setting-limit"><span>Approaches</span><input aria-label="Approach limit per wrestler" type="number" min={1} max={MAX_MATCH_APPROACHES} value={slots} onChange={(event) => setApproachLimit(Number(event.target.value))} /><small><span>Recommended: {recommendedSlots}</span> · Max {MAX_MATCH_APPROACHES}</small></label>
       <div className="match-setting-pace"><span>Ideal pace</span><strong>{aim.idealPace === 0 ? "Open" : aim.idealPace}</strong></div>
     </div>
   </section>;
@@ -164,7 +176,7 @@ export default function MatchApproachSetupEditor({
   const [openSlotKey, setOpenSlotKey] = useState("");
   const competitors = useMemo(() => segment.workers.filter(isMatchCompetitor), [segment.workers]);
   const recommendedSlots = approachSlotsForDuration(segment.durationMinutes);
-  const slots = segment.matchApproachSetup.approachLimit ?? recommendedSlots;
+  const slots = approachLimitForSetup(segment.durationMinutes, segment.matchApproachSetup.approachLimit);
   const aim = MATCH_AIMS.find((item) => item.id === segment.matchApproachSetup.matchAimId) ?? MATCH_AIMS[0];
 
   function updateSetup(patch: Partial<PlannedSegment["matchApproachSetup"]>): void {

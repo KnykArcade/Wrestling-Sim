@@ -1,6 +1,7 @@
 import { useMemo } from "react";
+import { CALCULATION_SYSTEM_VERSION } from "../calculations/foundation";
 import type { PlannedSegment, PlannedWorkerReference } from "../planner/types";
-import { generateMatchPerformancePreview, formatStarRating } from "./performance";
+import { generateMatchPerformancePreview, formatStarRating, performancePreviewInputFingerprint } from "./performance";
 import { workerProfileKey } from "./model";
 import type {
   MatchEngineProfile,
@@ -44,8 +45,18 @@ export default function MatchPerformancePreviewEditor({
   });
   const incompleteWorkers = readyWorkers.filter((item) => !item.profile || !item.plan || item.plan.selectedApproachIds.length === 0);
   const canGenerate = readyWorkers.length > 0 && incompleteWorkers.length === 0;
-  const preview = segment.matchApproachSetup.performancePreview;
   const settings = segment.matchApproachSetup.performanceSettings;
+  const previewWorkers = readyWorkers.filter((item): item is typeof item & { profile: MatchEngineProfile; plan: MatchWorkerApproachPlan } => Boolean(item.profile && item.plan)).map((item) => ({ profile: item.profile, plan: item.plan }));
+  const storedPreview = segment.matchApproachSetup.performancePreview;
+  const expectedFingerprint = canGenerate ? performancePreviewInputFingerprint({
+    workers: previewWorkers,
+    aimId: segment.matchApproachSetup.matchAimId,
+    durationMinutes: segment.durationMinutes,
+    approachLimit: segment.matchApproachSetup.approachLimit,
+    plannedWinner: segment.plannedWinner,
+    settings,
+  }) : "";
+  const preview = storedPreview?.calculationVersion === CALCULATION_SYSTEM_VERSION && storedPreview.inputFingerprint === expectedFingerprint ? storedPreview : null;
 
   function updateSettings(patch: Partial<MatchPerformanceSettings>): void {
     onChange({
@@ -61,12 +72,8 @@ export default function MatchPerformancePreviewEditor({
 
   function generate(reuseSeed: boolean): void {
     if (!canGenerate) return;
-    const workers = readyWorkers.map((item) => ({
-      profile: item.profile as MatchEngineProfile,
-      plan: item.plan as MatchWorkerApproachPlan,
-    }));
     const result = generateMatchPerformancePreview({
-      workers,
+      workers: previewWorkers,
       aimId: segment.matchApproachSetup.matchAimId,
       durationMinutes: segment.durationMinutes,
       approachLimit: segment.matchApproachSetup.approachLimit,
@@ -127,7 +134,7 @@ export default function MatchPerformancePreviewEditor({
             <div><span>Pace</span><b>{result.actualPace === undefined ? result.paceStatus : `Pace ${result.actualPace} · ${result.paceStatus}`}</b></div>
             <div><span>Stamina</span><b>{result.staminaStatus}</b></div>
           </div>
-          <div className="match-performance-variance"><span>Luck {result.luck >= 0 ? "+" : ""}{result.luck.toFixed(1)}</span><span>Rare swing {result.swing >= 0 ? "+" : ""}{result.swing}</span><span>Consistency variance {result.consistencyVariance >= 0 ? "+" : ""}{result.consistencyVariance.toFixed(1)}</span>{preview.authority === "competitive-preview" && <span>Win chance {(result.winProbability * 100).toFixed(1)}%</span>}</div>
+          <div className="match-performance-variance"><span>Mental base {result.mentalBase.toFixed(1)}</span><span>Luck {result.luck >= 0 ? "+" : ""}{result.luck.toFixed(1)}</span><span>Rare swing {result.swing >= 0 ? "+" : ""}{result.swing}</span><span>Consistency variance {result.consistencyVariance >= 0 ? "+" : ""}{result.consistencyVariance.toFixed(1)}</span>{preview.authority === "competitive-preview" && <span>Win chance {(result.winProbability * 100).toFixed(1)}%</span>}</div>
         </article>)}
       </div>
 

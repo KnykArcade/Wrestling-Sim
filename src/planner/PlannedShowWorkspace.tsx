@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import MatchApproachSetupEditor, { MatchSettingsEditor } from "../matchEngine/MatchApproachSetup";
 import { loadMatchEngineUniverse, saveMatchEngineUniverse } from "../matchEngine/storage";
 import type { MatchEngineUniverse } from "../matchEngine/types";
 import NarrativeGenerator from "../narratives/NarrativeGenerator";
 import { loadStartingUniverseActivationState } from "../startingUniverse/activation";
 import { loadActiveStartingUniverse, loadStartingUniverseState } from "../startingUniverse/storage";
-import type { StartingUniverseRecord } from "../startingUniverse/types";
+import type { StartingUniverseCompany, StartingUniverseRecord } from "../startingUniverse/types";
 import type { TewSnapshot } from "../tew/types";
 import { loadWorkerUniverse } from "../workers/storage";
 import type { WorkerProfile } from "../workers/types";
@@ -62,6 +62,44 @@ interface BookingRosterWorker {
 const ALL_WORKERS_FILTER = "__all_workers__";
 const FREE_AGENTS_FILTER = "__free_agents__";
 
+interface BookingCompanyOption {
+  id: string;
+  label: string;
+}
+
+function bookingCompanyName(company: StartingUniverseCompany): string {
+  const name = company.name.trim();
+  const profile = company.profile.trim();
+  const looksLikeBiography = Boolean(profile && name === profile && (name.length > 60 || name.split(/\s+/).length > 9 || /[.!?]/.test(name)));
+  return looksLikeBiography ? company.initials.trim() || `Company ${company.id}` : name || company.initials.trim() || `Company ${company.id}`;
+}
+
+function BookingCompanyPicker({ options, value, onChange }: { options: BookingCompanyOption[]; value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
+  const selected = options.find((option) => option.id === value) ?? options[0];
+  const visible = options.filter((option) => option.label.toLowerCase().includes(search.trim().toLowerCase()));
+
+  useEffect(() => {
+    const close = (event: MouseEvent) => {
+      if (!wrapperRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  return <div className="booking-company-picker" ref={wrapperRef}>
+    <span className="booking-company-picker__label">Company / roster</span>
+    <button type="button" role="combobox" aria-label="Booking Company" aria-expanded={open} aria-controls={listboxId} className="booking-company-picker__trigger" onClick={() => { setOpen((current) => !current); setSearch(""); }}><span>{selected?.label ?? "Choose a company"}</span><b aria-hidden="true">▾</b></button>
+    {open && <div className="booking-company-picker__menu">
+      <input autoFocus aria-label="Search companies" value={search} placeholder="Search companies" onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); if (event.key === "Enter" && visible[0]) { onChange(visible[0].id); setOpen(false); } }} />
+      <div id={listboxId} role="listbox" aria-label="Booking company choices">{visible.length ? visible.map((option) => <button key={option.id} type="button" role="option" aria-selected={option.id === value} title={option.label} onClick={() => { onChange(option.id); setOpen(false); setSearch(""); }}>{option.label}</button>) : <span className="booking-company-picker__empty">No companies found</span>}</div>
+    </div>}
+  </div>;
+}
+
 function BasicMatchBooking({ segment, snapshot, company, startingUniverse, onChange }: { segment: PlannedSegment; snapshot: TewSnapshot | null; company: string; startingUniverse: StartingUniverseRecord | null; onChange: (segment: PlannedSegment) => void }) {
   const [importedWorkerId, setImportedWorkerId] = useState("");
   const [manualWorkerName, setManualWorkerName] = useState("");
@@ -79,7 +117,14 @@ function BasicMatchBooking({ segment, snapshot, company, startingUniverse, onCha
   const format = normalizeMatchFormat(segment.matchType);
   const validation = matchBookingValidation(segment);
   const isWrestler = (profile: WorkerProfile) => profile.currentRole === "Wrestler" || profile.currentRole === "Occasional Wrestler";
-  const worldCompanies = useMemo(() => startingUniverse?.companies.slice().sort((left, right) => left.name.localeCompare(right.name)) ?? [], [startingUniverse]);
+  const worldCompanies = useMemo(() => startingUniverse?.companies.slice().sort((left, right) => bookingCompanyName(left).localeCompare(bookingCompanyName(right))) ?? [], [startingUniverse]);
+  const fallbackCompanyNames = useMemo(() => Array.from(new Set([defaultCompany, activeCompany, ...workerUniverse.profiles.map((profile) => profile.companyName)].filter((name): name is string => Boolean(name)))).sort(), [activeCompany, defaultCompany, workerUniverse.profiles]);
+  const companyOptions = useMemo<BookingCompanyOption[]>(() => [
+    { id: ALL_WORKERS_FILTER, label: "All Workers" },
+    { id: FREE_AGENTS_FILTER, label: "Free Agents" },
+    ...worldCompanies.map((item) => ({ id: item.id, label: `${bookingCompanyName(item)}${item.active ? "" : " (Inactive)"}` })),
+    ...(!startingUniverse ? fallbackCompanyNames.map((name) => ({ id: name, label: name })) : []),
+  ], [fallbackCompanyNames, startingUniverse, worldCompanies]);
   const worldWorkers = useMemo<BookingRosterWorker[]>(() => {
     if (!startingUniverse) return [];
     const contractsByWorker = new Map<string, typeof startingUniverse.contracts>();
@@ -111,7 +156,7 @@ function BasicMatchBooking({ segment, snapshot, company, startingUniverse, onCha
     .filter((worker, index, list) => list.findIndex((item) => item.id === worker.id) === index)
     .filter((worker) => worker.name.toLowerCase().includes(workerSearch.trim().toLowerCase()))
     .sort((left, right) => left.name.localeCompare(right.name)), [fallbackWorkers, workerSearch, worldWorkers]);
-  const selectedCompanyName = rosterCompany === ALL_WORKERS_FILTER ? "All Workers" : rosterCompany === FREE_AGENTS_FILTER ? "Free Agents" : worldCompanies.find((item) => item.id === rosterCompany)?.name || rosterCompany;
+  const selectedCompanyName = companyOptions.find((item) => item.id === rosterCompany)?.label || rosterCompany;
 
   useEffect(() => {
     if (!startingUniverse || rosterCompany === ALL_WORKERS_FILTER || rosterCompany === FREE_AGENTS_FILTER || startingUniverse.companies.some((item) => item.id === rosterCompany)) return;
@@ -141,7 +186,7 @@ function BasicMatchBooking({ segment, snapshot, company, startingUniverse, onCha
   return <section className="basic-match-booking" aria-label="Basic match booking">
     <header><div><p className="eyebrow">COMPANY / ROSTER</p><h4>Choose wrestlers from any company in the game</h4></div><span className={validation === "Match setup is ready." ? "booking-ready" : "booking-needed"}>{validation}</span></header>
     <div className="booking-roster-controls">
-      <label className="field"><span>Company / roster</span><select aria-label="Booking Company" value={rosterCompany} onChange={(event) => { setRosterCompany(event.target.value); setImportedWorkerId(""); }}><option value={ALL_WORKERS_FILTER}>All Workers</option><option value={FREE_AGENTS_FILTER}>Free Agents</option>{worldCompanies.map((item) => <option key={item.id} value={item.id}>{item.name}{item.active ? "" : " (Inactive)"}</option>)}{!startingUniverse && Array.from(new Set([defaultCompany, activeCompany, ...workerUniverse.profiles.map((profile) => profile.companyName)].filter((name): name is string => Boolean(name)))).sort().map((name) => <option key={name} value={name}>{name}</option>)}</select><small>{rosterWorkers.length} wrestler{rosterWorkers.length === 1 ? "" : "s"} in {selectedCompanyName}.</small></label>
+      <div className="booking-company-picker-field"><BookingCompanyPicker options={companyOptions} value={rosterCompany} onChange={(value) => { setRosterCompany(value); setImportedWorkerId(""); }} /><small>{rosterWorkers.length} wrestler{rosterWorkers.length === 1 ? "" : "s"} in {selectedCompanyName}.</small></div>
       <label className="field"><span>Search roster</span><input aria-label="Search company roster" value={workerSearch} placeholder="Search by wrestler name" onChange={(event) => { setWorkerSearch(event.target.value); setImportedWorkerId(""); }} /></label>
       <label className="field"><span>Wrestler</span><select aria-label="Company wrestler" value={importedWorkerId} disabled={!rosterWorkers.length} onChange={(event) => setImportedWorkerId(event.target.value)}><option value="">{rosterWorkers.length ? "Select a wrestler" : "No wrestlers match this filter"}</option>{rosterWorkers.map((worker) => <option key={`${worker.id}-${worker.name}`} value={worker.id}>{worker.name}{rosterCompany === ALL_WORKERS_FILTER ? ` · ${worker.companyName}` : ""}</option>)}</select></label>
       <button className="secondary-button compact-button booking-add-worker" type="button" disabled={!importedWorkerId} onClick={addImportedWorker}>Add Wrestler</button>

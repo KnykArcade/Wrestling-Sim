@@ -18,6 +18,8 @@ import type {
   WrestlerStyleDefinition,
 } from "./types";
 
+export const MAX_MATCH_APPROACHES = 4;
+
 function fallbackId(): string {
   return `match-engine-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -85,7 +87,7 @@ export function approachSlotsForDuration(minutes: number): 1 | 2 | 3 | 4 {
 
 export function approachLimitForSetup(minutes: number, configuredLimit?: number | null): number {
   if (typeof configuredLimit !== "number" || !Number.isFinite(configuredLimit)) return approachSlotsForDuration(minutes);
-  return Math.max(1, Math.min(MATCH_APPROACHES.length, Math.round(configuredLimit)));
+  return Math.max(1, Math.min(MAX_MATCH_APPROACHES, Math.round(configuredLimit)));
 }
 
 export function evaluatePace(idealPace: number, actualPace: number): PaceEvaluation {
@@ -108,34 +110,32 @@ export function evaluateStamina(used: number, available: number): StaminaEvaluat
 }
 
 export function classifyMentalState(score: number): MentalStateDefinition {
-  if (score >= 85) return MENTAL_STATES[0];
-  if (score >= 70) return MENTAL_STATES[1];
-  if (score >= 55) return MENTAL_STATES[2];
+  if (score >= 82) return MENTAL_STATES[0];
+  if (score >= 68) return MENTAL_STATES[1];
+  if (score >= 52) return MENTAL_STATES[2];
   if (score >= 40) return MENTAL_STATES[3];
   return MENTAL_STATES[4];
 }
 
+export function calculateMentalStateBase(inputs: Omit<MentalStateInputs, "luck" | "swing">): number {
+  const raw = 60
+    + (inputs.health - 75) * 0.06
+    + (inputs.consistency - 60) * 0.08
+    + (inputs.experience - 60) * 0.04
+    + (inputs.overall - 60) * 0.04;
+  return Math.max(56, Math.min(64, raw));
+}
+
 export function calculateMentalStateScore(inputs: MentalStateInputs): number {
-  return (
-    0.2 * inputs.health +
-    0.2 * inputs.popularity +
-    0.15 * inputs.experience +
-    0.15 * inputs.fanReaction * 20 +
-    0.1 * inputs.gimmick * 20 +
-    0.2 * inputs.overall +
-    inputs.luck +
-    inputs.swing
-  );
+  return calculateMentalStateBase(inputs) + inputs.luck + inputs.swing;
 }
 
-export function mentalSwingProbability(overall: number): number {
-  return 0.05 + (100 - overall) / 2000;
+export function mentalSwingProbability(consistency: number): number {
+  return 0.04 + (100 - Math.max(0, Math.min(100, consistency))) / 2500;
 }
 
-export function averageApproachPace(approachIds: MatchApproachId[]): number {
-  if (approachIds.length === 0) return 0;
-  const total = approachIds.reduce((sum, id) => sum + (getApproach(id)?.pace ?? 0), 0);
-  return Math.round((total / approachIds.length) * 100) / 100;
+export function totalApproachPace(approachIds: MatchApproachId[]): number {
+  return approachIds.reduce((sum, id) => sum + (getApproach(id)?.pace ?? 0), 0);
 }
 
 export function totalApproachStamina(approachIds: MatchApproachId[]): number {
@@ -290,12 +290,13 @@ export function evaluateApproachPlan(
   configuredLimit?: number | null,
 ): ApproachPlanResult {
   const aim = aimForId(aimId);
-  const selected = Array.from(new Set(approachIds)).filter((id) => MATCH_APPROACHES.some((approach) => approach.id === id));
+  const limit = approachLimitForSetup(durationMinutes, configuredLimit);
+  const selected = Array.from(new Set(approachIds)).filter((id) => MATCH_APPROACHES.some((approach) => approach.id === id)).slice(0, limit);
   const candidateScores = selected.map((id) => scoreApproachCandidate(profile, aim.id, getApproach(id)!));
   const usedStamina = totalApproachStamina(selected);
   const availableStamina = profileStaminaCapacity(profile);
   const stamina = evaluateStamina(usedStamina, availableStamina);
-  const actualPace = selected.length === 0 ? 0 : Math.round(averageApproachPace(selected) * 2);
+  const actualPace = totalApproachPace(selected);
   const pace = evaluatePace(aim.idealPace, actualPace);
   const distinctPaces = new Set(selected.map((id) => getApproach(id)?.pace ?? 0)).size;
   const diversityBonus = selected.length >= 3 && distinctPaces >= 2 ? 3 : 0;

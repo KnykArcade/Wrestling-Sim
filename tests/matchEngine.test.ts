@@ -9,7 +9,9 @@ import {
 } from "../src/matchEngine/catalog";
 import {
   approachSlotsForDuration,
+  approachLimitForSetup,
   calculateApproachRating,
+  calculateMentalStateBase,
   calculateMentalStateScore,
   calculateProfileStaminaRating,
   chooseApproachPlan,
@@ -22,6 +24,7 @@ import {
   resolveApproachId,
   scoreApproachCandidate,
   staminaCapacityFromRating,
+  totalApproachPace,
 } from "../src/matchEngine/model";
 import {
   advisoryStarRating,
@@ -124,7 +127,7 @@ describe("native match engine data foundation", () => {
     expect(normalizeRating(-4)).toBe(0);
     expect(calculationQualityLabel(85)).toBe("Elite");
     expect(calculationQualityLabel(49.99)).toBe("Weak");
-    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b10d-v1");
+    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b17-v1");
   });
 
   test("migrates saved resolver IDs without losing selected or locked approaches", () => {
@@ -134,6 +137,23 @@ describe("native match engine data foundation", () => {
     });
     expect(setup.workerPlans[0].selectedApproachIds).toEqual(["aerial-showstopper", "pace-controller", "counter-specialist"]);
     expect(setup.workerPlans[0].lockedApproachIds).toEqual(["pace-controller"]);
+  });
+
+  test("hard-caps existing and newly configured approach plans at four", () => {
+    const setup = normalizeMatchApproachSetup({
+      approachLimit: 8,
+      workerPlans: [{
+        workerKey: "tew:1",
+        workerName: "Worker",
+        selectedApproachIds: MATCH_APPROACHES.slice(0, 6).map((approach) => approach.id),
+        lockedApproachIds: MATCH_APPROACHES.slice(0, 6).map((approach) => approach.id),
+        mode: "Manual",
+      }],
+    });
+    expect(setup.approachLimit).toBe(4);
+    expect(setup.workerPlans[0].selectedApproachIds).toEqual(MATCH_APPROACHES.slice(0, 4).map((approach) => approach.id));
+    expect(setup.workerPlans[0].lockedApproachIds).toEqual(setup.workerPlans[0].selectedApproachIds);
+    expect(approachLimitForSetup(60, 8)).toBe(4);
   });
 
   test("uses the approved duration boundaries for approach slots", () => {
@@ -165,16 +185,17 @@ describe("native match engine data foundation", () => {
     expect(evaluateStamina(9, 6)).toEqual({ overBudget: 3, status: "DEAD", modifier: -15 });
   });
 
-  test("preserves the five mental states and source score thresholds", () => {
+  test("centers ordinary mental form on neutral with rare extremes", () => {
     expect(MENTAL_STATES.map((state) => state.modifier)).toEqual([5, 2.5, 0, -5, -10]);
-    expect(classifyMentalState(85).name).toBe("HOT NIGHT");
-    expect(classifyMentalState(70).name).toBe("FOCUSED");
-    expect(classifyMentalState(55).name).toBe("NEUTRAL");
+    expect(classifyMentalState(82).name).toBe("HOT NIGHT");
+    expect(classifyMentalState(68).name).toBe("FOCUSED");
+    expect(classifyMentalState(52).name).toBe("NEUTRAL");
     expect(classifyMentalState(40).name).toBe("DISTRACTED");
     expect(classifyMentalState(39.99).name).toBe("OFF NIGHT");
-    expect(calculateMentalStateScore({ health: 80, popularity: 70, experience: 60, fanReaction: 4, gimmick: 3, overall: 75, luck: 5, swing: -10 })).toBe(67);
-    expect(mentalSwingProbability(100)).toBeCloseTo(0.05, 10);
-    expect(mentalSwingProbability(50)).toBeCloseTo(0.075, 10);
+    expect(calculateMentalStateBase({ health: 80, consistency: 60, experience: 60, overall: 75 })).toBeCloseTo(60.9, 10);
+    expect(calculateMentalStateScore({ health: 80, consistency: 60, experience: 60, overall: 75, luck: 5, swing: -18 })).toBeCloseTo(47.9, 10);
+    expect(mentalSwingProbability(100)).toBeCloseTo(0.04, 10);
+    expect(mentalSwingProbability(50)).toBeCloseTo(0.06, 10);
   });
 
   test("preserves combined aim and legacy importance data with explicit conflicts", () => {
@@ -323,26 +344,51 @@ describe("Phase 4C3 advisory match performance preview", () => {
     expect(preview.summary).toContain("does not change the planned winner or TEW result");
   });
 
-  test("keeps Ricochet and Roderick Strong at ideal pace in a Survival / Chaos preview", () => {
-    const ricochet = testProfile("Ricochet", "ricochet");
-    const roderick = testProfile("Roderick Strong", "roderick-strong");
+  test("sums the exact visible Andrade and Lashley approach pace to five", () => {
+    const andrade = testProfile("Andrade", "andrade");
+    const lashley = testProfile("Bobby Lashley", "bobby-lashley");
     const preview = generateMatchPerformancePreview({
       workers: [
-        { profile: ricochet, plan: testPlan(ricochet, ["aerial-showstopper", "high-tempo-hybrid", "resilient-underdog"]) },
-        { profile: roderick, plan: testPlan(roderick, ["high-tempo-hybrid", "heavy-striker-brawler", "strong-style-specialist"]) },
+        { profile: andrade, plan: testPlan(andrade, ["aerial-showstopper", "opportunistic-schemer", "chain-technician"]) },
+        { profile: lashley, plan: testPlan(lashley, ["power-dominance", "pace-controller", "heavy-striker-brawler"]) },
       ],
       aimId: "survival-chaos",
       durationMinutes: 20,
       approachLimit: 3,
       plannedWinner: "",
       settings: { authority: "tew-authoritative", volatility: 5, bookingInfluence: 0 },
-      seed: "phase-6b14-pace-integrity",
+      seed: "phase-6b17-pace-integrity",
     })!;
 
+    expect(totalApproachPace(["aerial-showstopper", "opportunistic-schemer", "chain-technician"])).toBe(5);
     expect(preview.workerResults.map((result) => ({ name: result.workerName, pace: result.actualPace, status: result.paceStatus }))).toEqual([
-      { name: "Ricochet", pace: 5, status: "IDEAL PACE" },
-      { name: "Roderick Strong", pace: 5, status: "IDEAL PACE" },
+      { name: "Andrade", pace: 5, status: "IDEAL PACE" },
+      { name: "Bobby Lashley", pace: 5, status: "IDEAL PACE" },
     ]);
+  });
+
+  test("does not trap a Kyle Fletcher-style low-popularity profile in bad nights", () => {
+    const kyle = { ...testProfile("Kyle Fletcher", "kyle-fletcher"), popularity: 18, fanReaction: 1, gimmick: 1, overall: 68, experience: 55 };
+    kyle.skills.Consistency = 66;
+    const opponent = testProfile("Opponent", "opponent");
+    const states = Array.from({ length: 600 }, (_, index) => generateMatchPerformancePreview({
+      workers: [
+        { profile: kyle, plan: testPlan(kyle, ["aerial-showstopper", "opportunistic-schemer", "chain-technician"]) },
+        { profile: opponent, plan: testPlan(opponent, ["power-dominance", "pace-controller", "heavy-striker-brawler"]) },
+      ],
+      aimId: "survival-chaos",
+      durationMinutes: 20,
+      approachLimit: 3,
+      plannedWinner: "",
+      settings: { authority: "tew-authoritative", volatility: 5, bookingInfluence: 0 },
+      seed: `phase-6b17-kyle-${index}`,
+    })!.workerResults.find((result) => result.workerName === "Kyle Fletcher")!.mentalStateName);
+    const count = (state: typeof states[number]) => states.filter((value) => value === state).length;
+    expect(count("NEUTRAL")).toBeGreaterThan(300);
+    expect(count("DISTRACTED") + count("OFF NIGHT")).toBeLessThan(180);
+    expect(count("OFF NIGHT")).toBeLessThan(30);
+    expect(count("FOCUSED")).toBeGreaterThan(20);
+    expect(count("HOT NIGHT")).toBeGreaterThan(0);
   });
 
   test("converts advisory match scores to quarter-star ratings", () => {

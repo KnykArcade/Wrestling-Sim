@@ -370,6 +370,21 @@
 .booking-roster-controls input,
 .booking-roster-controls select { min-height: 32px; padding: 5px 7px; }
 .booking-roster-controls small { font-size: .62rem; }
+.booking-company-picker-field { min-width: 0; display: grid; gap: 3px; }
+.booking-company-picker { position: relative; min-width: 0; display: grid; gap: 3px; }
+.booking-company-picker__label { color: #d7e2f3; font-size: .78rem; font-weight: 800; letter-spacing: .03em; }
+.booking-company-picker__trigger { min-width: 0; min-height: 32px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 5px 7px; border: 1px solid #7189b1; background: #f8f9fb; color: #071428; text-align: left; }
+.booking-company-picker__trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.booking-company-picker__trigger b { font-size: 12px; }
+.booking-company-picker__trigger:focus-visible { outline: 2px solid #fff200; outline-offset: 1px; }
+.booking-company-picker__menu { position: absolute; z-index: 70; top: calc(100% + 2px); left: 0; width: min(360px, 80vw); padding: 5px; border: 1px solid #6f8cad; background: #061222; box-shadow: 0 14px 28px rgba(0,0,0,.55); }
+.booking-company-picker__menu > input { width: 100%; min-height: 32px; margin-bottom: 4px; border: 1px solid #7189b1; background: #f8f9fb; color: #071428; padding: 5px 7px; }
+.booking-company-picker__menu [role="listbox"] { display: grid; max-height: 260px; overflow-y: auto; }
+.booking-company-picker__menu [role="option"] { overflow: hidden; min-height: 30px; padding: 5px 8px; border: 0; border-bottom: 1px solid #233d5b; background: #0d2037; color: #e5eef9; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.booking-company-picker__menu [role="option"]:hover,
+.booking-company-picker__menu [role="option"]:focus-visible,
+.booking-company-picker__menu [role="option"][aria-selected="true"] { background: #173858; color: #fff200; outline: none; }
+.booking-company-picker__empty { padding: 8px; color: #aebed1; }
 .booking-add-worker { align-self: end; }
 .manual-worker-inline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px; }
 .manual-worker-inline input { min-width: 0; }
