@@ -17,8 +17,8 @@ import {
   parseMatchEngineUniverse,
   saveMatchEngineUniverse,
 } from "../matchEngine/storage";
-import { performancePreviewSetupFingerprint } from "../matchEngine/performance";
-import type { MatchEngineUniverse } from "../matchEngine/types";
+import { performancePreviewIsCurrent } from "../matchEngine/previewIntegrity";
+import type { MatchEngineProfile, MatchEngineUniverse } from "../matchEngine/types";
 import { emptyShowOperationsUniverse } from "../operations/model";
 import { loadShowOperationsUniverse, parseShowOperationsUniverse, saveShowOperationsUniverse } from "../operations/storage";
 import type { ShowOperationsUniverse } from "../operations/types";
@@ -125,7 +125,7 @@ function normalizeActualMatch(value: unknown): ActualMatchSnapshot | null {
 }
 
 function normalizePlanOutcome(value: unknown, legacy: boolean | null): ReconciliationPlanOutcome {
-  const allowed: ReconciliationPlanOutcome[] = ["Unresolved", "Yes", "Partially", "No"];
+  const allowed: ReconciliationPlanOutcome[] = ["Unresolved", "Yes", "Partially", "No", "No Contest"];
   if (typeof value === "string" && allowed.includes(value as ReconciliationPlanOutcome)) return value as ReconciliationPlanOutcome;
   return legacy === true ? "Yes" : legacy === false ? "No" : "Unresolved";
 }
@@ -198,16 +198,7 @@ function normalizeSegment(value: unknown): PlannedSegment | null {
   const durationMinutes = Math.max(1, finiteNumber(value.durationMinutes, defaults.durationMinutes));
   const plannedWinner = text(value.plannedWinner);
   const normalizedApproachSetup = normalizeMatchApproachSetup(value.matchApproachSetup);
-  const preview = normalizedApproachSetup.performancePreview;
-  const activeWorkerNames = new Set(workers.map((worker) => worker.name.trim().toLowerCase()));
-  const matchApproachSetup = preview && preview.inputFingerprint !== performancePreviewSetupFingerprint({
-    workerPlans: normalizedApproachSetup.workerPlans.filter((plan) => activeWorkerNames.has(plan.workerName.trim().toLowerCase())),
-    aimId: normalizedApproachSetup.matchAimId,
-    durationMinutes,
-    approachLimit: normalizedApproachSetup.approachLimit,
-    plannedWinner,
-    settings: normalizedApproachSetup.performanceSettings,
-  }) ? { ...normalizedApproachSetup, performancePreview: null } : normalizedApproachSetup;
+  const matchApproachSetup = normalizedApproachSetup;
 
   return {
     ...defaults,
@@ -284,10 +275,23 @@ export function parsePlannerShows(value: unknown): PlannedShow[] {
   return shows as PlannedShow[];
 }
 
+function removeStalePerformancePreviews(shows: PlannedShow[], profiles: MatchEngineProfile[]): PlannedShow[] {
+  return shows.map((show) => ({
+    ...show,
+    segments: show.segments.map((segment) => segment.type === "match" && segment.matchApproachSetup.performancePreview?.profileFingerprint && !performancePreviewIsCurrent({ segment, cardSegments: show.segments, profiles })
+      ? { ...segment, matchApproachSetup: { ...segment.matchApproachSetup, performancePreview: null } }
+      : segment),
+  }));
+}
+
 export function loadPlannedShows(storage: Pick<Storage, "getItem">): PlannedShow[] {
   const stored = storage.getItem(PLANNER_STORAGE_KEY);
   if (!stored) return [];
-  try { return parsePlannerShows(JSON.parse(stored) as unknown); } catch { return []; }
+  try {
+    const shows = parsePlannerShows(JSON.parse(stored) as unknown);
+    const profiles = loadMatchEngineUniverse(storage).profiles;
+    return removeStalePerformancePreviews(shows, profiles);
+  } catch { return []; }
 }
 
 export function savePlannedShows(storage: Pick<Storage, "setItem">, shows: PlannedShow[]): void {
@@ -391,7 +395,7 @@ export function createPlannerBackup(
     product: "TEW IX Story Tracker",
     version: 22,
     exportedAt: new Date().toISOString(),
-    shows,
+    shows: removeStalePerformancePreviews(shows, matchEngine.profiles),
     storylines,
     workers,
     control,
@@ -422,7 +426,8 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
     ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22].includes(typeof value.version === "number" ? value.version : -1)
   ) throw new Error("The selected file is not a supported TEW Story Tracker backup.");
   const version = value.version as number;
-  const shows = parsePlannerShows(value.shows);
+  const matchEngine = version >= 9 ? parseMatchEngineUniverse(value.matchEngine ?? emptyMatchEngineUniverse()) : emptyMatchEngineUniverse();
+  const shows = removeStalePerformancePreviews(parsePlannerShows(value.shows), matchEngine.profiles);
   return {
     shows,
     storylines: version >= 4 ? parseTrackerStorylines(value.storylines ?? []) : [],
@@ -430,7 +435,7 @@ export function parsePlannerBackupBundle(textValue: string): PlannerBackupBundle
     control: version >= 6 ? parseCreativeControlData(value.control ?? emptyCreativeControlData()) : emptyCreativeControlData(),
     championships: version >= 7 ? parseChampionshipUniverse(value.championships ?? emptyChampionshipUniverse()) : emptyChampionshipUniverse(),
     handoff: version >= 8 ? parseHandoffUniverse(value.handoff ?? emptyHandoffUniverse()) : emptyHandoffUniverse(),
-    matchEngine: version >= 9 ? parseMatchEngineUniverse(value.matchEngine ?? emptyMatchEngineUniverse()) : emptyMatchEngineUniverse(),
+    matchEngine,
     competitions: version >= 11 ? parseCompetitionUniverse(value.competitions ?? emptyCompetitionUniverse()) : emptyCompetitionUniverse(),
     bridge: version >= 12 ? parseBridgeUniverse(value.bridge ?? emptyBridgeUniverse()) : emptyBridgeUniverse(),
     transfer: version >= 13 ? parseTransferUniverse(value.transfer ?? emptyTransferUniverse()) : emptyTransferUniverse(),

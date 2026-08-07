@@ -8,6 +8,7 @@ import {
   scoreApproachCandidate,
 } from "../matchEngine/model";
 import type { MatchAimId, MatchEngineProfile, MatchWorkerApproachPlan } from "../matchEngine/types";
+import { currentPerformancePreview } from "../matchEngine/previewIntegrity";
 import type { PlannedSegment } from "../planner/types";
 import type { AnticipationLabel, CrowdHeatLabel, LiveAudienceResult, MatchAnticipation, MomentumLabel } from "./types";
 
@@ -191,7 +192,9 @@ export function projectedCrowdBeforeForSegment(input: {
   let crowd = round(clamp(input.crowdStart ?? 50));
   for (const segment of input.segments) {
     if (segment.id === input.segmentId) break;
-    if (segment.type !== "match" || !segment.matchApproachSetup.performancePreview) continue;
+    if (segment.type !== "match") continue;
+    const preview = currentPerformancePreview({ segment, cardSegments: input.segments, profiles: input.profiles });
+    if (!preview) continue;
     const profileKeys = new Set(segment.workers.map((worker) => `${worker.source}:${worker.id}`));
     const profiles = input.profiles.filter((profile) => profileKeys.has(profile.workerKey));
     if (profiles.length < 2) continue;
@@ -200,7 +203,7 @@ export function projectedCrowdBeforeForSegment(input: {
       plans: segment.matchApproachSetup.workerPlans,
       aimId: segment.matchApproachSetup.matchAimId,
     });
-    crowd = calculateLiveMatchAudience(segment.matchApproachSetup.performancePreview.matchScore, anticipation.score, crowd).crowdAfter;
+    crowd = calculateLiveMatchAudience(preview.matchScore, anticipation.score, crowd).crowdAfter;
   }
   return crowd;
 }

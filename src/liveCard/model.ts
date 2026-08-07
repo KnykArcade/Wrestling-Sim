@@ -234,7 +234,7 @@ export function lockMatchResult(
       updatedAt: timestamp,
     } : item),
     currentCrowd: audience.crowdAfter,
-    audit: [audit("Match Result Locked", session.showId, record.segmentId, `${result.finalResult.winnerName} defeated ${result.finalResult.loserName}. Final rating ${audience.finalRating}; crowd ${audience.crowdBefore} to ${audience.crowdAfter}.`), ...session.audit],
+    audit: [audit("Match Result Locked", session.showId, record.segmentId, `${result.finalResult.finishType === "No Contest" ? "Match ended in a No Contest" : `${result.finalResult.winnerName} defeated ${result.finalResult.loserName}`}. Final rating ${audience.finalRating}; crowd ${audience.crowdBefore} to ${audience.crowdAfter}.`), ...session.audit],
     updatedAt: timestamp,
     ...(nextId ? {} : { currentSegmentId: record.segmentId }),
   };
@@ -287,7 +287,7 @@ export function skipLiveCardSegment(session: LiveCardSession, segmentId: string,
 
 function groundedFacts(sourceSegment: PlannedSegment, result: LiveCardResultSnapshot): string[] {
   return [
-    `${result.finalResult.winnerName} defeated ${result.finalResult.loserName}.`,
+    result.finalResult.finishType === "No Contest" ? "The match ended in a No Contest with no winner or loser." : `${result.finalResult.winnerName} defeated ${result.finalResult.loserName}.`,
     result.finalResult.finishDescription,
     `Official duration: ${result.finalResult.actualDurationMinutes.toFixed(2)} minutes.`,
     `Match score: ${result.finalResult.matchScore.toFixed(1)} (${result.finalResult.starRating} stars).`,

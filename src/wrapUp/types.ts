@@ -1,5 +1,5 @@
 export type WrapUpStatus = "Not Reviewed" | "In Progress" | "Closed" | "Amendment Open";
-export type WrapUpPlanOutcome = "Unresolved" | "Yes" | "Partially" | "No";
+export type WrapUpPlanOutcome = "Unresolved" | "Yes" | "Partially" | "No" | "No Contest";
 export type WrapUpDecisionStatus = "Pending" | "Confirmed" | "Deferred" | "Reversed" | "Amended";
 export type WrapUpSegmentReviewStatus = "Pending" | "Reviewed";
 

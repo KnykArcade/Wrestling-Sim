@@ -20,6 +20,8 @@ test("generates and persists a TEW-authoritative match performance preview", asy
   await match.getByRole("button", { name: "Run AI for All Competitors" }).click();
 
   await expect(match.getByLabel("Performance preview authority")).toHaveValue("tew-authoritative");
+  await expect(match.getByLabel("Performance preview importance")).toHaveValue("Auto");
+  await match.getByLabel("Performance preview chemistry").fill("2");
   await match.getByRole("button", { name: "Roll New Night" }).click();
   await expect(match.getByText("Determined in TEW", { exact: true })).toBeVisible();
   await expect(
@@ -45,6 +47,7 @@ test("generates and persists a TEW-authoritative match performance preview", asy
   const persistedMatch = page.locator('[data-segment-type="match"]');
   await expect(page.getByLabel("Show name")).toHaveValue("PWL Performance Preview");
   await expect(persistedMatch.getByText("Determined in TEW", { exact: true })).toBeVisible();
+  await expect(persistedMatch.getByLabel("Performance preview chemistry")).toHaveValue("2");
   await expect(persistedMatch.locator(".match-performance-scorecard strong").first()).toHaveText(savedScore ?? "");
   await expect(persistedMatch.locator(".match-performance-seed span").first()).toHaveText(savedSeed ?? "");
 

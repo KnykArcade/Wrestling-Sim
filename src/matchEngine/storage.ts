@@ -118,10 +118,16 @@ function normalizePerformanceSettings(value: unknown): MatchPerformanceSettings 
   const authority = authorities.includes(value.authority as MatchOutcomeAuthority)
     ? value.authority as MatchOutcomeAuthority
     : fallback.authority;
+  const importanceOptions: MatchPerformanceSettings["importance"][] = ["Auto", "Television", "Feature", "Main Event", "Championship", "Tournament"];
+  const importance = importanceOptions.includes(value.importance as MatchPerformanceSettings["importance"])
+    ? value.importance as MatchPerformanceSettings["importance"]
+    : fallback.importance;
   return {
     authority,
-    volatility: clamp(finiteNumber(value.volatility, fallback.volatility), 1, 10),
-    bookingInfluence: clamp(finiteNumber(value.bookingInfluence, fallback.bookingInfluence), 0, 10),
+    volatility: clamp(finiteNumber(value.volatility, fallback.volatility ?? 5), 1, 10),
+    bookingInfluence: clamp(finiteNumber(value.bookingInfluence, fallback.bookingInfluence ?? 0), 0, 10),
+    importance,
+    chemistry: clamp(finiteNumber(value.chemistry, fallback.chemistry ?? 0), -10, 10),
   };
 }
 
@@ -168,6 +174,8 @@ function normalizePerformancePreview(value: unknown): MatchPerformancePreview | 
     seed: text(value.seed),
     authority: settings.authority,
     calculationVersion: text(value.calculationVersion, "legacy-unversioned"),
+    setupFingerprint: text(value.setupFingerprint),
+    profileFingerprint: text(value.profileFingerprint),
     inputFingerprint: text(value.inputFingerprint),
     matchScore: clamp(finiteNumber(value.matchScore, 0), 0, 100),
     starRating: clamp(finiteNumber(value.starRating, 0), 0, 5),

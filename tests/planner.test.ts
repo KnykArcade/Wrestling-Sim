@@ -50,6 +50,8 @@ function addAdvisoryPreview(match: ReturnType<typeof createPlannedSegment>): voi
     seed: "test-night",
     authority: "tew-authoritative",
     calculationVersion: CALCULATION_SYSTEM_VERSION,
+    setupFingerprint: "",
+    profileFingerprint: "",
     inputFingerprint: performancePreviewSetupFingerprint({
       workerPlans: match.matchApproachSetup.workerPlans,
       aimId: match.matchApproachSetup.matchAimId,
@@ -82,6 +84,7 @@ function addAdvisoryPreview(match: ReturnType<typeof createPlannedSegment>): voi
       presentationScore: 78,
       staminaStatus: "PASS",
       staminaModifier: 2,
+      actualPace: undefined,
       paceStatus: "IDEAL PACE",
       paceModifier: 2,
       performanceScore: 82.8,
@@ -341,6 +344,22 @@ describe("planned show workspace", () => {
       competitions, bridge, transfer, operations, workbench, profileLibrary, outputLibrary,
       showSession, promotionSchedule, wrapUp, snapshotVault, startingUniverse,
     });
+  });
+
+  test("omits fingerprinted stale performance previews from backup exports and imports", () => {
+    const show = createPlannedShow(1);
+    const match = createPlannedSegment("match");
+    addAdvisoryPreview(match);
+    match.matchApproachSetup.performancePreview!.profileFingerprint = "stale-profile-state";
+    show.segments = [match];
+
+    const backup = createPlannerBackup([show], [], { profiles: [], relationships: [] });
+    expect(match.matchApproachSetup.performancePreview).not.toBeNull();
+    expect(backup.shows[0].segments[0].matchApproachSetup.performancePreview).toBeNull();
+
+    const rawBackup = priorBackup(22, [show]);
+    (rawBackup as Record<string, unknown>).startingUniverse = emptyStartingUniverseState();
+    expect(parsePlannerBackupBundle(JSON.stringify(rawBackup)).shows[0].segments[0].matchApproachSetup.performancePreview).toBeNull();
   });
 
   test("migrates version 21 backups without Starting Universe data", () => {

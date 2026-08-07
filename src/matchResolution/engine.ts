@@ -1,5 +1,6 @@
 import {
   approachLimitForSetup,
+  calculateApproachPlanScore,
   calculateMentalStateBase,
   calculateMentalStateScore,
   classifyMentalState,
@@ -218,7 +219,7 @@ function selectedApproaches(
   opponents: MatchResolutionWorkerSource[],
   setup: MatchResolutionSetup,
 ): { ids: ResolutionApproachId[]; scores: MatchResolutionApproachScore[]; plan: ReturnType<typeof createCalculationStage> } {
-  const planFormula = CALCULATION_FORMULAS.resolutionApproachPlan;
+  const planFormula = CALCULATION_FORMULAS.approachPlan;
   const slots = approachLimitForSetup(setup.durationMinutes, setup.approachLimit);
   const locked = worker.approachMode === "AI" ? uniqueApproaches(worker.lockedApproachIds).slice(0, slots) : [];
   const manual = uniqueApproaches(worker.manualApproachIds).filter((id) => !locked.includes(id));
@@ -235,8 +236,17 @@ function selectedApproaches(
     const stamina = evaluateStamina(staminaUsed, staminaAvailable);
     const actualPace = ids.reduce((total, id) => total + resolutionApproach(id).pace, 0);
     const pace = evaluatePace(idealPaceForAim(setup.aimId), actualPace);
-    const diversity = new Set(ids.map((id) => resolutionApproach(id).pace)).size >= 2 && ids.length >= 3 ? planFormula.diversityBonus : 0;
-    const total = scores.reduce((sum, item) => sum + item.total, 0) + stamina.modifier * planFormula.staminaModifierWeight + pace.modifier * planFormula.paceModifierWeight + diversity;
+    const planScore = calculateApproachPlanScore({
+      recommendationTotal: scores.reduce((sum, item) => sum + item.total, 0),
+      paceModifier: pace.modifier,
+      staminaModifier: stamina.modifier,
+      selectedPaces: ids.map((id) => resolutionApproach(id).pace),
+      includesBigMatchPerformer: ids.includes("big-match-performer"),
+      durationMinutes: setup.durationMinutes,
+      staminaUsed,
+      staminaAvailable,
+    });
+    const total = planScore.total;
     if (total > bestScore || (total === bestScore && staminaUsed < bestIds.reduce((sum, id) => sum + resolutionApproach(id).staminaCost, 0))) {
       bestScore = total;
       bestIds = ids;
@@ -248,12 +258,23 @@ function selectedApproaches(
   const stamina = evaluateStamina(staminaUsed, staminaAvailable);
   const actualPace = bestIds.reduce((total, id) => total + resolutionApproach(id).pace, 0);
   const pace = evaluatePace(idealPaceForAim(setup.aimId), actualPace);
-  const diversity = new Set(bestIds.map((id) => resolutionApproach(id).pace)).size >= 2 && bestIds.length >= 3 ? planFormula.diversityBonus : 0;
+  const planScore = calculateApproachPlanScore({
+    recommendationTotal: bestScores.reduce((sum, item) => sum + item.total, 0),
+    paceModifier: pace.modifier,
+    staminaModifier: stamina.modifier,
+    selectedPaces: bestIds.map((id) => resolutionApproach(id).pace),
+    includesBigMatchPerformer: bestIds.includes("big-match-performer"),
+    durationMinutes: setup.durationMinutes,
+    staminaUsed,
+    staminaAvailable,
+  });
   const terms = [
     ...bestScores.map((score) => createCalculationTerm(`recommendation-${score.approachId}`, `${score.approachName} recommendation`, score.total, 1, "Selection-only recommendation score.")),
     createCalculationTerm("stamina", "Stamina modifier", stamina.modifier, planFormula.staminaModifierWeight, `${staminaUsed}/${staminaAvailable} stamina: ${stamina.status}.`),
     createCalculationTerm("pace", "Pace modifier", pace.modifier, planFormula.paceModifierWeight, `Pace ${actualPace} against ideal ${idealPaceForAim(setup.aimId)}: ${pace.status}.`),
-    createCalculationTerm("variety", "Pace-variety bonus", diversity, 1, diversity ? "Three or more approaches use at least two pace levels." : "No pace-variety bonus applied."),
+    createCalculationTerm("variety", "Pace-variety bonus", planScore.diversityBonus, 1, planScore.diversityBonus ? "Three or more approaches use at least two pace levels." : "No pace-variety bonus applied."),
+    createCalculationTerm("long-match", "Big Match Performer long-match bonus", planScore.longMatchBonus, 1, planScore.longMatchBonus ? "Big Match Performer is used in a match lasting at least 16 minutes." : "No long-match bonus applied."),
+    createCalculationTerm("over-budget", "Stamina over-budget penalty", planScore.overBudgetPoints, -planFormula.staminaOverBudgetPenalty, planScore.overBudgetPenalty ? `${planScore.overBudgetPoints} stamina above capacity.` : "The plan stays within stamina capacity."),
   ];
   return {
     ids: bestIds,
@@ -383,7 +404,6 @@ function workerResult(
     createCalculationTerm("stamina", "Stamina modifier", stamina.modifier, 1, `${staminaUsed}/${staminaAvailable}: ${stamina.status}.`),
     createCalculationTerm("pace", "Pace modifier", pace.modifier, executionFormula.paceModifierWeight, `Actual ${actualPace}; ideal ${idealPaceForAim(setup.aimId)}: ${pace.status}.`),
     createCalculationTerm("consistency", "Random consistency variance", consistencyVariance, 1, `Roll ${roundCalculation(consistencyRoll, 6)} within the ${roundCalculation(-consistencyRange, 3)} to +${roundCalculation(consistencyRange, 3)} range created by consistency ${profile.skills.Consistency} and volatility ${setup.volatility}.`),
-    createCalculationTerm("chemistry", "Chemistry", setup.chemistry, executionFormula.chemistryWeight),
     createCalculationTerm("fit", "Average aim, style, and opponent fit", averageAimFit, executionFormula.fitWeight),
     createCalculationTerm("incident", "Execution-incident penalty", incident.penalty, 1, `${incident.label || "No incident occurred."} Botch risk ${risk} created a ${roundCalculation(incident.chance * 100, 3)}% incident chance; occurrence roll ${roundCalculation(incident.occurrenceRoll, 6)}${incident.severityRoll === null ? "." : `; severity roll ${roundCalculation(incident.severityRoll, 6)}.`}`),
   ];
@@ -393,7 +413,6 @@ function workerResult(
     stamina.modifier +
     pace.modifier * executionFormula.paceModifierWeight +
     consistencyVariance +
-    setup.chemistry * executionFormula.chemistryWeight +
     averageAimFit * executionFormula.fitWeight +
     incident.penalty,
   );
@@ -734,16 +753,13 @@ function matchScore(results: MatchResolutionWorkerResult[], setup: MatchResoluti
   const closeness = setup.aimId === "squash-dominant-showcase" || normalize(setup.matchType).includes("squash")
     ? clamp(60 + dominanceGap * 2)
     : clamp(100 - meanDeviation * 2);
-  const incidentCount = results.filter((result) => result.incident).length;
-  const incidentPenalty = incidentCount * formula.incidentPenalty;
   const terms = [
     createCalculationTerm("performance", "Average individual performance", performanceAverage, formula.performanceWeight),
     createCalculationTerm("structure", "Average pace/stamina structure", structure, formula.structureWeight, `Per wrestler: ${formula.structureBaseline} + pace modifier x ${formula.structurePaceWeight} + stamina modifier x ${formula.structureStaminaWeight}, capped 0-100.`),
     createCalculationTerm("closeness", setup.aimId === "squash-dominant-showcase" || normalize(setup.matchType).includes("squash") ? "Squash dominance" : "Competitive closeness", closeness, formula.closenessWeight),
     createCalculationTerm("chemistry", "Chemistry bonus", setup.chemistry, formula.chemistryWeight),
-    createCalculationTerm("incidents", "Flat match-level incident penalty", incidentCount, -formula.incidentPenalty, `${incidentCount} wrestler incident${incidentCount === 1 ? "" : "s"}.`),
   ];
-  const raw = performanceAverage * formula.performanceWeight + structure * formula.structureWeight + closeness * formula.closenessWeight + setup.chemistry * formula.chemistryWeight - incidentPenalty;
+  const raw = performanceAverage * formula.performanceWeight + structure * formula.structureWeight + closeness * formula.closenessWeight + setup.chemistry * formula.chemistryWeight;
   const ledger = createCalculationStage(formula, terms, {
     rawSubtotal: raw,
     notes: [
@@ -996,6 +1012,7 @@ function finalFromEngine(attempt: MatchResolutionAttempt): MatchResolutionFinalR
     actualDurationMinutes: result.actualDurationMinutes,
     matchScore: result.matchScore,
     starRating: result.starRating,
+    upset: result.upset,
     acceptedEngineResult: true,
     overrideReason: "",
     finalizedAt: new Date().toISOString(),
@@ -1025,6 +1042,41 @@ export function overrideEngineResult(
   const attempt = record.attempts.find((item) => item.id === record.activeAttemptId);
   if (!attempt) throw new Error("The active match calculation could not be found.");
   if (attempt.status !== "Calculated") throw new Error("This official calculation has already been finalized.");
+  if (!reason.trim()) throw new Error("Record why the engine result was overridden.");
+  if (finishType === "No Contest") {
+    const finalResult: MatchResolutionFinalResult = {
+      winnerKey: "",
+      winnerName: "",
+      loserKey: "",
+      loserName: "",
+      winnerTeamId: "",
+      winnerTeamName: "",
+      winnerMemberKeys: [],
+      winnerMemberNames: [],
+      loserKeys: [],
+      loserNames: [],
+      fallWinnerKey: "",
+      fallWinnerName: "",
+      fallLoserKey: "",
+      fallLoserName: "",
+      eliminationOrder: [],
+      finishType,
+      finishDescription: finishDescriptionValue.trim() || "The match ended in a No Contest; no winner or loser was recorded.",
+      actualDurationMinutes: attempt.engineResult.actualDurationMinutes,
+      matchScore: attempt.engineResult.matchScore,
+      starRating: attempt.engineResult.starRating,
+      upset: false,
+      acceptedEngineResult: false,
+      overrideReason: reason.trim(),
+      finalizedAt: new Date().toISOString(),
+    };
+    return {
+      ...record,
+      attempts: record.attempts.map((item) => item.id === attempt.id ? { ...item, status: "Overridden", finalResult } : item),
+      status: "Overridden",
+      updatedAt: finalResult.finalizedAt,
+    };
+  }
   const winner = attempt.workerResults.find((item) => item.workerKey === winnerKey);
   if (!winner) throw new Error("Choose one of the calculated match participants as the override winner.");
   const setupWorker = record.setup.workers.find((item) => item.workerKey === winnerKey);
@@ -1048,7 +1100,10 @@ export function overrideEngineResult(
       return settings ? workerTeamName(settings) : item.workerName;
     }))).join(" & ")
     : loser.workerName;
-  if (!reason.trim()) throw new Error("Record why the engine result was overridden.");
+  const outcomeCount = attempt.engineResult.teamResults?.length || attempt.workerResults.length;
+  const finalWinProbability = teamOutcome
+    ? attempt.engineResult.teamResults?.find((team) => team.id === winnerTeamId)?.winProbability ?? winner.winProbability
+    : winner.winProbability;
   const finalResult: MatchResolutionFinalResult = {
     winnerKey: winner.workerKey,
     winnerName,
@@ -1070,6 +1125,7 @@ export function overrideEngineResult(
     actualDurationMinutes: attempt.engineResult.actualDurationMinutes,
     matchScore: attempt.engineResult.matchScore,
     starRating: attempt.engineResult.starRating,
+    upset: finalWinProbability < 1 / outcomeCount,
     acceptedEngineResult: false,
     overrideReason: reason.trim(),
     finalizedAt: new Date().toISOString(),

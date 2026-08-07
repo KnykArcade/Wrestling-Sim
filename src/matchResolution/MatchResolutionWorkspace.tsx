@@ -4,6 +4,7 @@ import { MATCH_AIMS } from "../matchEngine/catalog";
 import { approachLimitForSetup, normalizeApproachName, workerProfileKey } from "../matchEngine/model";
 import { loadMatchEngineUniverse } from "../matchEngine/storage";
 import type { MatchEngineProfile } from "../matchEngine/types";
+import { resolveMatchFormat, resolveMatchImportance } from "../matchEngine/performance";
 import { calculateMatchAnticipation, momentumLabel } from "../crowd/model";
 import { loadPlannedShows } from "../planner/storage";
 import type { PlannedSegment, PlannedShow, PlannedWorkerReference } from "../planner/types";
@@ -28,7 +29,6 @@ import {
 } from "./storage";
 import type {
   MatchResolutionFinalResult,
-  MatchResolutionImportance,
   MatchResolutionRecord,
   MatchResolutionSetup,
   MatchResolutionUniverse,
@@ -38,8 +38,6 @@ import type {
 } from "./types";
 
 const finishTypes: MatchResolutionFinalResult["finishType"][] = ["Pinfall", "Submission", "Knockout", "Referee Stoppage", "Count Out", "Disqualification", "No Contest"];
-const importanceOptions: MatchResolutionImportance[] = ["Television", "Feature", "Main Event", "Championship", "Tournament"];
-
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value));
 }
@@ -52,6 +50,10 @@ function formatDate(value: string): string {
 
 function starLabel(value: number): string {
   return `${value.toFixed(value % 1 === 0 ? 0 : 2)}★`;
+}
+
+function finalResultHeadline(result: MatchResolutionFinalResult): string {
+  return result.finishType === "No Contest" ? "Match ended in a No Contest" : `${result.winnerName} defeated ${result.loserName}`;
 }
 
 function profileForWorker(worker: PlannedWorkerReference, profiles: MatchEngineProfile[]): MatchEngineProfile | null {
@@ -68,23 +70,6 @@ function workbookMetricsForWorker(worker: PlannedWorkerReference, universe: Star
 
 function eligibleMatchSegments(show: PlannedShow | null): PlannedSegment[] {
   return show?.segments.filter((segment) => segment.type === "match" && segment.workers.length >= 2) ?? [];
-}
-
-function formatForSegment(segment: PlannedSegment): NonNullable<MatchResolutionSetup["format"]> {
-  const matchType = normalizeApproachName(segment.matchType);
-  if (matchType.includes("battle royal") || matchType.includes("royal rumble")) return "Battle Royal";
-  if (matchType.includes("elimination") || matchType.includes("survivor series")) return "Elimination";
-  const sides = segment.workers.map((worker) => normalizeApproachName(worker.side)).filter(Boolean);
-  if (new Set(sides).size >= 2 && new Set(sides).size < segment.workers.length) return "Team";
-  return segment.workers.length === 2 ? "Singles" : "Multi Person";
-}
-
-function defaultImportance(show: PlannedShow, segment: PlannedSegment): MatchResolutionImportance {
-  if (segment.championshipId || segment.championship.trim()) return "Championship";
-  if (segment.competitionId || segment.competitionRoundLabel.trim()) return "Tournament";
-  if (show.segments.at(-1)?.id === segment.id) return "Main Event";
-  if (segment.durationMinutes >= 15) return "Feature";
-  return "Television";
 }
 
 function createWorkerSettings(worker: PlannedWorkerReference, segment: PlannedSegment, profile: MatchEngineProfile | null): MatchResolutionWorkerSettings {
@@ -115,6 +100,9 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, profiles: MatchE
     return profile ? [profile] : [];
   });
   const anticipation = calculateMatchAnticipation({ profiles: participantProfiles, plans: segment.matchApproachSetup.workerPlans, aimId: segment.matchApproachSetup.matchAimId });
+  const bookedSettings = segment.matchApproachSetup.performanceSettings;
+  const bookedImportance = resolveMatchImportance(bookedSettings.importance, segment, show.segments);
+  const matchFormat = resolveMatchFormat(segment);
   if (existing) {
     return {
       ...existing.setup,
@@ -125,11 +113,14 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, profiles: MatchE
       durationMinutes: segment.durationMinutes,
       approachLimit: segment.matchApproachSetup.approachLimit,
       aimId: segment.matchApproachSetup.matchAimId,
+      importance: bookedImportance,
+      chemistry: bookedSettings.chemistry ?? 0,
+      volatility: bookedSettings.volatility,
       anticipation,
       championship: segment.championship,
       competitionRound: segment.competitionRoundLabel,
-      format: formatForSegment(segment),
-      eliminationRules: formatForSegment(segment) === "Elimination" || formatForSegment(segment) === "Battle Royal",
+      format: matchFormat,
+      eliminationRules: matchFormat === "Elimination" || matchFormat === "Battle Royal",
       workers: segment.workers.map((worker) => {
         const derived = createWorkerSettings(worker, segment, profileForWorker(worker, profiles));
         const saved = existing.setup.workers.find((item) => item.workerId === worker.id || normalizeApproachName(item.workerName) === normalizeApproachName(worker.name));
@@ -155,14 +146,14 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, profiles: MatchE
     durationMinutes: segment.durationMinutes,
     approachLimit: segment.matchApproachSetup.approachLimit,
     aimId: segment.matchApproachSetup.matchAimId,
-    importance: defaultImportance(show, segment),
+    importance: bookedImportance,
     championship: segment.championship,
     competitionRound: segment.competitionRoundLabel,
-    chemistry: 0,
-    volatility: 8,
+    chemistry: bookedSettings.chemistry ?? 0,
+    volatility: bookedSettings.volatility,
     anticipation,
-    format: formatForSegment(segment),
-    eliminationRules: formatForSegment(segment) === "Elimination" || formatForSegment(segment) === "Battle Royal",
+    format: matchFormat,
+    eliminationRules: matchFormat === "Elimination" || matchFormat === "Battle Royal",
     workers: segment.workers.map((worker) => createWorkerSettings(worker, segment, profileForWorker(worker, profiles))),
   };
 }
@@ -351,9 +342,9 @@ export default function MatchResolutionWorkspace({ onReturnToShow }: { onReturnT
         <header><div><p className="eyebrow">MATCH CONTEXT</p><h3>{selectedSegment.title}</h3><p>{selectedShow.name} · {selectedSegment.matchType} · {selectedSegment.durationMinutes} minutes</p></div><span className={`resolution-status resolution-status--${statusClass(displayedRecord?.status ?? "Unresolved")}`}>{displayedRecord?.status ?? "Unresolved"}</span></header>
           <div className="match-resolution-context-grid">
           <label className="field"><span>Match aim</span><select aria-label="Resolution match aim" value={setup.aimId} onChange={(event) => { const aimId = event.target.value as MatchResolutionSetup["aimId"]; setSetup({ ...setup, aimId, anticipation: calculateMatchAnticipation({ profiles: sources.map((source) => source.profile), plans: selectedSegment.matchApproachSetup.workerPlans, aimId }) }); }}>{MATCH_AIMS.map((aim) => <option key={aim.id} value={aim.id}>{aim.name}</option>)}</select></label>
-          <label className="field"><span>Importance</span><select aria-label="Resolution match importance" value={setup.importance} onChange={(event) => setSetup({ ...setup, importance: event.target.value as MatchResolutionImportance })}>{importanceOptions.map((importance) => <option key={importance}>{importance}</option>)}</select></label>
-          <label className="field"><span>Chemistry</span><input aria-label="Resolution chemistry" type="number" min={-10} max={10} value={setup.chemistry} onChange={(event) => setSetup({ ...setup, chemistry: clamp(Number(event.target.value) || 0, -10, 10) })} /></label>
-          <label className="field"><span>Volatility</span><input aria-label="Resolution volatility" type="number" min={0} max={20} value={setup.volatility} onChange={(event) => setSetup({ ...setup, volatility: clamp(Number(event.target.value) || 0, 0, 20) })} /></label>
+          <div><span>Importance</span><strong>{setup.importance}</strong><small>Set once in the booking preview</small></div>
+          <div><span>Chemistry</span><strong>{setup.chemistry >= 0 ? "+" : ""}{setup.chemistry}</strong><small>Set once in the booking preview</small></div>
+          <div><span>Volatility</span><strong>{setup.volatility}</strong><small>Shared with the booking preview</small></div>
           <div><span>Anticipation</span><strong>{setup.anticipation ? `${setup.anticipation.score.toFixed(1)} · ${setup.anticipation.label}` : "Not calculated"}</strong></div><div><span>Format</span><strong>{setup.format || "Singles"}</strong></div><div><span>Championship</span><strong>{setup.championship || "None"}</strong></div><div><span>Competition</span><strong>{setup.competitionRound || "None"}</strong></div>
         </div>
       </section>
@@ -389,7 +380,7 @@ export default function MatchResolutionWorkspace({ onReturnToShow }: { onReturnT
         <div className="match-resolution-worker-results">{displayedAttempt.workerResults.map((result) => <article key={result.workerKey} className={result.workerKey === displayedAttempt.engineResult.winnerKey ? "winner" : ""}><header><div><strong>{result.workerName}</strong><span>{result.selectedApproachNames.join(" · ")}</span></div><b>{(result.winProbability * 100).toFixed(1)}%</b></header><dl><div><dt>Performance</dt><dd>{result.performanceScore.toFixed(1)}</dd></div><div><dt>Competitive</dt><dd>{result.competitiveScore.toFixed(1)}</dd></div><div><dt>Mental state</dt><dd>{result.mentalStateName}</dd></div><div><dt>Stamina</dt><dd>{result.staminaUsed}/{result.staminaAvailable} · {result.staminaStatus}</dd></div><div><dt>Pace</dt><dd>{result.actualPace} · {result.paceStatus}</dd></div><div><dt>Interaction</dt><dd>{result.interactionModifier >= 0 ? "+" : ""}{result.interactionModifier.toFixed(1)}</dd></div></dl>{result.incident && <p>{result.incident}</p>}</article>)}</div>
         <CalculationLedgerView attempt={displayedAttempt} anticipation={displayedRecord?.setup.anticipation} />
 
-        {!finalResult ? <div className="match-resolution-decision"><section><h3>Accept the result</h3><p>The engine result becomes official and applies records, rankings, guarded titles, tournaments, and condition changes.</p><button className="primary-button" type="button" onClick={acceptResult}>Accept Engine Result</button></section><section><h3>Override as booker</h3><p>The original engine winner and every calculation remain visible. An override is never disguised as an engine result.</p><label className="field"><span>Final winner</span><select aria-label="Resolution override winner" value={overrideWinnerKey} onChange={(event) => setOverrideWinnerKey(event.target.value)}>{displayedAttempt.workerResults.map((result) => <option key={result.workerKey} value={result.workerKey}>{result.workerName}</option>)}</select></label><label className="field"><span>Finish type</span><select aria-label="Resolution override finish type" value={overrideFinishType} onChange={(event) => setOverrideFinishType(event.target.value as MatchResolutionFinalResult["finishType"])}>{finishTypes.map((finish) => <option key={finish}>{finish}</option>)}</select></label><label className="field"><span>Final finish description</span><textarea aria-label="Resolution override description" rows={3} value={overrideDescription} onChange={(event) => setOverrideDescription(event.target.value)} /></label><label className="field"><span>Override reason</span><textarea aria-label="Resolution override reason" rows={3} value={overrideReason} onChange={(event) => setOverrideReason(event.target.value)} /></label><button className="secondary-button" type="button" onClick={overrideResult}>Confirm Booker Override</button></section></div> : <section className={`match-resolution-final match-resolution-final--${displayedAttempt.status.toLowerCase()}`}><header><div><p className="eyebrow">OFFICIAL WRESTLING SIM RESULT</p><h3>{finalResult.winnerName} defeated {finalResult.loserName}</h3></div><span>{displayedAttempt.status}</span></header><p>{finalResult.finishDescription}</p>{!finalResult.acceptedEngineResult && <p><strong>Override reason:</strong> {finalResult.overrideReason}</p>}<small>Finalized {formatDate(finalResult.finalizedAt)}. The original engine result remains preserved above.</small></section>}
+        {!finalResult ? <div className="match-resolution-decision"><section><h3>Accept the result</h3><p>The engine result becomes official and applies records, rankings, guarded titles, tournaments, and condition changes.</p><button className="primary-button" type="button" onClick={acceptResult}>Accept Engine Result</button></section><section><h3>Override as booker</h3><p>The original engine winner and every calculation remain visible. An override is never disguised as an engine result.</p><label className="field"><span>Final winner</span><select aria-label="Resolution override winner" disabled={overrideFinishType === "No Contest"} value={overrideWinnerKey} onChange={(event) => setOverrideWinnerKey(event.target.value)}>{displayedAttempt.workerResults.map((result) => <option key={result.workerKey} value={result.workerKey}>{result.workerName}</option>)}</select><small>{overrideFinishType === "No Contest" ? "No winner or loser will be recorded." : "Choose the official winner."}</small></label><label className="field"><span>Finish type</span><select aria-label="Resolution override finish type" value={overrideFinishType} onChange={(event) => setOverrideFinishType(event.target.value as MatchResolutionFinalResult["finishType"])}>{finishTypes.map((finish) => <option key={finish}>{finish}</option>)}</select></label><label className="field"><span>Final finish description</span><textarea aria-label="Resolution override description" rows={3} value={overrideDescription} onChange={(event) => setOverrideDescription(event.target.value)} /></label><label className="field"><span>Override reason</span><textarea aria-label="Resolution override reason" rows={3} value={overrideReason} onChange={(event) => setOverrideReason(event.target.value)} /></label><button className="secondary-button" type="button" onClick={overrideResult}>Confirm Booker Override</button></section></div> : <section className={`match-resolution-final match-resolution-final--${displayedAttempt.status.toLowerCase()}`}><header><div><p className="eyebrow">OFFICIAL WRESTLING SIM RESULT</p><h3>{finalResultHeadline(finalResult)}</h3></div><span>{displayedAttempt.status}</span></header><p>{finalResult.finishDescription}</p>{!finalResult.acceptedEngineResult && <p><strong>Override reason:</strong> {finalResult.overrideReason}</p>}<small>Finalized {formatDate(finalResult.finalizedAt)}. The original engine result remains preserved above.</small></section>}
 
         <details className="match-resolution-audit"><summary>Calculation audit history · {displayedRecord?.attempts.length ?? 0} attempt{displayedRecord?.attempts.length === 1 ? "" : "s"}</summary>{displayedRecord?.attempts.map((attempt) => <article key={attempt.id}><strong>Attempt {attempt.number} · {attempt.status}</strong><span>{attempt.engineResult.winnerName} · {(attempt.engineResult.winnerProbability * 100).toFixed(1)}% · roll {attempt.engineResult.resultRoll.toFixed(4)}</span><small>{formatDate(attempt.generatedAt)} · fingerprint {attempt.setupFingerprint}{attempt.setupChangeReason ? ` · ${attempt.setupChangeReason}` : ""}</small></article>)}</details>
       </section>}
