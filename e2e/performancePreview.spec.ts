@@ -24,6 +24,7 @@ test("generates and persists a TEW-authoritative match performance preview", asy
   await expect(match.getByText("Determined in TEW", { exact: true })).toBeVisible();
   await expect(match.getByText("Tracker preview only", { exact: true })).toBeVisible();
   await expect(match.locator(".match-performance-worker")).toHaveCount(2);
+  await expect(match.locator(".match-performance-worker-metrics").first().getByText(/^Pace \d+ · /)).toBeVisible();
   await expect(match.locator(".match-performance-scorecard strong").first()).not.toHaveText("0.0");
   const savedScore = await match.locator(".match-performance-scorecard strong").first().textContent();
   const savedSeed = await match.locator(".match-performance-seed span").first().textContent();

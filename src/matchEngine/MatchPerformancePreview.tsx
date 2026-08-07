@@ -124,7 +124,7 @@ export default function MatchPerformancePreviewEditor({
             <div><span>Execution</span><b>{result.approachExecution.toFixed(1)}</b></div>
             <div><span>Presentation</span><b>{result.presentationScore.toFixed(1)}</b></div>
             <div><span>Mental score</span><b>{result.mentalStateScore.toFixed(1)}</b></div>
-            <div><span>Pace</span><b>{result.paceStatus}</b></div>
+            <div><span>Pace</span><b>{result.actualPace === undefined ? result.paceStatus : `Pace ${result.actualPace} · ${result.paceStatus}`}</b></div>
             <div><span>Stamina</span><b>{result.staminaStatus}</b></div>
           </div>
           <div className="match-performance-variance"><span>Luck {result.luck >= 0 ? "+" : ""}{result.luck.toFixed(1)}</span><span>Rare swing {result.swing >= 0 ? "+" : ""}{result.swing}</span><span>Consistency variance {result.consistencyVariance >= 0 ? "+" : ""}{result.consistencyVariance.toFixed(1)}</span>{preview.authority === "competitive-preview" && <span>Win chance {(result.winProbability * 100).toFixed(1)}%</span>}</div>

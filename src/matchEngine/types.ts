@@ -238,6 +238,7 @@ export interface MatchWorkerPerformanceResult {
   presentationScore: number;
   staminaStatus: StaminaStatus;
   staminaModifier: number;
+  actualPace?: number;
   paceStatus: PaceStatus;
   paceModifier: number;
   performanceScore: number;

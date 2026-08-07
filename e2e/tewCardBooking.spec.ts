@@ -21,7 +21,8 @@ test("uses a compact TEW-style card and previews wrestler approach quality befor
   await expect(jay.getByText("Approach Selection Board", { exact: true })).toBeVisible();
   await expect(choices.locator(".approach-candidate")).toHaveCount(16);
   const firstChoice = choices.locator(".approach-candidate").first();
-  await expect(firstChoice.locator(".approach-rating-gauge b")).toHaveText(/\d+\.\d/);
+  await expect(firstChoice).toHaveCSS("min-height", "76px");
+  await expect(firstChoice.locator(".approach-rating-badge b")).toHaveText(/\d+\.\d/);
   const fitIndicators = firstChoice.locator(".approach-candidate__fit span");
   await expect(fitIndicators.filter({ hasText: /^Style / })).toHaveText(/^Style (Strong fit|Neutral)$/);
   await expect(fitIndicators.filter({ hasText: /^Match aim / })).toHaveText(/^Match aim (Strong fit|Clash|Neutral)$/);

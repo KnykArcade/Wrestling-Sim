@@ -129,6 +129,7 @@ function normalizeWorkerPerformance(value: unknown): MatchWorkerPerformanceResul
     presentationScore: finiteNumber(value.presentationScore, 0),
     staminaStatus: staminaStatuses.includes(value.staminaStatus as StaminaStatus) ? value.staminaStatus as StaminaStatus : "PASS",
     staminaModifier: finiteNumber(value.staminaModifier, 0),
+    actualPace: typeof value.actualPace === "number" && Number.isFinite(value.actualPace) ? Math.max(0, value.actualPace) : undefined,
     paceStatus: paceStatuses.includes(value.paceStatus as PaceStatus) ? value.paceStatus as PaceStatus : "OPEN PACE",
     paceModifier: finiteNumber(value.paceModifier, 0),
     performanceScore: finiteNumber(value.performanceScore, 0),

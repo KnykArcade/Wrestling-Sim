@@ -1,5 +1,4 @@
 import { Fragment, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
 import type { PlannedSegment, PlannedWorkerReference } from "../planner/types";
 import { isMatchCompetitor } from "../planner/model";
 import { MATCH_AIMS, MATCH_APPROACHES } from "./catalog";
@@ -307,7 +306,7 @@ export default function MatchApproachSetupEditor({
                   key={approach.id}
                   aria-label={`${approach.name}, rating ${score.rating.toFixed(1)}, ${ratingLabel(score.rating)}${selected ? `, selected in slot ${selectedIndex + 1}` : ""}`}
                 >
-                  <div className="approach-rating-gauge" style={{ "--approach-rating": `${Math.max(0, Math.min(100, score.rating)) * 3.6}deg` } as CSSProperties} aria-hidden="true">
+                  <div className="approach-rating-badge" aria-hidden="true">
                     <span><b>{score.rating.toFixed(1)}</b><small>Rating</small></span>
                   </div>
                   <div className="approach-candidate__content">
