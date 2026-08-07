@@ -4,6 +4,8 @@ import { loadMatchEngineUniverse, saveMatchEngineUniverse } from "../matchEngine
 import type { MatchEngineUniverse } from "../matchEngine/types";
 import NarrativeGenerator from "../narratives/NarrativeGenerator";
 import { loadStartingUniverseActivationState } from "../startingUniverse/activation";
+import { loadActiveStartingUniverse, loadStartingUniverseState } from "../startingUniverse/storage";
+import type { StartingUniverseRecord } from "../startingUniverse/types";
 import type { TewSnapshot } from "../tew/types";
 import { loadWorkerUniverse } from "../workers/storage";
 import type { WorkerProfile } from "../workers/types";
@@ -50,24 +52,71 @@ function narrativeIsComplete(segment: PlannedSegment): boolean {
   return segment.type === "match" ? Boolean(segment.matchStory.trim()) : Boolean(segment.segmentOutput.trim());
 }
 
-function BasicMatchBooking({ segment, snapshot, company, onChange }: { segment: PlannedSegment; snapshot: TewSnapshot | null; company: string; onChange: (segment: PlannedSegment) => void }) {
+interface BookingRosterWorker {
+  id: string;
+  name: string;
+  companyName: string;
+  source: "world" | "hub" | "snapshot";
+}
+
+const ALL_WORKERS_FILTER = "__all_workers__";
+const FREE_AGENTS_FILTER = "__free_agents__";
+
+function BasicMatchBooking({ segment, snapshot, company, startingUniverse, onChange }: { segment: PlannedSegment; snapshot: TewSnapshot | null; company: string; startingUniverse: StartingUniverseRecord | null; onChange: (segment: PlannedSegment) => void }) {
   const [importedWorkerId, setImportedWorkerId] = useState("");
   const [manualWorkerName, setManualWorkerName] = useState("");
   const activeCompany = useMemo(() => loadStartingUniverseActivationState(window.localStorage).activeCompanyName, []);
+  const activeCompanyId = useMemo(() => loadStartingUniverseActivationState(window.localStorage).activeCompanyId, []);
   const workerUniverse = useMemo(() => loadWorkerUniverse(window.localStorage), []);
   const defaultCompany = company.trim() || activeCompany || "Unassigned Company";
-  const [rosterCompany, setRosterCompany] = useState(defaultCompany);
+  const defaultCompanyId = startingUniverse?.companies.find((item) => item.name === defaultCompany)?.id
+    || startingUniverse?.companies.find((item) => item.id === activeCompanyId)?.id
+    || startingUniverse?.playableCompanyId
+    || activeCompanyId
+    || defaultCompany;
+  const [rosterCompany, setRosterCompany] = useState(defaultCompanyId);
   const [workerSearch, setWorkerSearch] = useState("");
-  const [showOutsideTalent, setShowOutsideTalent] = useState(false);
   const format = normalizeMatchFormat(segment.matchType);
   const validation = matchBookingValidation(segment);
   const isWrestler = (profile: WorkerProfile) => profile.currentRole === "Wrestler" || profile.currentRole === "Occasional Wrestler";
-  const companyNames = useMemo(() => Array.from(new Set([defaultCompany, activeCompany, company, ...workerUniverse.profiles.map((profile) => profile.companyName)].filter((name): name is string => Boolean(name)))).sort(), [activeCompany, company, defaultCompany, workerUniverse.profiles]);
-  const companyRoster = useMemo(() => {
-    return workerUniverse.profiles.filter((profile) => isWrestler(profile) && (profile.companyName === rosterCompany || (!profile.companyName && rosterCompany === activeCompany))).map((profile) => ({ id: profile.linkedTewWorkerId || profile.id, name: profile.displayName, source: "hub" as const }));
-  }, [activeCompany, company, rosterCompany, workerUniverse.profiles]);
-  const outsideRoster = useMemo(() => (snapshot?.workers ?? []).filter((worker) => !companyRoster.some((profile) => profile.id === worker.id || profile.name.toLowerCase() === worker.name.toLowerCase())).map((worker) => ({ id: worker.id, name: worker.name, source: "outside" as const })), [companyRoster, snapshot]);
-  const rosterWorkers = useMemo(() => [...companyRoster, ...(showOutsideTalent ? outsideRoster : [])].filter((worker) => worker.name.toLowerCase().includes(workerSearch.trim().toLowerCase())).sort((left, right) => left.name.localeCompare(right.name)), [companyRoster, outsideRoster, showOutsideTalent, workerSearch]);
+  const worldCompanies = useMemo(() => startingUniverse?.companies.slice().sort((left, right) => left.name.localeCompare(right.name)) ?? [], [startingUniverse]);
+  const worldWorkers = useMemo<BookingRosterWorker[]>(() => {
+    if (!startingUniverse) return [];
+    const contractsByWorker = new Map<string, typeof startingUniverse.contracts>();
+    for (const contract of startingUniverse.contracts) contractsByWorker.set(contract.workerId, [...(contractsByWorker.get(contract.workerId) ?? []), contract]);
+    return startingUniverse.workers
+      .filter((worker) => worker.active && (worker.flags.wrestler || worker.flags.occasionalWrestler || (contractsByWorker.get(worker.id) ?? []).some((contract) => contract.flags.wrestler || contract.flags.occasionalWrestler)))
+      .flatMap((worker) => {
+        const contracts = contractsByWorker.get(worker.id) ?? [];
+        if (rosterCompany === FREE_AGENTS_FILTER) {
+          return contracts.length === 0 ? [{ id: worker.id, name: worker.name, companyName: "Free Agent", source: "world" as const }] : [];
+        }
+        if (rosterCompany === ALL_WORKERS_FILTER) {
+          const preferred = contracts[0];
+          return [{ id: worker.id, name: preferred?.ringName || worker.name, companyName: preferred?.companyName || "Free Agent", source: "world" as const }];
+        }
+        const contract = contracts.find((item) => item.companyId === rosterCompany);
+        return contract ? [{ id: worker.id, name: contract.ringName || worker.name, companyName: contract.companyName, source: "world" as const }] : [];
+      });
+  }, [rosterCompany, startingUniverse]);
+  const fallbackWorkers = useMemo<BookingRosterWorker[]>(() => {
+    if (startingUniverse) return [];
+    const hub = workerUniverse.profiles
+      .filter((profile) => isWrestler(profile) && (rosterCompany === ALL_WORKERS_FILTER || rosterCompany === profile.companyName || (!profile.companyName && rosterCompany === activeCompany)))
+      .map((profile) => ({ id: profile.linkedTewWorkerId || profile.id, name: profile.displayName, companyName: profile.companyName || activeCompany || "Unassigned", source: "hub" as const }));
+    const imported = rosterCompany === ALL_WORKERS_FILTER ? (snapshot?.workers ?? []).filter((worker) => !hub.some((profile) => profile.id === worker.id || profile.name.toLowerCase() === worker.name.toLowerCase())).map((worker) => ({ id: worker.id, name: worker.name, companyName: "Imported", source: "snapshot" as const })) : [];
+    return [...hub, ...imported];
+  }, [activeCompany, rosterCompany, snapshot, startingUniverse, workerUniverse.profiles]);
+  const rosterWorkers = useMemo(() => [...worldWorkers, ...fallbackWorkers]
+    .filter((worker, index, list) => list.findIndex((item) => item.id === worker.id) === index)
+    .filter((worker) => worker.name.toLowerCase().includes(workerSearch.trim().toLowerCase()))
+    .sort((left, right) => left.name.localeCompare(right.name)), [fallbackWorkers, workerSearch, worldWorkers]);
+  const selectedCompanyName = rosterCompany === ALL_WORKERS_FILTER ? "All Workers" : rosterCompany === FREE_AGENTS_FILTER ? "Free Agents" : worldCompanies.find((item) => item.id === rosterCompany)?.name || rosterCompany;
+
+  useEffect(() => {
+    if (!startingUniverse || rosterCompany === ALL_WORKERS_FILTER || rosterCompany === FREE_AGENTS_FILTER || startingUniverse.companies.some((item) => item.id === rosterCompany)) return;
+    setRosterCompany(defaultCompanyId);
+  }, [defaultCompanyId, rosterCompany, startingUniverse]);
 
   function appendWorker(id: string, name: string, source: "tew" | "manual"): void {
     if (segment.workers.some((worker) => worker.source === source && (worker.id === id || worker.name.toLowerCase() === name.toLowerCase()))) return;
@@ -90,15 +139,13 @@ function BasicMatchBooking({ segment, snapshot, company, onChange }: { segment: 
   }
 
   return <section className="basic-match-booking" aria-label="Basic match booking">
-    <header><div><p className="eyebrow">COMPANY ROSTER</p><h4>Choose the booking company and wrestlers</h4><p>Sides and teams are assigned automatically. You can rename them below.</p></div><span className={validation === "Match setup is ready." ? "booking-ready" : "booking-needed"}>{validation}</span></header>
+    <header><div><p className="eyebrow">COMPANY / ROSTER</p><h4>Choose wrestlers from any company in the game</h4></div><span className={validation === "Match setup is ready." ? "booking-ready" : "booking-needed"}>{validation}</span></header>
     <div className="booking-roster-controls">
-      <label className="field match-format-field"><span>Booking Company</span><select aria-label="Booking Company" value={rosterCompany} onChange={(event) => { setRosterCompany(event.target.value); setImportedWorkerId(""); }}>{companyNames.map((name) => <option key={name} value={name}>{name}</option>)}</select><small>{companyRoster.length} active wrestlers in this company roster.</small></label>
+      <label className="field"><span>Company / roster</span><select aria-label="Booking Company" value={rosterCompany} onChange={(event) => { setRosterCompany(event.target.value); setImportedWorkerId(""); }}><option value={ALL_WORKERS_FILTER}>All Workers</option><option value={FREE_AGENTS_FILTER}>Free Agents</option>{worldCompanies.map((item) => <option key={item.id} value={item.id}>{item.name}{item.active ? "" : " (Inactive)"}</option>)}{!startingUniverse && Array.from(new Set([defaultCompany, activeCompany, ...workerUniverse.profiles.map((profile) => profile.companyName)].filter((name): name is string => Boolean(name)))).sort().map((name) => <option key={name} value={name}>{name}</option>)}</select><small>{rosterWorkers.length} wrestler{rosterWorkers.length === 1 ? "" : "s"} in {selectedCompanyName}.</small></label>
       <label className="field"><span>Search roster</span><input aria-label="Search company roster" value={workerSearch} placeholder="Search by wrestler name" onChange={(event) => { setWorkerSearch(event.target.value); setImportedWorkerId(""); }} /></label>
-      <label className="outside-talent-toggle"><input type="checkbox" checked={showOutsideTalent} onChange={(event) => { setShowOutsideTalent(event.target.checked); setImportedWorkerId(""); }} /><span>Include outside talent</span></label>
-    </div>
-    <div className="reference-add-grid">
-      <div className="reference-add-card"><label className="field"><span>Company wrestler</span><select aria-label="Company wrestler" value={importedWorkerId} disabled={!rosterWorkers.length} onChange={(event) => setImportedWorkerId(event.target.value)}><option value="">{rosterWorkers.length ? "Select a wrestler" : "No wrestlers match this roster filter"}</option>{rosterWorkers.map((worker) => <option key={`${worker.id}-${worker.name}`} value={worker.id}>{worker.name}{worker.source === "outside" ? " (Outside)" : ""}</option>)}</select></label><button className="secondary-button compact-button" type="button" disabled={!importedWorkerId} onClick={addImportedWorker}>Add Wrestler</button></div>
-      <div className="reference-add-card"><label className="field"><span>Manual worker name</span><input aria-label="Manual worker name" value={manualWorkerName} placeholder="Enter wrestler name" onChange={(event) => setManualWorkerName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addManualWorker(); } }} /></label><button className="secondary-button compact-button" type="button" disabled={!manualWorkerName.trim()} onClick={addManualWorker}>Add Manual Worker</button></div>
+      <label className="field"><span>Wrestler</span><select aria-label="Company wrestler" value={importedWorkerId} disabled={!rosterWorkers.length} onChange={(event) => setImportedWorkerId(event.target.value)}><option value="">{rosterWorkers.length ? "Select a wrestler" : "No wrestlers match this filter"}</option>{rosterWorkers.map((worker) => <option key={`${worker.id}-${worker.name}`} value={worker.id}>{worker.name}{rosterCompany === ALL_WORKERS_FILTER ? ` · ${worker.companyName}` : ""}</option>)}</select></label>
+      <button className="secondary-button compact-button booking-add-worker" type="button" disabled={!importedWorkerId} onClick={addImportedWorker}>Add Wrestler</button>
+      <div className="manual-worker-inline"><input aria-label="Manual worker name" value={manualWorkerName} placeholder="Manual wrestler" onChange={(event) => setManualWorkerName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addManualWorker(); } }} /><button className="secondary-button compact-button" type="button" aria-label="Add Manual Worker" disabled={!manualWorkerName.trim()} onClick={addManualWorker}>Add</button></div>
     </div>
     {segment.workers.length ? <div className="basic-participant-list">{segment.workers.map((worker, index) => <article key={worker.id}><b>{index + 1}</b><div><strong>{worker.name}</strong><small>{worker.source === "tew" ? "TEW roster" : "Manual entry"}</small></div><label className="field"><span>Side / team</span><input value={worker.side} onChange={(event) => onChange({ ...segment, workers: segment.workers.map((item) => item.id === worker.id ? { ...item, side: event.target.value } : item) })} /></label><button className="danger-button compact-button" type="button" aria-label={`Remove ${worker.name}`} onClick={() => onChange({ ...segment, workers: segment.workers.filter((item) => item.id !== worker.id) })}>Remove</button></article>)}</div> : <p className="narrative-empty-line">No wrestlers selected. Add wrestlers above; a TEW snapshot is optional.</p>}
   </section>;
@@ -110,6 +157,7 @@ function SegmentEditor({
   count,
   snapshot,
   company = "",
+  startingUniverse,
   matchEngine,
   onMatchEngineChange,
   onChange,
@@ -122,6 +170,7 @@ function SegmentEditor({
   count: number;
   snapshot: TewSnapshot | null;
   company?: string;
+  startingUniverse: StartingUniverseRecord | null;
   matchEngine: MatchEngineUniverse;
   onMatchEngineChange: (universe: MatchEngineUniverse) => void;
   onChange: (segment: PlannedSegment) => void;
@@ -161,8 +210,8 @@ function SegmentEditor({
         {segment.type === "angle" && <label className="field field--full"><span>Quick planning outline</span><textarea rows={3} placeholder="A short overview for the running order. Use Narrative Details below for the complete story." value={segment.notes} onChange={(event) => onChange({ ...segment, notes: event.target.value })} /></label>}
       </div>
 
-      {segment.type === "match" && <MatchSettingsEditor segment={segment} universe={matchEngine} onChange={onChange} />}
-      {segment.type === "match" && <BasicMatchBooking segment={segment} snapshot={snapshot} company={company} onChange={onChange} />}
+      {segment.type === "match" && <MatchSettingsEditor segment={segment} onChange={onChange} />}
+      {segment.type === "match" && <BasicMatchBooking segment={segment} snapshot={snapshot} company={company} startingUniverse={startingUniverse} onChange={onChange} />}
       {segment.type === "match" && <MatchApproachSetupEditor segment={segment} universe={matchEngine} onUniverseChange={onMatchEngineChange} onChange={onChange} />}
       <NarrativeEditor segment={segment} availableWorkers={snapshot?.workers ?? []} availableStorylines={snapshot?.storylines ?? []} onChange={onChange} />
       {segment.type === "angle" && <NarrativeGenerator segment={segment} universe={matchEngine} onChange={onChange} />}
@@ -191,6 +240,7 @@ export default function PlannedShowWorkspace({
 }) {
   const [shows, setShows] = useState<PlannedShow[]>(() => loadPlannedShows(window.localStorage));
   const [matchEngine, setMatchEngine] = useState<MatchEngineUniverse>(() => loadMatchEngineUniverse(window.localStorage));
+  const [startingUniverse, setStartingUniverse] = useState<StartingUniverseRecord | null>(null);
   const [selectedId, setSelectedId] = useState<string>(initialShowId);
   const [saveState, setSaveState] = useState<SaveState>("Saved");
   const [notice, setNotice] = useState("");
@@ -203,6 +253,16 @@ export default function PlannedShowWorkspace({
     () => shows.find((show) => show.id === selectedId) ?? shows[0] ?? null,
     [selectedId, shows],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadActiveStartingUniverse(loadStartingUniverseState(window.localStorage)).then((record) => {
+      if (!cancelled) setStartingUniverse(record);
+    }).catch(() => {
+      if (!cancelled) setStartingUniverse(null);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (!selectedId && shows[0]) setSelectedId(shows[0].id);
@@ -353,7 +413,7 @@ export default function PlannedShowWorkspace({
             <section className="planned-card-editor"><header className="card-editor-header"><div><p className="eyebrow">{activeSegment ? "SEGMENT BOOKING" : "CARD / BOOKING"}</p><h3>{activeSegment ? activeSegment.title : `${selectedShow.segments.length} planned segment${selectedShow.segments.length === 1 ? "" : "s"}`}</h3><p>{activeSegment ? "Complete this segment, save it, then return to the running order." : `${totalPlannedMinutes(selectedShow)} of ${selectedShow.expectedMinutes} expected minutes planned · ${completeNarratives} narratives complete`}</p></div>{!activeSegment && <div className="card-editor-actions"><button className="primary-button" type="button" onClick={() => addSegment("match")}>Add Match</button><button className="secondary-button" type="button" onClick={() => addSegment("angle")}>Add Angle</button></div>}</header>
               {!activeSegment && selectedShow.segments.length > 0 && <div className="tew-card-list" aria-label="Current card summary">{selectedShow.segments.map((segment, index) => <button type="button" key={segment.id} className={`tew-card-row tew-card-row--${segment.type}`} onClick={() => setActiveSegmentId(segment.id)}><b>{index + 1}</b><span>{segment.title || (segment.type === "match" ? "Untitled Match" : "Untitled Angle")}</span><small>{segment.type === "match" ? "MATCH" : "ANGLE"}</small></button>)}</div>}
               {!activeSegment && selectedShow.segments.length === 0 && <div className="empty-state card-empty">Add a match or angle to begin building the show in running order.</div>}
-              {activeSegment && <div className="planned-segment-list"><SegmentEditor key={activeSegment.id} segment={activeSegment} index={selectedShow.segments.findIndex((segment) => segment.id === activeSegment.id)} count={selectedShow.segments.length} snapshot={snapshot} company={selectedShow.company} matchEngine={matchEngine} onMatchEngineChange={setMatchEngine} onChange={(updated) => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.map((item) => item.id === updated.id ? updated : item) }))} onMove={(direction) => updateShow(selectedShow.id, (show) => ({ ...show, segments: movePlannedSegment(show.segments, activeSegment.id, direction) }))} onDelete={() => { updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.filter((item) => item.id !== activeSegment.id) })); setActiveSegmentId(""); setNotice("Segment removed from the card."); }} onClose={(saved) => { setActiveSegmentId(""); if (saved) setNotice("Segment saved. Returned to the card."); }} /></div>}
+              {activeSegment && <div className="planned-segment-list"><SegmentEditor key={activeSegment.id} segment={activeSegment} index={selectedShow.segments.findIndex((segment) => segment.id === activeSegment.id)} count={selectedShow.segments.length} snapshot={snapshot} company={selectedShow.company} startingUniverse={startingUniverse} matchEngine={matchEngine} onMatchEngineChange={setMatchEngine} onChange={(updated) => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.map((item) => item.id === updated.id ? updated : item) }))} onMove={(direction) => updateShow(selectedShow.id, (show) => ({ ...show, segments: movePlannedSegment(show.segments, activeSegment.id, direction) }))} onDelete={() => { updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.filter((item) => item.id !== activeSegment.id) })); setActiveSegmentId(""); setNotice("Segment removed from the card."); }} onClose={(saved) => { setActiveSegmentId(""); if (saved) setNotice("Segment saved. Returned to the card."); }} /></div>}
             </section>
           </>}
         </div>}

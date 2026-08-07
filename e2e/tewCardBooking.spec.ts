@@ -1,82 +1,92 @@
 import { expect, test } from "@playwright/test";
 
-test("uses one compact TEW-style strategy board and preserves each wrestler's selections", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Create First Show" }).first().click();
-  await page.getByRole("button", { name: "Create Show" }).first().click();
-  await page.getByLabel("Show name").fill("PWL TEW Card Test");
-
-  await page.getByRole("button", { name: "Add Match" }).click();
-  const match = page.locator('[data-segment-type="match"]');
-  await match.getByLabel("Segment name").fill("Manual match title");
-  for (const name of ["Jay White", "PAC"]) {
-    await match.getByLabel("Manual worker name").fill(name);
-    await match.getByRole("button", { name: "Add Manual Worker" }).click();
-  }
-  await match.getByRole("button", { name: "Auto-Name Match" }).click();
-  await expect(match.getByLabel("Segment name")).toHaveValue("Jay White vs PAC");
-
-  const jay = match.locator('[data-match-worker="manual:jay white"]');
-  const choices = match.getByLabel("Available approaches for Jay White");
-  await expect(match.getByText("Approach Selection Board", { exact: true })).toHaveCount(1);
-  await expect(choices.locator(".approach-candidate")).toHaveCount(16);
-  const firstChoice = choices.locator(".approach-candidate").first();
-  await expect(firstChoice).toHaveCSS("min-height", "68px");
-  await expect(firstChoice.locator(".approach-rating-badge b")).toHaveText(/\d+\.\d/);
-  const fitIndicators = firstChoice.locator(".approach-candidate__fit span");
-  await expect(fitIndicators.filter({ hasText: /^Style / })).toHaveText(/^Style (Strong fit|Neutral)$/);
-  await expect(fitIndicators.filter({ hasText: /^Match aim / })).toHaveText(/^Match aim (Strong fit|Clash|Neutral)$/);
-  await expect(fitIndicators.filter({ hasText: /^Pace / })).toHaveText(/^Pace (Ideal|Usable|Risk)$/);
-  await expect(fitIndicators.filter({ hasText: /^Stamina / })).toHaveText(/^Stamina \d+$/);
-  await expect(firstChoice.locator(".approach-quality")).toHaveText(/Elite|Strong|Capable|Developing|Weak/);
-  await expect(choices.getByText("Recommended", { exact: true })).toHaveCount(3);
-  await expect(firstChoice.getByText("More details", { exact: true })).toHaveCount(0);
-  await expect(firstChoice.getByText(/Rating source|Rating formula|Suitability/)).toHaveCount(0);
-  await firstChoice.getByRole("button", { name: /^Select / }).click();
-  await expect(jay.locator(".selected-approach-row")).toHaveCount(1);
-  await expect(firstChoice.getByRole("button", { name: /selected for Jay White in slot 1/i })).toBeDisabled();
-  await expect(jay.getByText(/stamina remaining/)).toBeVisible();
-
-  const pac = match.locator('[data-match-worker="manual:pac"]');
-  await pac.getByRole("button", { name: "Edit Strategy" }).click();
-  await expect(match.getByLabel("Available approaches for PAC").locator(".approach-candidate")).toHaveCount(16);
-  await expect(jay.locator(".selected-approach-row")).toHaveCount(1);
-
-  await match.getByRole("button", { name: "Save and Close" }).click();
-  await expect(page.locator('[data-segment-type="match"]')).toHaveCount(0);
-  const card = page.getByLabel("Current card summary");
-  await expect(card.getByRole("button", { name: /Jay White vs PAC/ })).toBeVisible();
-  await card.getByRole("button", { name: /Jay White vs PAC/ }).click();
-  await expect(page.locator('[data-segment-type="match"]')).toHaveCount(1);
-  await expect(page.getByLabel("Segment name")).toHaveValue("Jay White vs PAC");
-  await expect(page.locator('[data-match-worker="manual:jay white"] .selected-approach-row')).toHaveCount(1);
-});
-
-test("defaults booking to the activated company roster and keeps outside talent optional", async ({ page }) => {
-  await page.goto("/");
-  await page.evaluate(() => {
+async function seedImportedWorld(page: import("@playwright/test").Page): Promise<void> {
+  await page.evaluate(async () => {
     localStorage.clear();
-    localStorage.setItem("wrestling-sim:starting-universe-activation:v1", JSON.stringify({ activeUniverseId: "pwl", activeCompanyId: "pwl", activeCompanyName: "Pro Wrestling League", gameDate: "2019-01-02", activatedAt: "2019-01-02T00:00:00.000Z", nextShowId: "", ledger: {}, lastReport: null }));
-    localStorage.setItem("tew-story-tracker:workers:v1", JSON.stringify({ profiles: [
-      { id: "strong", displayName: "Roderick Strong", source: "tew", linkedTewWorkerId: "w1", linkedTewWorkerName: "Roderick Strong", currentRole: "Wrestler" },
-      { id: "ricochet", displayName: "Ricochet", source: "tew", linkedTewWorkerId: "w2", linkedTewWorkerName: "Trevor Mann", currentRole: "Wrestler" },
-      { id: "nigel", displayName: "Nigel McGuinness", source: "tew", linkedTewWorkerId: "w3", linkedTewWorkerName: "Nigel McGuinness", currentRole: "Announcer" },
-      { id: "cage", displayName: "Brian Cage", source: "tew", linkedTewWorkerId: "w4", linkedTewWorkerName: "Brian Cage", companyId: "impact", companyName: "Impact Wrestling", currentRole: "Wrestler" }
-    ], relationships: [] }));
+    localStorage.setItem("wrestling-sim:starting-universe-activation:v1", JSON.stringify({ activeUniverseId: "world", activeCompanyId: "pwl", activeCompanyName: "Pro Wrestling League", gameDate: "2019-01-02", activatedAt: "2019-01-02T00:00:00.000Z", nextShowId: "", ledger: {}, lastReport: null }));
+    localStorage.setItem("wrestling-sim:starting-universe-state:v1", JSON.stringify({ manifest: [], activeUniverseId: "world", selectedTab: "source", lastExportedAt: "", lastImportedAt: "" }));
+    const wrestlerFlags = { wrestler: true, occasionalWrestler: false, referee: false, announcer: false, colourCommentator: false, manager: false, onScreenPersonality: false, roadAgent: false };
+    const staffFlags = { ...wrestlerFlags, wrestler: false, announcer: true };
+    const worker = (id: string, name: string, flags = wrestlerFlags) => ({ id, name, active: true, basedIn: "USA", status: "Active", style: "", bodyType: "", nationality: "", race: "", height: "", weight: 0, debut: "", birthday: "", picture: "", profile: "", flags, physical: { head: 100, body: 100, arms: 100, legs: 100 }, skills: {}, looks: 0, starQuality: 0, reputation: 0, respect: 0, experience: 0, popularity: {} });
+    const company = (id: string, name: string, active = true) => ({ id, name, initials: id.toUpperCase(), profile: "", active, userControlled: id === "pwl", basedIn: "USA", size: "Medium", prestige: 0, ranking: 0, momentum: 0, money: 0, ownerName: "", headBookerName: "", styleName: "", productBase: "" });
+    const contract = (id: string, companyId: string, companyName: string, workerId: string, workerName: string, ringName = workerName) => ({ id, companyId, companyName, workerId, workerName, ringName, shortName: ringName, perception: "", babyface: true, gimmick: "", gimmickRating: null, rosterUsage: "", intendedRole: "Wrestler", brand: "", momentum: 0, exclusive: false, written: true, daysLeft: 0, datesLeft: 0, amount: 0, downside: 0, contractBegan: "", debuted: "", flags: wrestlerFlags });
+    const record = {
+      id: "world", name: "Imported World", mode: "Standalone Universe", status: "Confirmed", source: { format: "TEW SQLite", sourceFileName: "world.mdb", sourceFingerprint: "test", gameDate: "2019-01-02" }, playableCompanyId: "pwl",
+      companies: [company("pwl", "Pro Wrestling League"), company("impact", "Impact Wrestling"), company("njpw", "New Japan Pro-Wrestling"), company("inactive", "Inactive Wrestling", false)],
+      workers: [worker("w1", "Roderick Strong"), worker("w2", "Trevor Mann"), worker("w3", "Brian Cage"), worker("w4", "Nigel McGuinness", staffFlags), worker("w5", "PAC")],
+      contracts: [contract("c1", "pwl", "Pro Wrestling League", "w1", "Roderick Strong"), contract("c2", "pwl", "Pro Wrestling League", "w2", "Trevor Mann", "Ricochet"), contract("c3", "impact", "Impact Wrestling", "w3", "Brian Cage"), contract("c4", "pwl", "Pro Wrestling League", "w4", "Nigel McGuinness")],
+      titles: [], tvShows: [], tagTeamVariants: [], stables: [], relationships: [], attributes: [], review: { roster: [], titles: [], tvShows: [], tagTeams: [], stables: [], issues: [] }, approachFormulaVersion: "test", createdAt: "", updatedAt: "", confirmedAt: ""
+    };
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open("wrestling-sim-starting-universe", 1);
+      request.onupgradeneeded = () => { if (!request.result.objectStoreNames.contains("universes")) request.result.createObjectStore("universes", { keyPath: "id" }); };
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const transaction = request.result.transaction("universes", "readwrite");
+        transaction.objectStore("universes").put(record);
+        transaction.oncomplete = () => { request.result.close(); resolve(); };
+        transaction.onerror = () => reject(transaction.error);
+      };
+    });
   });
+}
+
+test("uses the full imported world for unrestricted company roster booking", async ({ page }) => {
+  await page.goto("/");
+  await seedImportedWorld(page);
   await page.reload();
   await page.getByRole("button", { name: "Create First Show" }).first().click();
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByRole("button", { name: "Add Match" }).click();
   const match = page.locator('[data-segment-type="match"]');
+  const companies = match.getByLabel("Booking Company");
 
-  await expect(match.getByLabel("Booking Company")).toHaveValue("Pro Wrestling League");
+  await expect(companies).toHaveValue("pwl");
+  await expect(companies.locator("option")).toHaveText(["All Workers", "Free Agents", "Impact Wrestling", "Inactive Wrestling (Inactive)", "New Japan Pro-Wrestling", "Pro Wrestling League"]);
   await expect(match.getByLabel("Company wrestler").locator("option")).toHaveText(["Select a wrestler", "Ricochet", "Roderick Strong"]);
-  await expect(match.getByText("2 active wrestlers in this company roster.")).toBeVisible();
-  await expect(match.getByLabel("Length (minutes)")).toHaveCount(1);
-  await expect(match.getByLabel("Length (minutes)")).toBeVisible();
-  await expect(match.getByLabel("Match type")).toBeVisible();
   await expect(match.getByText("Nigel McGuinness")).toHaveCount(0);
-  await match.getByLabel("Booking Company").selectOption("Impact Wrestling");
+
+  await companies.selectOption("impact");
   await expect(match.getByLabel("Company wrestler").locator("option")).toHaveText(["Select a wrestler", "Brian Cage"]);
+  await match.getByLabel("Company wrestler").selectOption("w3");
+  await match.getByRole("button", { name: "Add Wrestler" }).click();
+  await companies.selectOption("pwl");
+  await match.getByLabel("Company wrestler").selectOption("w2");
+  await match.getByRole("button", { name: "Add Wrestler" }).click();
+  await expect(match.locator(".basic-participant-list")).toContainText("Brian Cage");
+  await expect(match.locator(".basic-participant-list")).toContainText("Ricochet");
+
+  await companies.selectOption("__free_agents__");
+  await expect(match.getByLabel("Company wrestler").locator("option")).toHaveText(["Select a wrestler", "PAC"]);
+  await companies.selectOption("__all_workers__");
+  await expect(match.getByLabel("Company wrestler").locator("option")).toContainText(["Select a wrestler", "Brian Cage · Impact Wrestling", "PAC · Free Agent", "Ricochet · Pro Wrestling League", "Roderick Strong · Pro Wrestling League"]);
+});
+
+test("uses compact TEW-style wrestler rows with rated approach dropdowns", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Create First Show" }).first().click();
+  await page.getByRole("button", { name: "Create Show" }).first().click();
+  await page.getByRole("button", { name: "Add Match" }).click();
+  const match = page.locator('[data-segment-type="match"]');
+  for (const name of ["Jay White", "PAC"]) {
+    await match.getByLabel("Manual worker name").fill(name);
+    await match.getByRole("button", { name: "Add Manual Worker" }).click();
+  }
+
+  await expect(match.getByText("Projected pace", { exact: true })).toHaveCount(0);
+  await expect(match.getByText("Approach Selection Board", { exact: true })).toHaveCount(0);
+  await expect(match.locator(".approach-candidate, .match-competitor-card, .selected-approach-row")).toHaveCount(0);
+  await expect(match.locator(".tew-strategy-row")).toHaveCount(2);
+  expect(await match.getByLabel("Length (minutes)").evaluate((element) => element.getBoundingClientRect().width)).toBeLessThanOrEqual(90);
+  expect(await match.locator(".tew-strategy-row").first().evaluate((element) => element.getBoundingClientRect().height)).toBeLessThanOrEqual(70);
+
+  const jay = match.locator('[data-match-worker="manual:jay white"]');
+  await jay.getByRole("button", { name: "Jay White approach 1" }).click();
+  const menu = jay.getByRole("listbox", { name: "Approach choices for Jay White, slot 1" });
+  await expect(menu.locator('[role="option"]')).toHaveCount(17);
+  await expect(menu.locator(".approach-slot-option--strong, .approach-slot-option--balanced, .approach-slot-option--risk")).toHaveCount(16);
+  await expect(menu.locator(".approach-slot-option").nth(1)).toContainText(/\d+\.\d+Cost \d+ · Pace \d+/);
+  await menu.locator(".approach-slot-option").nth(1).click();
+  await expect(jay.getByRole("button", { name: "Jay White approach 1" })).toContainText(/\d+\.\d+ · Cost \d+ · Pace \d+/);
+  await expect(jay.locator(".tew-strategy-result")).toContainText(/Pace \d+ ·/);
 });

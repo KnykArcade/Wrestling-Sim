@@ -17,7 +17,7 @@ test("books wrestlers without a winner, runs one official result, and preserves 
   await match.getByLabel("Manual worker name").fill("PAC");
   await match.getByRole("button", { name: "Add Manual Worker" }).click();
   await match.getByRole("button", { name: "Run AI for All Competitors" }).click();
-  await expect(match.locator(".match-competitor-card")).toHaveCount(2);
+  await expect(match.locator(".tew-strategy-row")).toHaveCount(2);
   await expect(match.getByLabel("Planned winner")).toHaveValue("");
   await expect(page.locator(".save-state")).toHaveText("Saved");
 
