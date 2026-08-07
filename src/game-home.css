@@ -1,0 +1,23 @@
+.game-home { display: grid; gap: 20px; }
+.game-home__hero, .game-home__next { border: 1px solid #34577d; background: linear-gradient(145deg, #102744, #0b1a2d); box-shadow: 0 18px 44px rgba(0,0,0,.24); }
+.game-home__hero { display: flex; justify-content: space-between; gap: 24px; align-items: center; padding: 28px; }
+.game-home__hero h2 { margin: 4px 0 8px; font-size: clamp(28px, 4vw, 48px); }
+.game-home__hero p { margin: 0; color: #c6d5e9; }
+.game-home__hero > span { padding: 9px 13px; border: 1px solid currentColor; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.game-home__hero > span.ready { color: #7ee0a2; }
+.game-home__hero > span.needs-booking { color: #f2de3f; }
+.game-home__facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.game-home__facts article { padding: 18px; border: 1px solid #294866; background: #0c1b2e; }
+.game-home__facts span { display: block; color: #8ea8c4; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+.game-home__facts strong { display: block; margin-top: 7px; font-size: 24px; }
+.game-home__next { padding: 24px; }
+.game-home__next > header { display: flex; justify-content: space-between; gap: 20px; align-items: start; }
+.game-home__next h3 { margin: 4px 0 8px; font-size: 28px; }
+.game-home__next header p { margin: 0; color: #a9bed6; }
+.game-home__readiness { margin: 22px 0; padding: 18px; border-left: 4px solid #f2de3f; background: rgba(6,15,26,.55); }
+.game-home__readiness h4 { margin: 0 0 10px; }
+.game-home__readiness ul { margin: 0; padding-left: 22px; }
+.game-home__readiness p { margin: 0; }
+.game-home__actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.game-home--empty { justify-items: start; padding: 32px; border: 1px solid #34577d; background: #0c1b2e; }
+@media (max-width: 780px) { .game-home__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .game-home__hero, .game-home__next > header { align-items: flex-start; flex-direction: column; } }

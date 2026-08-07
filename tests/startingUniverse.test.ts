@@ -11,6 +11,7 @@ import { emptyProfileLibraryUniverse } from "../src/profileLibrary/model";
 import { emptyChampionshipUniverse } from "../src/championships/storage";
 import { emptyPromotionScheduleUniverse } from "../src/schedule/model";
 import { emptySnapshotVaultUniverse } from "../src/snapshotVault/model";
+import { ensurePlayableFirstDay, firstDayReadiness } from "../src/startingUniverse/quickStart";
 
 function importedWorld(): ParsedTewExport {
   return {
@@ -170,5 +171,35 @@ describe("Phase 6B12 complete Starting Universe activation", () => {
 
     expect(second.championships.championships[0].name).toBe("PWL Crown Championship");
     expect(second.report.categories["Championships"].updated).toBe(1);
+  });
+});
+
+describe("Phase 6B13 playable first day", () => {
+  test("creates one blank episode on the imported weekday and preserves it on repeat activation", () => {
+    const record = confirmStartingUniverse(createStartingUniverse(activationWorld()));
+    const activated = activateStartingUniverseData(record, emptyActivationData());
+    const first = ensurePlayableFirstDay(activated.activation, activated.schedule, []);
+
+    expect(first.created).toBe(true);
+    expect(first.shows).toHaveLength(1);
+    expect(first.nextShow).toMatchObject({ name: "PWL Power Hour #1", date: "2019-01-02", company: "Pro Wrestling League", showType: "Television", expectedMinutes: 60, segments: [] });
+    expect(first.schedule.links[0]).toMatchObject({ showId: first.nextShow!.id, seriesId: activated.schedule.series[0].id, episodeNumber: 1, originalDate: "2019-01-02" });
+    expect(firstDayReadiness(first.nextShow)).toEqual({ ready: false, blockers: ["Add at least one match or angle to the card."] });
+
+    const editedShows = first.shows.map((show) => ({ ...show, name: "My Edited Power Hour", notes: "Manual booking notes" }));
+    const repeated = ensurePlayableFirstDay(activated.activation, first.schedule, editedShows);
+    expect(repeated.created).toBe(false);
+    expect(repeated.shows).toHaveLength(1);
+    expect(repeated.nextShow).toMatchObject({ name: "My Edited Power Hour", notes: "Manual booking notes" });
+  });
+
+  test("moves the first episode forward to the imported television weekday", () => {
+    const record = confirmStartingUniverse(createStartingUniverse({
+      ...activationWorld(),
+      tables: { ...activationWorld().tables, Save_Game_Info: [{ Current_Date: "01/03/2019" }] },
+    }));
+    const activated = activateStartingUniverseData(record, emptyActivationData());
+    const result = ensurePlayableFirstDay(activated.activation, activated.schedule, []);
+    expect(result.nextShow?.date).toBe("2019-01-09");
   });
 });

@@ -4,6 +4,7 @@ import ChampionshipHub from "./championships/ChampionshipHub";
 import CompetitionHub from "./competitions/CompetitionHub";
 import ResultConsequenceWorkspace from "./consequences/ResultConsequenceWorkspace";
 import CreativeControlCenter from "./control/CreativeControlCenter";
+import GameHomeWorkspace from "./gameHome/GameHomeWorkspace";
 import HandoffWorkspace from "./handoff/HandoffWorkspace";
 import LiveCardRunnerWorkspace from "./liveCard/LiveCardRunnerWorkspace";
 import { loadLiveCardUniverse, saveLiveCardUniverse } from "./liveCard/storage";
@@ -27,6 +28,7 @@ import {
 } from "./snapshotVault/storage";
 import type { SnapshotVaultUniverse } from "./snapshotVault/types";
 import StartingUniverseWorkspace from "./startingUniverse/StartingUniverseWorkspace";
+import { loadStartingUniverseActivationState } from "./startingUniverse/activation";
 import StorylineHub from "./storylines/StorylineHub";
 import { readTewSnapshot } from "./tew/reader";
 import type { MatchRecord, ShowRecord, StorylineRecord, TewSnapshot } from "./tew/types";
@@ -36,7 +38,7 @@ import SegmentWorkbench from "./workbench/SegmentWorkbench";
 import { loadWorkbenchUniverse, updateWorkbenchSettings } from "./workbench/storage";
 import WorkerHub from "./workers/WorkerHub";
 
-type ViewName = "universe" | "runner" | "resolution" | "consequences" | "session" | "calendar" | "operations" | "workbench" | "outputs" | "profiles" | "transfer" | "results" | "bridge" | "control" | "planner" | "handoff" | "competitions" | "match-engine" | "storyline-hub" | "worker-hub" | "championship-hub" | "shows" | "tew-storylines" | "schema";
+type ViewName = "home" | "universe" | "runner" | "resolution" | "consequences" | "session" | "calendar" | "operations" | "workbench" | "outputs" | "profiles" | "transfer" | "results" | "bridge" | "control" | "planner" | "handoff" | "competitions" | "match-engine" | "storyline-hub" | "worker-hub" | "championship-hub" | "shows" | "tew-storylines" | "schema";
 
 const advancedViews: ViewName[] = ["operations", "bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub", "shows", "tew-storylines", "schema"];
 
@@ -99,6 +101,7 @@ function SnapshotHeader({ snapshot, onClose }: { snapshot: TewSnapshot; onClose:
 }
 
 export default function App() {
+  const activeGame = loadStartingUniverseActivationState(window.localStorage);
   const [snapshot, setSnapshot] = useState<TewSnapshot | null>(null);
   const [vault, setVault] = useState<SnapshotVaultUniverse>(() => loadSnapshotVaultUniverse(window.localStorage));
   const [vaultReady, setVaultReady] = useState(false);
@@ -179,6 +182,11 @@ export default function App() {
     setView("planner");
   }
 
+  function openPlannedShow(showId: string): void {
+    setPlannerTarget({ showId, segmentId: "", key: Date.now() });
+    setView("planner");
+  }
+
   function openShowSession(): void {
     setSessionKey(Date.now());
     setView("session");
@@ -211,8 +219,9 @@ export default function App() {
   const standaloneViews: ViewName[] = ["universe", "runner", "resolution", "consequences", "session", "calendar", "operations", "workbench", "outputs", "profiles", "transfer", "results", "bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
 
   return <div className="app-shell">
-    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>Wrestling Sim</h1></div><div className="phase-badge">BOOK · RUN · RECORD</div></header>
+    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>Wrestling Sim</h1></div><div className="phase-badge">{activeGame.gameDate ? `GAME DATE · ${activeGame.gameDate}` : "BOOK · RUN · RECORD"}</div></header>
     <nav className="global-tabbar" aria-label="Wrestling Sim sections">
+      <button className={view === "home" ? "active" : ""} onClick={() => setView("home")} type="button">Game Home</button>
       <button className={view === "universe" ? "active" : ""} onClick={() => setView("universe")} type="button">Starting Universe</button>
       <button className={view === "planner" ? "active" : ""} onClick={() => setView("planner")} type="button">Book Shows</button>
       <button className={view === "runner" ? "active" : ""} onClick={() => setView("runner")} type="button">Run Show</button>
@@ -246,7 +255,8 @@ export default function App() {
       </details>}
     </nav>
     <main>
-      {view === "universe" && <StartingUniverseWorkspace onUniverseLoaded={() => { setVault(loadSnapshotVaultUniverse(window.localStorage)); setView("session"); }} />}
+      {view === "home" && <GameHomeWorkspace onBookShow={openPlannedShow} onOpenCalendar={() => setView("calendar")} onOpenRoster={() => setView("worker-hub")} onOpenChampionships={() => setView("championship-hub")} onOpenUniverse={() => setView("universe")} />}
+      {view === "universe" && <StartingUniverseWorkspace onUniverseLoaded={() => { setVault(loadSnapshotVaultUniverse(window.localStorage)); setView("home"); }} />}
       {view === "runner" && <LiveCardRunnerWorkspace onOpenResolution={() => { setResolutionReturnToRunner(true); setView("resolution"); }} onOpenConsequences={() => setView("consequences")} onOpenPlanner={openPlannedSegment} />}
       {view === "resolution" && <MatchResolutionWorkspace onReturnToShow={resolutionReturnToRunner ? () => { setResolutionReturnToRunner(false); setView("runner"); } : undefined} />}
       {view === "consequences" && <ResultConsequenceWorkspace onOpenLiveCard={() => setView("runner")} onOpenPlanner={openPlannedSegment} />}

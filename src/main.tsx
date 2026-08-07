@@ -29,6 +29,7 @@ import "./wrap-up.css";
 import "./wrap-up-bridge.css";
 import "./companion-home.css";
 import "./starting-universe.css";
+import "./game-home.css";
 
 type ErrorBoundaryProps = {
   children: ReactNode;
