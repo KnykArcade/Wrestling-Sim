@@ -39,7 +39,7 @@ test("uses the full imported world for unrestricted company roster booking", asy
   await page.getByRole("button", { name: "Create Show" }).first().click();
   await page.getByRole("button", { name: "Add Match" }).click();
   const match = page.locator('[data-segment-type="match"]');
-  const companies = match.getByLabel("Booking Company");
+  const companies = match.getByRole("combobox", { name: "Booking Company" });
   const chooseCompany = async (name: string) => {
     await companies.click();
     await match.getByRole("option", { name, exact: true }).click();
