@@ -70,7 +70,7 @@ export function synchronizeWorkerRecordsFromProfiles(universe: ResultConsequence
     ...universe,
     workerRecords: universe.workerRecords.map((record) => {
       const profile = byKey.get(record.workerKey);
-      return profile ? { ...record, momentum: profile.momentum, popularity: profile.popularity, health: profile.health, updatedAt: profile.updatedAt } : record;
+      return profile ? { ...record, momentum: profile.momentum, momentumScale: "0-100-v1", popularity: profile.popularity, health: profile.health, updatedAt: profile.updatedAt } : record;
     }),
   };
 }
@@ -90,7 +90,8 @@ function defaultWorkerRecord(workerKey: string, workerId: string, workerName: st
     rankingPoints: 0,
     rankingPosition: 0,
     previousRankingPosition: 0,
-    momentum: profile?.momentum ?? 0,
+    momentum: profile?.momentum ?? 50,
+    momentumScale: "0-100-v1",
     popularity: profile?.popularity ?? 50,
     health: profile?.health ?? 100,
     fatigue: 0,
@@ -122,12 +123,12 @@ function rankingDelta(result: "W" | "L" | "D" | "NC", matchScore: number, winPro
   return 0;
 }
 
-function momentumDelta(result: "W" | "L" | "D" | "NC", matchScore: number, performanceLeader: boolean, upset: boolean): number {
-  const quality = matchScore >= 85 ? 2 : matchScore >= 75 ? 1 : 0;
-  if (result === "W") return 4 + quality + (upset ? 3 : 0) + (performanceLeader ? 1 : 0);
-  if (result === "L") return -2 + quality + (performanceLeader ? 2 : 0);
-  if (result === "D") return 1 + quality;
-  return 0;
+function momentumDelta(result: "W" | "L" | "D" | "NC", performanceScore: number, expectedPerformance: number, performanceLeader: boolean, upset: boolean): number {
+  const resultChange = result === "W" ? 3 : result === "L" ? -3 : 0;
+  const upsetChange = result === "W" && upset ? 2 : 0;
+  const leaderChange = performanceLeader ? 1 : 0;
+  const expectationChange = clamp(Math.round((performanceScore - expectedPerformance) / 8), -2, 2);
+  return clamp(resultChange + upsetChange + leaderChange + expectationChange, -6, 6);
 }
 
 function conditionForWorker(input: {
@@ -137,8 +138,9 @@ function conditionForWorker(input: {
   finalResult: NonNullable<ReturnType<typeof activeResolutionAttempt>>["finalResult"];
   performanceLeader: boolean;
   upset: boolean;
+  expectedPerformance: number;
 }): { record: StandaloneWorkerRecord; change: ConditionChange } {
-  const { existing, workerResult, resultCode, finalResult, performanceLeader, upset } = input;
+  const { existing, workerResult, resultCode, finalResult, performanceLeader, upset, expectedPerformance } = input;
   if (!finalResult) throw new Error("A finalized result is required.");
   const staminaFatigue = workerResult.staminaStatus === "DEAD" ? 8 : workerResult.staminaStatus === "GASSED" ? 4 : workerResult.staminaStatus === "WINDED" ? 2 : 0;
   const fatigueGain = round(finalResult.actualDurationMinutes * 0.7 + workerResult.staminaUsed * 1.8 + Math.max(0, workerResult.actualPace - 3) * 0.8 + staminaFatigue);
@@ -147,7 +149,7 @@ function conditionForWorker(input: {
   const incident = injuryFromIncident(workerResult.incident);
   const healthAfter = round(clamp(existing.health - baseHealthLoss - staminaPenalty - incident.healthPenalty, 0, 100));
   const fatigueAfter = round(clamp(existing.fatigue + fatigueGain, 0, 100));
-  const momentumChange = momentumDelta(resultCode, finalResult.matchScore, performanceLeader, upset);
+  const momentumChange = momentumDelta(resultCode, workerResult.performanceScore, expectedPerformance, performanceLeader, upset);
   const popularityChange = round(clamp((workerResult.performanceScore - existing.popularity) / 25 + (resultCode === "W" ? 0.3 : -0.1), -2, 2));
   const rankingChange = rankingDelta(resultCode, finalResult.matchScore, workerResult.winProbability, performanceLeader);
   const streak = updateStreak(existing, resultCode);
@@ -161,7 +163,8 @@ function conditionForWorker(input: {
     currentStreakCount: streak.count,
     lastFive: [resultCode, ...existing.lastFive].slice(0, 5),
     rankingPoints: round(existing.rankingPoints + rankingChange),
-    momentum: round(clamp(existing.momentum + momentumChange, -20, 20)),
+    momentum: round(clamp(existing.momentum + momentumChange, 0, 100)),
+    momentumScale: "0-100-v1",
     popularity: round(clamp(existing.popularity + popularityChange, 0, 100)),
     health: healthAfter,
     fatigue: fatigueAfter,
@@ -184,7 +187,7 @@ function conditionForWorker(input: {
     rankingPointsAfter: next.rankingPoints,
     injuryStatus: next.injuryStatus,
     explanation: [
-      `${resultCode === "W" ? "Win" : resultCode === "L" ? "Loss" : resultCode === "D" ? "Draw" : "No contest"} changed momentum by ${momentumChange >= 0 ? "+" : ""}${momentumChange}.`,
+      `${resultCode === "W" ? "Win" : resultCode === "L" ? "Loss" : resultCode === "D" ? "Draw" : "No contest"}, upset status, performance leadership, and performance versus the ${expectedPerformance.toFixed(1)} expectation changed momentum by ${momentumChange >= 0 ? "+" : ""}${momentumChange}.`,
       `Individual performance against current popularity changed popularity by ${popularityChange >= 0 ? "+" : ""}${popularityChange}.`,
       `Match quality changed ranking points by ${rankingChange >= 0 ? "+" : ""}${rankingChange}.`,
       `${finalResult.actualDurationMinutes.toFixed(2)} minutes and ${workerResult.staminaUsed} stamina cost added ${fatigueGain.toFixed(1)} fatigue.`,
@@ -472,7 +475,7 @@ export function applyCoreResultConsequences(input: {
     const winningKeys = attempt.finalResult.winnerMemberKeys?.length ? attempt.finalResult.winnerMemberKeys : [attempt.finalResult.winnerKey];
     const resultCode: "W" | "L" = winningKeys.includes(workerResult.workerKey) ? "W" : "L";
     const isLeader = workerResult.workerKey === attempt.engineResult.performanceLeaderKey;
-    const condition = conditionForWorker({ existing, workerResult, resultCode, finalResult: attempt.finalResult, performanceLeader: isLeader, upset: attempt.engineResult.upset && resultCode === "W" });
+    const condition = conditionForWorker({ existing, workerResult, resultCode, finalResult: attempt.finalResult, performanceLeader: isLeader, upset: attempt.engineResult.upset && resultCode === "W", expectedPerformance: profile?.overall ?? existing.popularity });
     const opponents = attempt.workerResults.filter((item) => winningKeys.includes(item.workerKey) !== winningKeys.includes(workerResult.workerKey));
     const history: StandaloneMatchHistoryEntry = {
       id: createPlannerId(),

@@ -461,6 +461,18 @@
   margin: 0;
 }
 
+.live-card-audience-result {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid #56769c;
+  border-left: 4px solid #fff200;
+  background: #0b2441;
+}
+
+.live-card-audience-result strong { color: #fff; font-size: 0.88rem; }
+.live-card-audience-result span { color: #b6c7dc; font-size: 0.76rem; }
+
 .live-card-grounded-facts strong {
   color: #fff200;
 }

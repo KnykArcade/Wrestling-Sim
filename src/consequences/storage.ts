@@ -25,9 +25,27 @@ function records<T>(value: unknown): T[] {
   return Array.isArray(value) ? value.filter(isRecord) as unknown as T[] : [];
 }
 
+function replayLegacyMomentum(value: Record<string, unknown>): number {
+  const history = Array.isArray(value.matchHistory) ? value.matchHistory.filter(isRecord).slice().reverse() : [];
+  return history.reduce((momentum, entry) => {
+    const result = entry.result === "W" ? 3 : entry.result === "L" ? -3 : 0;
+    const leader = entry.performanceLeader === true ? 1 : 0;
+    const performance = typeof entry.performanceScore === "number" && Number.isFinite(entry.performanceScore)
+      ? Math.max(-2, Math.min(2, Math.round((entry.performanceScore - 60) / 8)))
+      : 0;
+    return Math.max(0, Math.min(100, momentum + result + leader + performance));
+  }, 50);
+}
+
 function workerRecord(value: unknown): StandaloneWorkerRecord | null {
   if (!isRecord(value) || !text(value.workerKey) || !text(value.workerName)) return null;
-  return { ...value, popularity: typeof value.popularity === "number" && Number.isFinite(value.popularity) ? Math.max(0, Math.min(100, value.popularity)) : 50 } as unknown as StandaloneWorkerRecord;
+  const currentScale = value.momentumScale === "0-100-v1";
+  return {
+    ...value,
+    momentum: currentScale && typeof value.momentum === "number" && Number.isFinite(value.momentum) ? Math.max(0, Math.min(100, value.momentum)) : replayLegacyMomentum(value),
+    momentumScale: "0-100-v1",
+    popularity: typeof value.popularity === "number" && Number.isFinite(value.popularity) ? Math.max(0, Math.min(100, value.popularity)) : 50,
+  } as unknown as StandaloneWorkerRecord;
 }
 
 function teamRecord(value: unknown): StandaloneTeamRecord | null {

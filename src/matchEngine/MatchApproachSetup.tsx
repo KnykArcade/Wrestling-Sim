@@ -18,6 +18,7 @@ import {
   workerProfileKey,
 } from "./model";
 import { MATCH_ENGINE_SKILLS, WRESTLER_STYLES } from "./profileCatalog";
+import { calculateMatchAnticipation, momentumLabel } from "../crowd/model";
 import type {
   MatchApproachId,
   MatchEngineProfile,
@@ -143,7 +144,7 @@ function ApproachSlotDropdown({
 function RatingsDialog({ profile, worker, onClose, onProfileChange }: { profile: MatchEngineProfile; worker: PlannedWorkerReference; onClose: () => void; onProfileChange: (profile: MatchEngineProfile) => void }) {
   function updateNumber(field: "overall" | "health" | "popularity" | "momentum" | "experience" | "fanReaction" | "gimmick", value: number): void {
     const max = field === "fanReaction" || field === "gimmick" ? 5 : 100;
-    const min = field === "momentum" ? -20 : field === "fanReaction" || field === "gimmick" ? 1 : 0;
+    const min = field === "fanReaction" || field === "gimmick" ? 1 : 0;
     onProfileChange({ ...profile, [field]: Math.max(min, Math.min(max, Number.isFinite(value) ? value : min)) });
   }
 
@@ -152,7 +153,7 @@ function RatingsDialog({ profile, worker, onClose, onProfileChange }: { profile:
       <header><div><p className="eyebrow">MATCH PROFILE</p><h4>{worker.name}</h4></div><button type="button" onClick={onClose}>Close</button></header>
       <div className="match-profile-core-grid">
         <label className="field"><span>Wrestler style</span><select aria-label={`${worker.name} style`} value={profile.styleId} onChange={(event) => onProfileChange({ ...profile, styleId: event.target.value as MatchEngineProfile["styleId"] })}>{WRESTLER_STYLES.map((style) => <option key={style.id} value={style.id}>{style.name}</option>)}</select></label>
-        {(["overall", "health", "popularity", "momentum", "experience", "fanReaction", "gimmick"] as const).map((field) => <label className="field" key={field}><span>{field === "fanReaction" ? "Fan reaction" : field[0].toUpperCase() + field.slice(1)}</span><input aria-label={`${worker.name} ${field} rating`} type="number" min={field === "momentum" ? -20 : field === "fanReaction" || field === "gimmick" ? 1 : 0} max={field === "fanReaction" || field === "gimmick" ? 5 : field === "momentum" ? 20 : 100} value={profile[field]} onChange={(event) => updateNumber(field, Number(event.target.value))} /></label>)}
+        {(["overall", "health", "popularity", "momentum", "experience", "fanReaction", "gimmick"] as const).map((field) => <label className="field" key={field}><span>{field === "fanReaction" ? "Fan reaction" : field[0].toUpperCase() + field.slice(1)}</span><input aria-label={`${worker.name} ${field} rating`} type="number" min={field === "fanReaction" || field === "gimmick" ? 1 : 0} max={field === "fanReaction" || field === "gimmick" ? 5 : 100} value={profile[field]} onChange={(event) => updateNumber(field, Number(event.target.value))} /></label>)}
       </div>
       <div className="match-profile-preset-row"><span>Quick rating baseline</span>{[50, 60, 75].map((value) => <button key={value} type="button" onClick={() => onProfileChange({ ...profile, skills: Object.fromEntries(MATCH_ENGINE_SKILLS.map((skill) => [skill, value])) as Record<WrestlerSkill, number> })}>Set all {value}</button>)}</div>
       <div className="match-profile-skill-grid">{MATCH_ENGINE_SKILLS.map((skill) => <label className="field" key={skill}><span>{skill}</span><input aria-label={`${worker.name} ${skill} rating`} type="number" min={0} max={100} value={profile.skills[skill]} onChange={(event) => onProfileChange({ ...profile, skills: { ...profile.skills, [skill]: Math.max(0, Math.min(100, Number(event.target.value) || 0)) } })} /></label>)}</div>
@@ -252,12 +253,17 @@ export default function MatchApproachSetupEditor({
   const editingWorker = competitors.find((worker) => workerProfileKey(worker) === editingProfileKey) ?? null;
   const editingProfile = editingWorker ? profileForWorker(universe, editingWorker) : null;
   const tableStyle = { "--approach-slots": slots } as CSSProperties;
+  const anticipation = calculateMatchAnticipation({
+    profiles: competitors.map((worker) => profileForWorker(universe, worker) ?? createMatchEngineProfile(worker)),
+    plans: competitors.map((worker) => planForWorker(segment, worker)),
+    aimId: aim.id,
+  });
 
   return <section className="match-approach-setup match-approach-setup--compact" aria-label="Match approach setup">
-    <header className="match-strategy-header"><div><p className="eyebrow">MATCH APPROACHES</p><h4>Wrestler strategy</h4></div><button className="primary-button compact-button" type="button" aria-label="Run AI for All Competitors" onClick={runAll} disabled={competitors.length === 0}>AI All</button></header>
+    <header className="match-strategy-header"><div><p className="eyebrow">MATCH APPROACHES</p><h4>Wrestler strategy</h4></div><div className="match-anticipation" aria-label={`Crowd anticipation ${anticipation.score.toFixed(1)} ${anticipation.label}`}><span>Anticipation</span><strong>{anticipation.score.toFixed(1)} · {anticipation.label}</strong><details><summary>Breakdown</summary><small>Popularity {anticipation.popularity.toFixed(1)} · Momentum {anticipation.momentum.toFixed(1)} · Skills {anticipation.skills.toFixed(1)} · Style {anticipation.styleAppeal.toFixed(1)}</small></details></div><button className="primary-button compact-button" type="button" aria-label="Run AI for All Competitors" onClick={runAll} disabled={competitors.length === 0}>AI All</button></header>
 
     {competitors.length === 0 ? <div className="match-approach-empty">Add wrestlers above to choose their match approaches.</div> : <div className="tew-strategy-table" style={tableStyle} aria-label="Compact wrestler approach table">
-      <div className="tew-strategy-table__header"><span>Wrestler</span><span>Style</span><span>OVR</span><span>Stamina</span>{Array.from({ length: slots }, (_, index) => <span key={index}>Approach {index + 1}</span>)}<span>Individual result</span><span>Actions</span></div>
+      <div className="tew-strategy-table__header"><span>Wrestler</span><span>Style</span><span>OVR</span><span>MOM</span><span>Stamina</span>{Array.from({ length: slots }, (_, index) => <span key={index}>Approach {index + 1}</span>)}<span>Individual result</span><span>Actions</span></div>
       {competitors.map((worker) => {
         const key = workerProfileKey(worker);
         const savedProfile = profileForWorker(universe, worker);
@@ -269,6 +275,7 @@ export default function MatchApproachSetupEditor({
           <div className="tew-strategy-worker"><strong>{worker.name}</strong><small>{worker.side || "Competitor"}</small></div>
           <span>{WRESTLER_STYLES.find((style) => style.id === profile.styleId)?.name ?? "All-Rounder"}</span>
           <b>{profile.overall}</b>
+          <label className="tew-strategy-momentum"><input aria-label={`${worker.name} momentum`} title={`${momentumLabel(profile.momentum)} momentum`} type="number" min={0} max={100} value={profile.momentum} onChange={(event) => upsertProfile({ ...profile, momentum: Math.max(0, Math.min(100, Number(event.target.value) || 0)), momentumScale: "0-100-v1" })} /><small>{momentumLabel(profile.momentum)}</small></label>
           <span>{calculateProfileStaminaRating(profile).toFixed(1)} / {profileStaminaCapacity(profile)}</span>
           {Array.from({ length: slots }, (_, slotIndex) => {
             const selectedId = plan.selectedApproachIds[slotIndex];

@@ -1,5 +1,6 @@
 import type { MatchResolutionFinalResult } from "../matchResolution/types";
 import type { PlannedSegmentType } from "../planner/types";
+import type { LiveAudienceResult } from "../crowd/types";
 
 export type LiveCardShowStatus = "Planned" | "In Progress" | "Completed";
 export type LiveCardSegmentStatus = "Planned" | "Current" | "Result Pending" | "Completed" | "Skipped" | "Correction";
@@ -42,6 +43,7 @@ export interface LiveCardSegmentProgress {
   insertedDuringShow: boolean;
   sourceSegmentId: string;
   result: LiveCardResultSnapshot | null;
+  audience: LiveAudienceResult | null;
   finalAngleOutput: string;
   finalConsequences: string;
   finalFollowUp: string;
@@ -72,6 +74,8 @@ export interface LiveCardSession {
   segmentOrder: string[];
   progress: LiveCardSegmentProgress[];
   audit: LiveCardAuditEntry[];
+  crowdStart: number;
+  currentCrowd: number;
   startedAt: string;
   completedAt: string;
   createdAt: string;

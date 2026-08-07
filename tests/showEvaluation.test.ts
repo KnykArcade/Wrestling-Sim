@@ -103,7 +103,7 @@ describe("Phase 6B7 angle resolution and show evaluation", () => {
       profiles = applied.profiles;
     }
     let session = startLiveCardSession(createLiveCardSession(show, { records: [], settings: { defaultImportance: "Television", defaultChemistry: 0, defaultVolatility: 8, requireOverrideReason: true, selectedShowId: "", selectedSegmentId: "" } }));
-    for (const segment of show.segments) session = completeAngleSegment(session, segment.id, segment.segmentOutput, "", "");
+    for (const segment of show.segments) session = completeAngleSegment(session, segment.id, segment.segmentOutput, "", "", 60);
     session = completeLiveCard(session);
     const evaluated = evaluateCompletedShow(evaluations, show, session, { company, profiles });
     const report = evaluated.showReports[0];

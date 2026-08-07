@@ -49,6 +49,7 @@ export interface StandaloneWorkerRecord {
   rankingPosition: number;
   previousRankingPosition: number;
   momentum: number;
+  momentumScale: "0-100-v1";
   popularity: number;
   health: number;
   fatigue: number;

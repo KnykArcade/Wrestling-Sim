@@ -189,6 +189,7 @@ export interface MatchEngineProfile {
   health: number;
   popularity: number;
   momentum: number;
+  momentumScale: "0-100-v1";
   experience: number;
   fanReaction: number;
   gimmick: number;

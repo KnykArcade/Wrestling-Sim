@@ -1,4 +1,5 @@
 import type { MatchAimId, MatchEngineProfile, MentalStateDefinition, MentalStateId, PaceStatus, StaminaStatus } from "../matchEngine/types";
+import type { LiveAudienceResult, MatchAnticipation } from "../crowd/types";
 import type { ImportedApproachFormulaId, StartingUniverseWorkbookMetrics } from "../startingUniverse/types";
 
 export type ResolutionApproachId = ImportedApproachFormulaId;
@@ -74,6 +75,7 @@ export interface MatchResolutionSetup {
   competitionRound: string;
   chemistry: number;
   volatility: number;
+  anticipation?: MatchAnticipation;
   workers: MatchResolutionWorkerSettings[];
   format?: MatchResolutionFormat;
   eliminationRules?: boolean;
@@ -188,6 +190,8 @@ export interface MatchResolutionFinalResult {
   actualDurationMinutes: number;
   matchScore: number;
   starRating: number;
+  performanceRating?: number;
+  audience?: LiveAudienceResult;
   acceptedEngineResult: boolean;
   overrideReason: string;
   finalizedAt: string;

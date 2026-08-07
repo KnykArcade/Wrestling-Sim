@@ -31,4 +31,7 @@ test("calculates and accepts an angle before producing one permanent post-show r
   expect(stored.angleEvaluations?.[0].appliedAt).toBeTruthy();
   expect(stored.showReports).toHaveLength(1);
   expect(stored.showReports?.[0]).toMatchObject({ showName: "PWL Angle Evaluation Test", appliedAt: expect.any(String) });
+  const live = await page.evaluate(() => JSON.parse(window.localStorage.getItem("wrestling-sim:live-card:v1") || "{}") as { sessions?: Array<{ crowdStart?: number; currentCrowd?: number; progress?: Array<{ audience?: { performanceRating?: number; crowdResponse?: number; finalRating?: number; crowdBefore?: number; crowdAfter?: number } }> }> });
+  expect(live.sessions?.[0].crowdStart).toEqual(expect.any(Number));
+  expect(live.sessions?.[0].progress?.[0].audience).toMatchObject({ performanceRating: expect.any(Number), crowdResponse: expect.any(Number), finalRating: expect.any(Number), crowdBefore: expect.any(Number), crowdAfter: expect.any(Number) });
 });

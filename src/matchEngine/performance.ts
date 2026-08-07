@@ -100,7 +100,7 @@ function workerSettings(input: GenerateMatchPerformanceInput, worker: MatchPerfo
     lockedApproachIds: [],
     manualApproachIds: resolutionApproaches(worker.plan),
     storyNeed: 0,
-    momentum: 0,
+    momentum: worker.profile.momentum,
     bookingBias: input.settings.authority === "competitive-preview" && isPlannedWinner ? input.settings.bookingInfluence * 2 : 0,
     teamId: worker.profile.workerKey,
     teamName: worker.profile.workerName,

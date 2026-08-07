@@ -84,6 +84,12 @@ test("uses compact TEW-style wrestler rows with rated approach dropdowns", async
   await expect(match.getByText("Approach Selection Board", { exact: true })).toHaveCount(0);
   await expect(match.locator(".approach-candidate, .match-competitor-card, .selected-approach-row")).toHaveCount(0);
   await expect(match.locator(".tew-strategy-row")).toHaveCount(2);
+  await expect(match.getByLabel(/Crowd anticipation/)).toContainText(/Anticipation/i);
+  await expect(match.getByLabel("Jay White momentum")).toHaveValue("50");
+  await expect(match.getByLabel("PAC momentum")).toHaveValue("50");
+  await match.getByLabel("Jay White momentum").fill("72");
+  await expect(match.getByLabel("Jay White momentum")).toHaveValue("72");
+  await expect(match.getByLabel(/Crowd anticipation/)).toContainText(/\d+\.\d+ ·/);
   expect(await match.getByLabel("Length (minutes)").evaluate((element) => element.getBoundingClientRect().width)).toBeLessThanOrEqual(90);
   expect(await match.getByLabel("Match aim").evaluate((element) => element.getBoundingClientRect().width)).toBeLessThanOrEqual(300);
   expect(await match.getByLabel("Approach limit per wrestler").evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThanOrEqual(100);
