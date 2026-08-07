@@ -22,7 +22,12 @@ test("generates and persists a TEW-authoritative match performance preview", asy
   await expect(match.getByLabel("Performance preview authority")).toHaveValue("tew-authoritative");
   await match.getByRole("button", { name: "Roll New Night" }).click();
   await expect(match.getByText("Determined in TEW", { exact: true })).toBeVisible();
-  await expect(match.getByText("Tracker preview only", { exact: true })).toBeVisible();
+  await expect(
+    match.getByText(
+      "This is a projected pre-live performance. The official rating is finalized when the match runs with its actual incoming crowd heat.",
+      { exact: true },
+    ),
+  ).toBeVisible();
   await expect(match.locator(".match-performance-worker")).toHaveCount(2);
   await expect(match.getByText(/Mental base/)).toHaveCount(2);
   await expect(match.locator(".match-performance-worker-metrics").first().getByText(/^Pace \d+ · /)).toBeVisible();

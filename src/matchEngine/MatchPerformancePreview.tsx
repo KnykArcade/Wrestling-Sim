@@ -96,7 +96,7 @@ export default function MatchPerformancePreviewEditor({
       <div>
         <p className="eyebrow">MATCH RESULT / RECAP</p>
         <h4>Performance, mental state, and match-quality result</h4>
-        <p>The preview uses your selected approaches and tracker ratings. TEW remains the final authority for the actual match result and rating.</p>
+        <p>This is a projected pre-live performance. The official rating is finalized when the match runs with its actual incoming crowd heat.</p>
       </div>
       <div className="match-performance-actions">
         <button className="primary-button" type="button" disabled={!canGenerate} onClick={() => generate(false)}>Roll New Night</button>
@@ -115,8 +115,8 @@ export default function MatchPerformancePreviewEditor({
 
     {preview ? <div className="match-performance-results">
       <section className="match-performance-scorecard">
-        <div><span>Advisory match score</span><strong>{preview.matchScore.toFixed(1)}</strong><small>Tracker preview only</small></div>
-        <div><span>Advisory star rating</span><strong>{formatStarRating(preview.starRating)}</strong><small>Does not replace TEW</small></div>
+        <div><span>Projected in-ring performance</span><strong>{preview.matchScore.toFixed(1)}</strong><small>Before live crowd response</small></div>
+        <div><span>Projected performance stars</span><strong>{formatStarRating(preview.starRating)}</strong><small>Official stars use the live final rating</small></div>
         <div><span>Performance leader</span><strong>{preview.performanceLeaderName}</strong><small>Best projected individual night</small></div>
         <div><span>{preview.authority === "tew-authoritative" ? "Winner" : "Projected winner"}</span><strong>{preview.authority === "tew-authoritative" ? "Determined in TEW" : preview.projectedWinnerName || "Not available"}</strong><small>{preview.authority === "competitive-preview" && preview.confidence ? `${preview.confidence.toFixed(1)}% advisory confidence` : authorityLabel(preview.authority)}</small></div>
       </section>
@@ -143,7 +143,7 @@ export default function MatchPerformancePreviewEditor({
 
     <footer className="match-approach-boundary">
       <strong>Phase 4C3 boundary</strong>
-      <span>This is an optional companion forecast. It never writes a winner or rating into TEW and never replaces TEW’s match engine.</span>
+      <span>This forecast never becomes the official match rating. Live crowd response finalizes the stored result when the match runs.</span>
     </footer>
   </section>;
 }

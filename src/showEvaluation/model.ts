@@ -144,7 +144,8 @@ export function applyAngleEvaluation(universe: ShowEvaluationUniverse, evaluatio
     const priorProfile = nextProfiles[profileIndex];
     const updatedProfile: MatchEngineProfile = {
       ...priorProfile,
-      momentum: round(clamp(priorProfile.momentum + participant.momentumDelta, -20, 20)),
+      momentum: round(clamp(priorProfile.momentum + participant.momentumDelta, 0, 100)),
+      momentumScale: "0-100-v1",
       popularity: round(clamp(priorProfile.popularity + participant.popularityDelta)),
       updatedAt: timestamp,
     };
@@ -222,6 +223,12 @@ export function promotionStrength(company: StartingUniverseCompany | null | unde
   };
 }
 
+export function startingCrowdForShow(show: PlannedShow, company: StartingUniverseCompany | null | undefined, savedPopularity: number, popularitySeeded = false): number {
+  const seeded = promotionStrength(company, savedPopularity);
+  const popularity = popularitySeeded ? clamp(savedPopularity) : seeded.popularity;
+  return round(clamp(42 + popularity * .15 + showImportance(show.showType) * 2.5, 35, 70));
+}
+
 function expectedCardStrength(show: PlannedShow, profiles: MatchEngineProfile[]): number {
   const keys = new Set<string>();
   const values: number[] = [];
@@ -231,7 +238,7 @@ function expectedCardStrength(show: PlannedShow, profiles: MatchEngineProfile[])
     keys.add(key);
     const profile = profileFor(worker, profiles);
     if (!profile) return;
-    values.push(profile.overall * .45 + profile.popularity * .35 + clamp(profile.momentum + 50) * .1 + profile.health * .1);
+    values.push(profile.overall * .45 + profile.popularity * .35 + clamp(profile.momentum) * .1 + profile.health * .1);
   }));
   return round(values.length ? values.reduce((total, value) => total + value, 0) / values.length : 50);
 }
@@ -271,8 +278,7 @@ export function evaluateCompletedShow(universe: ShowEvaluationUniverse, show: Pl
   const promotionPopularityBefore = universe.promotionPopularitySeeded ? universe.promotionPopularity : seeded.popularity;
   const strength = context.company ? seeded.snapshot : { ...seeded.snapshot, source: universe.promotionPopularitySeeded ? "Saved Promotion" as const : "Estimated Baseline" as const };
   const importance = showImportance(show.showType);
-  const crowdStart = round(clamp(42 + promotionPopularityBefore * .15 + importance * 2.5, 35, 70));
-  const segmentExpectation = round(clamp(50 + promotionPopularityBefore * .15, 50, 68));
+  const crowdStart = session.crowdStart || startingCrowdForShow(show, context.company, universe.promotionPopularity, universe.promotionPopularitySeeded);
   let crowd = crowdStart;
   let weightedTotal = 0;
   let totalWeight = 0;
@@ -281,13 +287,13 @@ export function evaluateCompletedShow(universe: ShowEvaluationUniverse, show: Pl
   const segments: CrowdProgressionEntry[] = completed.map((progress, index) => {
     const segment = show.segments.find((item) => item.id === progress.segmentId);
     const angle = universe.angleEvaluations.find((item) => item.segmentId === progress.segmentId && item.appliedAt);
-    const score = progress.type === "match" ? progress.result?.finalResult.matchScore ?? 0 : angle?.finalScore ?? 0;
+    const score = progress.audience?.performanceRating ?? (progress.type === "match" ? progress.result?.finalResult.performanceRating ?? progress.result?.finalResult.matchScore ?? 0 : angle?.finalScore ?? 0);
     const isMainEvent = progress.segmentId === mainEventId;
     const weight = segment?.section === "Main Show" ? (isMainEvent ? 1.4 : 1) : .65;
-    const before = crowd;
-    const crowdModifier = round(clamp((before - 50) * .08, -4, 4));
-    const receptionScore = round(clamp(score + crowdModifier));
-    crowd = round(clamp(crowd + (receptionScore - segmentExpectation) / 7, 0, 100));
+    const before = progress.audience?.crowdBefore ?? crowd;
+    const receptionScore = progress.audience?.finalRating ?? round(clamp(score + (before - 50) * .08));
+    const crowdModifier = round(receptionScore - score);
+    crowd = progress.audience?.crowdAfter ?? round(clamp(before + (receptionScore - before) / 3, 0, 100));
     weightedTotal += receptionScore * weight;
     totalWeight += weight;
     return { segmentId: progress.segmentId, segmentTitle: progress.title, segmentType: progress.type, score: round(score), receptionScore, crowdModifier, importanceWeight: weight, mainEvent: isMainEvent, crowdBefore: before, crowdAfter: crowd, reaction: reaction(receptionScore) };
@@ -305,9 +311,9 @@ export function evaluateCompletedShow(universe: ShowEvaluationUniverse, show: Pl
     id: createPlannerId(), showId: show.id, showName: show.name, showDate: show.date, calculationVersion: CALCULATION_SYSTEM_VERSION, overallScore, audienceReaction: reaction(overallScore), estimatedAttendance: attendanceResult.attendance, expectedShowScore, promotionStrength: strength, attendanceCalculation: attendanceResult.calculation,
     promotionPopularityBefore, promotionPopularityAfter, promotionPopularityDelta, crowdStart, crowdFinish: crowd, segments,
     explanations: [
-      "Every completed segment contributes its accepted score.",
+      "Every completed segment contributes its stored live crowd-adjusted final rating.",
       "The actual final main-show segment carries 1.4× weight; other main-show segments carry 1×; pre-show and post-show segments carry 0.65×.",
-      `The crowd began at ${crowdStart.toFixed(1)} from promotion strength and show importance, then affected how later segments were received.`,
+      `The crowd began at ${crowdStart.toFixed(1)} from promotion strength and show importance. Each stored segment response then became the incoming heat for the next segment.`,
       `The promotion was expected to deliver a ${expectedShowScore.toFixed(1)} show; popularity changed according to performance above or below that expectation.`,
       "Attendance uses promotion size and popularity, show importance, expected card strength, local market demand, recent show performance, momentum, and the venue ceiling.",
       "Promotion popularity and attendance consequences apply once and cannot be duplicated by reopening the report.",

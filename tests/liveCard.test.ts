@@ -141,7 +141,7 @@ describe("Phase 6B2 reactive live card runner", () => {
     const { show, opening, match } = card();
     let session = createLiveCardSession(show, { records: [], settings: { defaultImportance: "Television", defaultChemistry: 0, defaultVolatility: 8, requireOverrideReason: true, selectedShowId: "", selectedSegmentId: "" } });
     session = startLiveCardSession(session);
-    expect(session).toMatchObject({ status: "In Progress", currentSegmentId: opening.id });
+    expect(session).toMatchObject({ status: "In Progress", currentSegmentId: opening.id, crowdStart: 50, currentCrowd: 50 });
     expect(session.progress.find((item) => item.segmentId === opening.id)?.status).toBe("Current");
     session = selectLiveCardSegment(session, match.id);
     expect(session.currentSegmentId).toBe(match.id);
@@ -159,7 +159,8 @@ describe("Phase 6B2 reactive live card runner", () => {
     expect(() => lockMatchResult(session, unresolved)).toThrow("Accept or explicitly override");
     const record = acceptedResolution(show.id, match.id);
     session = lockMatchResult(session, record);
-    expect(session.progress.find((item) => item.segmentId === match.id)).toMatchObject({ status: "Completed", result: { status: "Accepted" } });
+    expect(session.progress.find((item) => item.segmentId === match.id)).toMatchObject({ status: "Completed", result: { status: "Accepted", finalResult: { performanceRating: 86, matchScore: 82.4 } }, audience: { performanceRating: 86, anticipation: 50, crowdBefore: 50, crowdResponse: 74, finalRating: 82.4, crowdAfter: 58 } });
+    expect(session.currentCrowd).toBe(58);
     expect(() => lockMatchResult(session, record)).toThrow("already locked");
   });
 

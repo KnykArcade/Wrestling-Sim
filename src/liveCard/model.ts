@@ -1,4 +1,6 @@
-import { activeResolutionAttempt } from "../matchResolution/engine";
+import { activeResolutionAttempt, finalizeResolutionForLiveCrowd } from "../matchResolution/engine";
+import { calculateLiveAngleAudience } from "../crowd/model";
+import type { MatchAnticipation } from "../crowd/types";
 import type { MatchResolutionRecord, MatchResolutionUniverse } from "../matchResolution/types";
 import { createPlannedSegment, createPlannerId, matchBookingValidation, touchShow } from "../planner/model";
 import type { PlannedSegment, PlannedShow } from "../planner/types";
@@ -71,6 +73,7 @@ function progressFromSegment(segment: PlannedSegment, result: LiveCardResultSnap
     insertedDuringShow: false,
     sourceSegmentId: "",
     result: null,
+    audience: null,
     finalAngleOutput: segment.type === "angle" ? segment.segmentOutput : "",
     finalConsequences: segment.consequences,
     finalFollowUp: segment.followUp,
@@ -95,6 +98,8 @@ export function createLiveCardSession(show: PlannedShow, resolutions: MatchResol
     segmentOrder: show.segments.map((segment) => segment.id),
     progress: show.segments.map((segment) => progressFromSegment(segment, finalizedResult(resolutionForSegment(show.id, segment.id, resolutions)))),
     audit: [audit("Session Created", show.id, "", `${show.name} live card session created with ${show.segments.length} segments.`)],
+    crowdStart: 50,
+    currentCrowd: 50,
     startedAt: "",
     completedAt: "",
     createdAt: timestamp,
@@ -151,13 +156,15 @@ function currentStatus(progress: LiveCardSegmentProgress): LiveCardSegmentProgre
   return "Current";
 }
 
-export function startLiveCardSession(session: LiveCardSession): LiveCardSession {
+export function startLiveCardSession(session: LiveCardSession, crowdStart = session.crowdStart || 50): LiveCardSession {
   if (session.status === "Completed") return session;
   const timestamp = now();
   const currentSegmentId = session.currentSegmentId || session.progress.find((item) => !["Completed", "Skipped"].includes(item.status))?.segmentId || "";
   return {
     ...session,
     status: "In Progress",
+    crowdStart,
+    currentCrowd: crowdStart,
     currentSegmentId,
     progress: session.progress.map((item) => item.segmentId === currentSegmentId && item.status === "Planned"
       ? { ...item, status: currentStatus(item), startedAt: item.startedAt || timestamp, updatedAt: timestamp }
@@ -203,14 +210,17 @@ export function nextUnfinishedMatchId(session: LiveCardSession, afterSegmentId =
 export function lockMatchResult(
   session: LiveCardSession,
   record: MatchResolutionRecord,
+  anticipation?: MatchAnticipation,
 ): LiveCardSession {
-  const attempt = activeResolutionAttempt(record);
+  const ratedRecord = finalizeResolutionForLiveCrowd(record, anticipation ?? record.setup.anticipation ?? { score: 50, label: "Interested", popularity: 50, momentum: 50, skills: 50, styleAppeal: 50 }, session.currentCrowd);
+  const attempt = activeResolutionAttempt(ratedRecord);
   if (!attempt?.finalResult || (attempt.status !== "Accepted" && attempt.status !== "Overridden")) throw new Error("Accept or explicitly override the engine result before locking the match in the live card.");
   const progress = session.progress.find((item) => item.segmentId === record.segmentId);
   if (!progress || progress.type !== "match") throw new Error("The match is not part of this live card session.");
   if (progress.status === "Completed") throw new Error("The match result is already locked. Open a correction rather than silently replacing it.");
   const timestamp = now();
-  const result = finalizedResult(record)!;
+  const result = finalizedResult(ratedRecord)!;
+  const audience = result.finalResult.audience!;
   const nextId = nextUnfinishedSegmentId(session, record.segmentId);
   return {
     ...session,
@@ -219,10 +229,12 @@ export function lockMatchResult(
       ...item,
       status: "Completed",
       result,
+      audience,
       completedAt: timestamp,
       updatedAt: timestamp,
     } : item),
-    audit: [audit("Match Result Locked", session.showId, record.segmentId, `${result.finalResult.winnerName} defeated ${result.finalResult.loserName}. ${result.status} result locked.`), ...session.audit],
+    currentCrowd: audience.crowdAfter,
+    audit: [audit("Match Result Locked", session.showId, record.segmentId, `${result.finalResult.winnerName} defeated ${result.finalResult.loserName}. Final rating ${audience.finalRating}; crowd ${audience.crowdBefore} to ${audience.crowdAfter}.`), ...session.audit],
     updatedAt: timestamp,
     ...(nextId ? {} : { currentSegmentId: record.segmentId }),
   };
@@ -234,20 +246,24 @@ export function completeAngleSegment(
   output: string,
   consequences: string,
   followUp: string,
+  performanceRating = 50,
 ): LiveCardSession {
   const progress = session.progress.find((item) => item.segmentId === segmentId);
   if (!progress || progress.type !== "angle") throw new Error("Choose an angle from this live card.");
   if (!output.trim()) throw new Error("Record the final Angle Output before completing the segment.");
   if (progress.status === "Completed") throw new Error("The angle is already completed. Open a correction rather than silently replacing it.");
   const timestamp = now();
+  const audience = calculateLiveAngleAudience(performanceRating, session.currentCrowd);
   return {
     ...session,
+    currentCrowd: audience.crowdAfter,
     progress: session.progress.map((item) => item.segmentId === segmentId ? {
       ...item,
       status: "Completed",
       finalAngleOutput: output.trim(),
       finalConsequences: consequences.trim(),
       finalFollowUp: followUp.trim(),
+      audience,
       completedAt: timestamp,
       updatedAt: timestamp,
     } : item),

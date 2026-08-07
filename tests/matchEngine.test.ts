@@ -127,7 +127,7 @@ describe("native match engine data foundation", () => {
     expect(normalizeRating(-4)).toBe(0);
     expect(calculationQualityLabel(85)).toBe("Elite");
     expect(calculationQualityLabel(49.99)).toBe("Weak");
-    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b17-v1");
+    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b18-v1");
   });
 
   test("migrates saved resolver IDs without losing selected or locked approaches", () => {
@@ -137,6 +137,18 @@ describe("native match engine data foundation", () => {
     });
     expect(setup.workerPlans[0].selectedApproachIds).toEqual(["aerial-showstopper", "pace-controller", "counter-specialist"]);
     expect(setup.workerPlans[0].lockedApproachIds).toEqual(["pace-controller"]);
+  });
+
+  test("starts every wrestler at even 50 momentum and migrates the legacy scale", () => {
+    expect(createMatchEngineProfile({ id: "new", name: "New Wrestler", source: "manual" }).momentum).toBe(50);
+    const storage = new MemoryStorage();
+    const legacy = { ...testProfile(), momentum: -12, momentumScale: undefined };
+    storage.setItem(MATCH_ENGINE_STORAGE_KEY, JSON.stringify({ profiles: [legacy] }));
+    expect(loadMatchEngineUniverse(storage).profiles[0]).toMatchObject({ momentum: 50, momentumScale: "0-100-v1" });
+    storage.setItem("wrestling-sim:result-consequences:v1", JSON.stringify({ workerRecords: [{ workerKey: legacy.workerKey, workerName: legacy.workerName, matchHistory: [{ result: "W", performanceLeader: true, performanceScore: 80 }] }] }));
+    expect(loadMatchEngineUniverse(storage).profiles[0].momentum).toBe(56);
+    storage.setItem("wrestling-sim:show-evaluation:v1", JSON.stringify({ workerImpacts: [{ workerKey: legacy.workerKey, angleHistory: [{ momentumDelta: 2, occurredAt: "2026-08-01T00:00:00.000Z" }] }] }));
+    expect(loadMatchEngineUniverse(storage).profiles[0].momentum).toBe(58);
   });
 
   test("hard-caps existing and newly configured approach plans at four", () => {

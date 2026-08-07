@@ -40,6 +40,18 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
+function replayLegacyMomentum(value: Record<string, unknown>): number {
+  const history = Array.isArray(value.matchHistory) ? value.matchHistory.filter(isRecord).slice().reverse() : [];
+  return history.reduce((momentum, entry) => {
+    const result = entry.result === "W" ? 3 : entry.result === "L" ? -3 : 0;
+    const leader = entry.performanceLeader === true ? 1 : 0;
+    const performance = typeof entry.performanceScore === "number" && Number.isFinite(entry.performanceScore)
+      ? clamp(Math.round((entry.performanceScore - 60) / 8), -2, 2)
+      : 0;
+    return clamp(momentum + result + leader + performance, 0, 100);
+  }, 50);
+}
+
 function validApproachIds(value: unknown): MatchApproachId[] {
   if (!Array.isArray(value)) return [];
   const valid = new Set(MATCH_APPROACHES.map((approach) => approach.id));
@@ -61,6 +73,7 @@ function normalizeProfile(value: unknown): MatchEngineProfile | null {
   const styleId = WRESTLER_STYLES.some((style) => style.id === value.styleId) ? value.styleId as MatchEngineProfile["styleId"] : fallback.styleId;
   const rawSkills = isRecord(value.skills) ? value.skills : {};
   const skills = Object.fromEntries(MATCH_ENGINE_SKILLS.map((skill) => [skill, finiteNumber(rawSkills[skill], fallback.skills[skill])])) as Record<WrestlerSkill, number>;
+  const hasCurrentMomentumScale = value.momentumScale === "0-100-v1";
   return normalizeProfileRatings({
     ...fallback,
     id: text(value.id, fallback.id),
@@ -72,7 +85,8 @@ function normalizeProfile(value: unknown): MatchEngineProfile | null {
     overall: finiteNumber(value.overall, fallback.overall),
     health: finiteNumber(value.health, fallback.health),
     popularity: finiteNumber(value.popularity, fallback.popularity),
-    momentum: finiteNumber(value.momentum, fallback.momentum),
+    momentum: hasCurrentMomentumScale ? finiteNumber(value.momentum, fallback.momentum) : 50,
+    momentumScale: "0-100-v1",
     experience: finiteNumber(value.experience, fallback.experience),
     fanReaction: finiteNumber(value.fanReaction, fallback.fanReaction),
     gimmick: finiteNumber(value.gimmick, fallback.gimmick),
@@ -213,7 +227,35 @@ export function loadMatchEngineUniverse(storage: Pick<Storage, "getItem">): Matc
   const stored = storage.getItem(MATCH_ENGINE_STORAGE_KEY);
   if (!stored) return emptyMatchEngineUniverse();
   try {
-    return parseMatchEngineUniverse(JSON.parse(stored) as unknown);
+    const rawUniverse = JSON.parse(stored) as unknown;
+    const universe = parseMatchEngineUniverse(rawUniverse);
+    const legacyKeys = new Set(isRecord(rawUniverse) && Array.isArray(rawUniverse.profiles)
+      ? rawUniverse.profiles.filter(isRecord).filter((profile) => profile.momentumScale !== "0-100-v1").map((profile) => text(profile.workerKey))
+      : []);
+    const consequenceRaw = storage.getItem("wrestling-sim:result-consequences:v1");
+    let consequenceData: unknown = null;
+    try { consequenceData = consequenceRaw ? JSON.parse(consequenceRaw) as unknown : null; } catch { consequenceData = null; }
+    const records = isRecord(consequenceData) && Array.isArray(consequenceData.workerRecords) ? consequenceData.workerRecords.filter(isRecord) : [];
+    const evaluationRaw = storage.getItem("wrestling-sim:show-evaluation:v1");
+    let evaluationData: unknown = null;
+    try { evaluationData = evaluationRaw ? JSON.parse(evaluationRaw) as unknown : null; } catch { evaluationData = null; }
+    const impacts = isRecord(evaluationData) && Array.isArray(evaluationData.workerImpacts) ? evaluationData.workerImpacts.filter(isRecord) : [];
+    return {
+      profiles: universe.profiles.map((profile) => {
+        const record = records.find((item) => item.workerKey === profile.workerKey);
+        const currentScale = record?.momentumScale === "0-100-v1" && typeof record.momentum === "number" && Number.isFinite(record.momentum);
+        const recordMomentum = record ? currentScale ? clamp(record.momentum as number, 0, 100) : replayLegacyMomentum(record) : profile.momentum;
+        const recordTime = Date.parse(text(record?.updatedAt));
+        const profileTime = Date.parse(profile.updatedAt);
+        let momentum = record && (!currentScale || (Number.isFinite(recordTime) && (!Number.isFinite(profileTime) || recordTime >= profileTime))) ? recordMomentum : profile.momentum;
+        if (legacyKeys.has(profile.workerKey) && !currentScale) {
+          const impact = impacts.find((item) => item.workerKey === profile.workerKey);
+          const angleHistory = impact && Array.isArray(impact.angleHistory) ? impact.angleHistory.filter(isRecord).slice().reverse() : [];
+          momentum = angleHistory.reduce((value, entry) => typeof entry.momentumDelta === "number" && Number.isFinite(entry.momentumDelta) ? clamp(value + entry.momentumDelta, 0, 100) : value, momentum);
+        }
+        return { ...profile, momentum, momentumScale: "0-100-v1" };
+      }),
+    };
   } catch {
     return emptyMatchEngineUniverse();
   }

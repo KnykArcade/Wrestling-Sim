@@ -12,6 +12,8 @@ import {
 } from "../matchEngine/model";
 import { MATCH_APPROACHES } from "../matchEngine/catalog";
 import { calculateStarRating } from "../calculations/foundation";
+import { calculateLiveMatchAudience } from "../crowd/model";
+import type { MatchAnticipation } from "../crowd/types";
 import type { MatchEngineProfile } from "../matchEngine/types";
 import { IMPORTED_APPROACH_FORMULAS, matchEngineIdForImportedApproachId } from "../startingUniverse/formulas";
 import type { ImportedApproachFormulaId, ImportedApproachFormulaSource, StartingUniverseWorkbookMetrics } from "../startingUniverse/types";
@@ -312,7 +314,7 @@ function workerResult(
   const presentation = presentationScore(profile);
   const performanceScore = clamp(approachExecution * 0.72 + presentation * 0.28 + importance.performance);
   const storyNeedModifier = settings.storyNeed * 0.4;
-  const momentumModifier = settings.momentum * 0.35;
+  const momentumModifier = (clamp(settings.momentum) - 50) * 0.12;
   const bookingModifier = settings.bookingBias * 0.4;
   const volatilityNoise = round((random() * 2 - 1) * setup.volatility);
   const finishingEdge = average(approaches.ids.map((id) => {
@@ -873,6 +875,30 @@ export function overrideEngineResult(
 
 export function activeResolutionAttempt(record: MatchResolutionRecord | null): MatchResolutionAttempt | null {
   return record?.attempts.find((attempt) => attempt.id === record.activeAttemptId) ?? null;
+}
+
+export function finalizeResolutionForLiveCrowd(
+  record: MatchResolutionRecord,
+  anticipation: MatchAnticipation,
+  crowdBefore: number,
+): MatchResolutionRecord {
+  const attempt = activeResolutionAttempt(record);
+  if (!attempt?.finalResult || (attempt.status !== "Accepted" && attempt.status !== "Overridden")) throw new Error("Accept or explicitly override the match result before applying the live crowd rating.");
+  if (attempt.finalResult.audience) return record;
+  const audience = calculateLiveMatchAudience(attempt.engineResult.matchScore, anticipation.score, crowdBefore);
+  const finalResult: MatchResolutionFinalResult = {
+    ...attempt.finalResult,
+    performanceRating: attempt.engineResult.matchScore,
+    audience,
+    matchScore: audience.finalRating,
+    starRating: calculateStarRating(audience.finalRating),
+  };
+  return {
+    ...record,
+    setup: { ...record.setup, anticipation },
+    attempts: record.attempts.map((item) => item.id === attempt.id ? { ...item, finalResult } : item),
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 export function resolutionCanRecalculate(

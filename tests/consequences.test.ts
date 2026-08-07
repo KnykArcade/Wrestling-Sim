@@ -208,13 +208,13 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(result.universe.workerRecords).toHaveLength(2);
     const pac = result.universe.workerRecords.find((record) => record.workerName === "PAC")!;
     const white = result.universe.workerRecords.find((record) => record.workerName === "Jay White")!;
-    expect(pac).toMatchObject({ wins: 1, losses: 0, rankingPosition: 1, currentStreakType: "W", currentStreakCount: 1 });
-    expect(white).toMatchObject({ wins: 0, losses: 1, currentStreakType: "L", currentStreakCount: 1 });
+    expect(pac).toMatchObject({ wins: 1, losses: 0, rankingPosition: 1, currentStreakType: "W", currentStreakCount: 1, momentum: 56, momentumScale: "0-100-v1" });
+    expect(white).toMatchObject({ wins: 0, losses: 1, currentStreakType: "L", currentStreakCount: 1, momentum: 49, momentumScale: "0-100-v1" });
     expect(pac.fatigue).toBeGreaterThan(0);
     expect(pac.health).toBeLessThan(95);
     expect(result.profiles.find((profile) => profile.workerName === "PAC")?.momentum).toBe(pac.momentum);
     expect(result.profiles.find((profile) => profile.workerName === "PAC")?.popularity).toBe(pac.popularity);
-    expect(result.universe.applications[0]).toMatchObject({ calculationVersion: "wrestling-sim-calculations-6b17-v1", idempotencyKey: expect.stringContaining("match-consequences") });
+    expect(result.universe.applications[0]).toMatchObject({ calculationVersion: "wrestling-sim-calculations-6b18-v1", idempotencyKey: expect.stringContaining("match-consequences") });
     expect(pac.matchHistory[0].result).toBe("W");
     expect(result.shows[0].segments[0]).toMatchObject({ workflowStatus: "Reconciled", reconciliation: { actualMatch: { winner: "PAC", rating: 86 }, finalNarrative: "PAC forced Jay White to submit." } });
     expect(() => applyCoreResultConsequences({

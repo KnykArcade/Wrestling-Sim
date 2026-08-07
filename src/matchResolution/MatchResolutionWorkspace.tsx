@@ -3,6 +3,7 @@ import { MATCH_AIMS } from "../matchEngine/catalog";
 import { approachLimitForSetup, normalizeApproachName, workerProfileKey } from "../matchEngine/model";
 import { loadMatchEngineUniverse } from "../matchEngine/storage";
 import type { MatchEngineProfile } from "../matchEngine/types";
+import { calculateMatchAnticipation, momentumLabel } from "../crowd/model";
 import { loadPlannedShows } from "../planner/storage";
 import type { PlannedSegment, PlannedShow, PlannedWorkerReference } from "../planner/types";
 import { loadActiveStartingUniverse, loadStartingUniverseState } from "../startingUniverse/storage";
@@ -100,7 +101,7 @@ function createWorkerSettings(worker: PlannedWorkerReference, segment: PlannedSe
     lockedApproachIds: [],
     manualApproachIds: bookedApproaches,
     storyNeed: 0,
-    momentum: profile?.momentum ?? 0,
+    momentum: profile?.momentum ?? 50,
     bookingBias: 0,
     teamId: side || workerProfileKey({ id: worker.id, name: worker.name, source: worker.source }),
     teamName: teammates.map((candidate) => candidate.name).join(" & ") || worker.name,
@@ -108,6 +109,11 @@ function createWorkerSettings(worker: PlannedWorkerReference, segment: PlannedSe
 }
 
 function buildSetup(show: PlannedShow, segment: PlannedSegment, profiles: MatchEngineProfile[], existing?: MatchResolutionRecord | null): MatchResolutionSetup {
+  const participantProfiles = segment.workers.flatMap((worker) => {
+    const profile = profileForWorker(worker, profiles);
+    return profile ? [profile] : [];
+  });
+  const anticipation = calculateMatchAnticipation({ profiles: participantProfiles, plans: segment.matchApproachSetup.workerPlans, aimId: segment.matchApproachSetup.matchAimId });
   if (existing) {
     return {
       ...existing.setup,
@@ -118,6 +124,7 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, profiles: MatchE
       durationMinutes: segment.durationMinutes,
       approachLimit: segment.matchApproachSetup.approachLimit,
       aimId: segment.matchApproachSetup.matchAimId,
+      anticipation,
       championship: segment.championship,
       competitionRound: segment.competitionRoundLabel,
       format: formatForSegment(segment),
@@ -152,6 +159,7 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, profiles: MatchE
     competitionRound: segment.competitionRoundLabel,
     chemistry: 0,
     volatility: 8,
+    anticipation,
     format: formatForSegment(segment),
     eliminationRules: formatForSegment(segment) === "Elimination" || formatForSegment(segment) === "Battle Royal",
     workers: segment.workers.map((worker) => createWorkerSettings(worker, segment, profileForWorker(worker, profiles))),
@@ -242,7 +250,15 @@ export default function MatchResolutionWorkspace({ onReturnToShow }: { onReturnT
   }
 
   function updateWorker(index: number, patch: Partial<MatchResolutionWorkerSettings>): void {
-    setSetup((current) => current ? { ...current, workers: current.workers.map((worker, workerIndex) => workerIndex === index ? { ...worker, ...patch } : worker) } : current);
+    setSetup((current) => {
+      if (!current) return current;
+      const workers = current.workers.map((worker, workerIndex) => workerIndex === index ? { ...worker, ...patch } : worker);
+      const profiles = sources.map((source) => {
+        const settings = workers.find((worker) => worker.workerKey === source.profile.workerKey);
+        return settings ? { ...source.profile, momentum: settings.momentum } : source.profile;
+      });
+      return { ...current, workers, anticipation: calculateMatchAnticipation({ profiles, plans: selectedSegment?.matchApproachSetup.workerPlans ?? [], aimId: current.aimId }) };
+    });
   }
 
   function toggleApproach(index: number, approachId: ResolutionApproachId, mode: "locked" | "manual"): void {
@@ -332,12 +348,12 @@ export default function MatchResolutionWorkspace({ onReturnToShow }: { onReturnT
     {!selectedShow || !selectedSegment || !setup ? <div className="empty-state match-resolution-empty"><h3>No planned match is ready</h3><p>Create a planned match with at least two wrestlers. Assign matching sides to teammates in tag and trios matches.</p></div> : <>
       <section className="match-resolution-context">
         <header><div><p className="eyebrow">MATCH CONTEXT</p><h3>{selectedSegment.title}</h3><p>{selectedShow.name} · {selectedSegment.matchType} · {selectedSegment.durationMinutes} minutes</p></div><span className={`resolution-status resolution-status--${statusClass(displayedRecord?.status ?? "Unresolved")}`}>{displayedRecord?.status ?? "Unresolved"}</span></header>
-        <div className="match-resolution-context-grid">
-          <label className="field"><span>Match aim</span><select aria-label="Resolution match aim" value={setup.aimId} onChange={(event) => setSetup({ ...setup, aimId: event.target.value as MatchResolutionSetup["aimId"] })}>{MATCH_AIMS.map((aim) => <option key={aim.id} value={aim.id}>{aim.name}</option>)}</select></label>
+          <div className="match-resolution-context-grid">
+          <label className="field"><span>Match aim</span><select aria-label="Resolution match aim" value={setup.aimId} onChange={(event) => { const aimId = event.target.value as MatchResolutionSetup["aimId"]; setSetup({ ...setup, aimId, anticipation: calculateMatchAnticipation({ profiles: sources.map((source) => source.profile), plans: selectedSegment.matchApproachSetup.workerPlans, aimId }) }); }}>{MATCH_AIMS.map((aim) => <option key={aim.id} value={aim.id}>{aim.name}</option>)}</select></label>
           <label className="field"><span>Importance</span><select aria-label="Resolution match importance" value={setup.importance} onChange={(event) => setSetup({ ...setup, importance: event.target.value as MatchResolutionImportance })}>{importanceOptions.map((importance) => <option key={importance}>{importance}</option>)}</select></label>
           <label className="field"><span>Chemistry</span><input aria-label="Resolution chemistry" type="number" min={-10} max={10} value={setup.chemistry} onChange={(event) => setSetup({ ...setup, chemistry: clamp(Number(event.target.value) || 0, -10, 10) })} /></label>
           <label className="field"><span>Volatility</span><input aria-label="Resolution volatility" type="number" min={0} max={20} value={setup.volatility} onChange={(event) => setSetup({ ...setup, volatility: clamp(Number(event.target.value) || 0, 0, 20) })} /></label>
-          <div><span>Format</span><strong>{setup.format || "Singles"}</strong></div><div><span>Championship</span><strong>{setup.championship || "None"}</strong></div><div><span>Competition</span><strong>{setup.competitionRound || "None"}</strong></div>
+          <div><span>Anticipation</span><strong>{setup.anticipation ? `${setup.anticipation.score.toFixed(1)} · ${setup.anticipation.label}` : "Not calculated"}</strong></div><div><span>Format</span><strong>{setup.format || "Singles"}</strong></div><div><span>Championship</span><strong>{setup.championship || "None"}</strong></div><div><span>Competition</span><strong>{setup.competitionRound || "None"}</strong></div>
         </div>
       </section>
 
@@ -349,7 +365,7 @@ export default function MatchResolutionWorkspace({ onReturnToShow }: { onReturnT
         const profile = source?.profile ?? null;
         return <article key={`${workerSettings.workerKey}:${index}`} className="match-resolution-worker-card">
           <header><div><p className="eyebrow">WRESTLER {index + 1}</p><h3>{plannedWorker?.name ?? workerSettings.workerName}</h3><span>{profile ? `${profile.styleId} · ${source?.workbookMetrics ? "Exact Starting Universe workbook metrics" : "Match Engine profile formulas"}` : "Profile missing"}</span></div><strong>{slots} approach slot{slots === 1 ? "" : "s"}</strong></header>
-          <div className="match-resolution-worker-factors"><label className="field"><span>Approach control</span><select aria-label={`${workerSettings.workerName} approach mode`} value={workerSettings.approachMode} onChange={(event) => updateWorker(index, { approachMode: event.target.value as MatchResolutionWorkerSettings["approachMode"] })}><option>AI</option><option>Manual</option></select></label><label className="field"><span>Story need</span><input aria-label={`${workerSettings.workerName} story need`} type="number" min={-20} max={20} value={workerSettings.storyNeed} onChange={(event) => updateWorker(index, { storyNeed: clamp(Number(event.target.value) || 0, -20, 20) })} /></label><label className="field"><span>Momentum</span><input aria-label={`${workerSettings.workerName} momentum`} type="number" min={-20} max={20} value={workerSettings.momentum} onChange={(event) => updateWorker(index, { momentum: clamp(Number(event.target.value) || 0, -20, 20) })} /></label><label className="field"><span>Booker influence</span><input aria-label={`${workerSettings.workerName} booking influence`} type="number" min={-20} max={20} value={workerSettings.bookingBias} onChange={(event) => updateWorker(index, { bookingBias: clamp(Number(event.target.value) || 0, -20, 20) })} /></label></div>
+          <div className="match-resolution-worker-factors"><label className="field"><span>Approach control</span><select aria-label={`${workerSettings.workerName} approach mode`} value={workerSettings.approachMode} onChange={(event) => updateWorker(index, { approachMode: event.target.value as MatchResolutionWorkerSettings["approachMode"] })}><option>AI</option><option>Manual</option></select></label><label className="field"><span>Story need</span><input aria-label={`${workerSettings.workerName} story need`} type="number" min={-20} max={20} value={workerSettings.storyNeed} onChange={(event) => updateWorker(index, { storyNeed: clamp(Number(event.target.value) || 0, -20, 20) })} /></label><label className="field"><span>Momentum</span><input aria-label={`${workerSettings.workerName} momentum`} title={momentumLabel(workerSettings.momentum)} type="number" min={0} max={100} value={workerSettings.momentum} onChange={(event) => updateWorker(index, { momentum: clamp(Number(event.target.value) || 0, 0, 100) })} /></label><label className="field"><span>Booker influence</span><input aria-label={`${workerSettings.workerName} booking influence`} type="number" min={-20} max={20} value={workerSettings.bookingBias} onChange={(event) => updateWorker(index, { bookingBias: clamp(Number(event.target.value) || 0, -20, 20) })} /></label></div>
           <div className="match-resolution-approach-grid">{RESOLUTION_APPROACHES.map((approach) => {
             const checked = workerSettings.approachMode === "Manual" ? workerSettings.manualApproachIds.includes(approach.id) : workerSettings.lockedApproachIds.includes(approach.id);
             const rating = profile ? resolutionApproachRating(profile, source?.workbookMetrics ?? null, approach.id) : 0;
