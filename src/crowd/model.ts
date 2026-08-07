@@ -140,21 +140,22 @@ export function calculateLiveMatchAudience(performanceRating: number, anticipati
   const performance = clamp(performanceRating);
   const expected = clamp(anticipation);
   const incoming = clamp(crowdBefore);
+  const performanceGap = performance - expected;
+  const deliveryWeight = performanceGap >= 0 ? expectationFormula.overdeliveryWeight : expectationFormula.disappointmentWeight;
   const expectationLedger = createCalculationStage(expectationFormula, [
-    createCalculationTerm("performance-gap", "Performance above/below anticipation", performance - expected, expectationFormula.differenceWeight),
-  ]);
+    createCalculationTerm("performance-gap", performanceGap >= 0 ? "Performance above anticipation" : "Performance below anticipation", performanceGap, deliveryWeight),
+  ], { notes: [performanceGap >= 0 ? "Overdelivery earns 25% of the positive performance gap, capped at +12." : "Disappointment loses 40% of the negative performance gap, capped at -15."] });
   const expectationAdjustment = expectationLedger.result;
   const responseLedger = createCalculationStage(responseFormula, [
-    createCalculationTerm("performance", "Raw in-ring performance", performance, responseFormula.performanceWeight),
     createCalculationTerm("anticipation", "Anticipation", expected, responseFormula.anticipationWeight),
     createCalculationTerm("incoming", "Incoming crowd heat", incoming, responseFormula.incomingCrowdWeight),
-    createCalculationTerm("expectation", "Expectation adjustment", expectationAdjustment),
-  ]);
+    createCalculationTerm("expectation", "Delivery adjustment", expectationAdjustment),
+  ], { notes: ["Raw in-ring performance affects crowd response only through whether the match exceeded or missed expectations; it is not counted as another direct crowd-response weight."] });
   const crowdResponse = responseLedger.result;
   const finalLedger = createCalculationStage(finalFormula, [
     createCalculationTerm("performance", "Raw in-ring performance", performance, finalFormula.performanceWeight),
     createCalculationTerm("crowd-response", "Live crowd response", crowdResponse, finalFormula.crowdResponseWeight),
-  ], { notes: ["This final rating replaces the raw in-ring rating only after the result is locked into the live card."] });
+  ], { notes: ["The official rating keeps raw wrestling quality and live audience response as separate 60% and 40% lanes, and replaces the raw in-ring rating only after the result is locked into the live card."] });
   const finalRating = finalLedger.result;
   const uncappedMovement = (crowdResponse - incoming) / movementFormula.divisor;
   const movement = clamp(uncappedMovement, movementFormula.movementMinimum, movementFormula.movementMaximum);

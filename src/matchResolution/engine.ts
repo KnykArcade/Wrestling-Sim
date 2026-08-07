@@ -419,15 +419,18 @@ function workerResult(
   const executionLedger = createCalculationStage(executionFormula, executionTerms);
   const presentation = presentationScore(profile);
   const performanceFormula = CALCULATION_FORMULAS.performance;
+  const performanceMomentumModifier = (clamp(settings.momentum) - 50) * performanceFormula.momentumWeight;
   const performanceTerms = [
     createCalculationTerm("approach-execution", "Approach execution", approachExecution, performanceFormula.approachExecutionWeight),
     createCalculationTerm("presentation", "Presentation", presentation.value, performanceFormula.presentationWeight),
     createCalculationTerm("importance", `${setup.importance} importance bonus`, importance.performance),
+    createCalculationTerm("momentum-form", "Momentum confidence above/below 50", clamp(settings.momentum) - 50, performanceFormula.momentumWeight, "Momentum contributes between -3 and +3 before the individual performance score is capped."),
   ];
   const performanceScore = clamp(
     approachExecution * performanceFormula.approachExecutionWeight +
     presentation.value * performanceFormula.presentationWeight +
-    importance.performance,
+    importance.performance +
+    performanceMomentumModifier,
   );
   const performanceLedger = createCalculationStage(performanceFormula, performanceTerms);
   const competitiveFormula = CALCULATION_FORMULAS.competitive;

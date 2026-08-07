@@ -150,7 +150,7 @@ describe("Phase 6B1 official singles match resolution", () => {
     expect(first.engineResult.starRating).toBeGreaterThanOrEqual(0);
   });
 
-  test("preserves a complete Phase 6B20B ledger without combining score lanes", () => {
+  test("preserves a complete Phase 6B20C ledger without combining score lanes", () => {
     const attempt = resolveSinglesMatch({ setup: setup(), workers: sources(), seed: "phase-6b20a-ledger" });
     expect(attempt.calculationLedger).toMatchObject({
       version: RESOLUTION_CALCULATION_VERSION,
@@ -172,6 +172,26 @@ describe("Phase 6B1 official singles match resolution", () => {
       expect(worker.approachScores.every((approach) => approach.calculation?.formulaId === "approach.suitability")).toBe(true);
       expect(worker.approachScores.every((approach) => approach.calculation?.notes.some((note) => note.includes("select")))).toBe(true);
     });
+  });
+
+  test("applies momentum separately to performance confidence and competitive form", () => {
+    const neutralSetup = setup();
+    neutralSetup.workers = neutralSetup.workers.map((worker) => ({ ...worker, momentum: 50 }));
+    const coldSetup = { ...neutralSetup, workers: neutralSetup.workers.map((worker, index) => ({ ...worker, momentum: index === 0 ? 0 : 50 })) };
+    const hotSetup = { ...neutralSetup, workers: neutralSetup.workers.map((worker, index) => ({ ...worker, momentum: index === 0 ? 100 : 50 })) };
+    const neutral = resolveSinglesMatch({ setup: neutralSetup, workers: sources(), seed: "momentum-performance" });
+    const cold = resolveSinglesMatch({ setup: coldSetup, workers: sources(), seed: "momentum-performance" });
+    const hot = resolveSinglesMatch({ setup: hotSetup, workers: sources(), seed: "momentum-performance" });
+    const neutralWorker = neutral.workerResults[0];
+    const coldWorker = cold.workerResults[0];
+    const hotWorker = hot.workerResults[0];
+
+    expect(coldWorker.performanceScore).toBeCloseTo(neutralWorker.performanceScore - 3, 2);
+    expect(hotWorker.performanceScore).toBeCloseTo(neutralWorker.performanceScore + 3, 2);
+    expect(coldWorker.calculationLedger?.performance.terms.find((term) => term.id === "momentum-form")?.contribution).toBe(-3);
+    expect(hotWorker.calculationLedger?.performance.terms.find((term) => term.id === "momentum-form")?.contribution).toBe(3);
+    expect(coldWorker.calculationLedger?.competitive.terms.find((term) => term.id === "momentum")?.contribution).toBe(-6);
+    expect(hotWorker.calculationLedger?.competitive.terms.find((term) => term.id === "momentum")?.contribution).toBe(6);
   });
 
   test("records exact terms, caps, and rounding metadata for every additive stage", () => {
