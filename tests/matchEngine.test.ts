@@ -323,6 +323,28 @@ describe("Phase 4C3 advisory match performance preview", () => {
     expect(preview.summary).toContain("does not change the planned winner or TEW result");
   });
 
+  test("keeps Ricochet and Roderick Strong at ideal pace in a Survival / Chaos preview", () => {
+    const ricochet = testProfile("Ricochet", "ricochet");
+    const roderick = testProfile("Roderick Strong", "roderick-strong");
+    const preview = generateMatchPerformancePreview({
+      workers: [
+        { profile: ricochet, plan: testPlan(ricochet, ["aerial-showstopper", "high-tempo-hybrid", "resilient-underdog"]) },
+        { profile: roderick, plan: testPlan(roderick, ["high-tempo-hybrid", "heavy-striker-brawler", "strong-style-specialist"]) },
+      ],
+      aimId: "survival-chaos",
+      durationMinutes: 20,
+      approachLimit: 3,
+      plannedWinner: "",
+      settings: { authority: "tew-authoritative", volatility: 5, bookingInfluence: 0 },
+      seed: "phase-6b14-pace-integrity",
+    })!;
+
+    expect(preview.workerResults.map((result) => ({ name: result.workerName, pace: result.actualPace, status: result.paceStatus }))).toEqual([
+      { name: "Ricochet", pace: 5, status: "IDEAL PACE" },
+      { name: "Roderick Strong", pace: 5, status: "IDEAL PACE" },
+    ]);
+  });
+
   test("converts advisory match scores to quarter-star ratings", () => {
     expect(advisoryStarRating(20)).toBe(0);
     expect(advisoryStarRating(50)).toBe(2);

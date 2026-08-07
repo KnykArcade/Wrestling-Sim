@@ -2,7 +2,7 @@ import { calculateStarRating } from "../calculations/foundation";
 import { importedApproachIdForMatchEngineId } from "../startingUniverse/formulas";
 import { resolveMatch } from "../matchResolution/engine";
 import type { MatchResolutionSetup, MatchResolutionWorkerSettings, ResolutionApproachId } from "../matchResolution/types";
-import { normalizeApproachName } from "./model";
+import { evaluateApproachPlan, normalizeApproachName } from "./model";
 import type {
   MatchEngineProfile,
   MatchPerformancePreview,
@@ -88,27 +88,41 @@ export function generateMatchPerformancePreview(input: GenerateMatchPerformanceI
     workers: input.workers.map((worker) => ({ profile: worker.profile, workbookMetrics: null })),
     seed: input.seed,
   });
-  const workerResults = attempt.workerResults.map((result) => ({
-    workerKey: result.workerKey,
-    workerName: result.workerName,
-    mentalStateId: result.mentalStateId,
-    mentalStateName: result.mentalStateName,
-    mentalStateScore: result.mentalStateScore,
-    mentalModifier: result.mentalModifier,
-    luck: result.luck,
-    swing: result.swing,
-    consistencyVariance: result.consistencyVariance,
-    averageApproachRating: result.averageApproachRating,
-    approachExecution: result.approachExecution,
-    presentationScore: result.presentationScore,
-    staminaStatus: result.staminaStatus,
-    staminaModifier: result.staminaModifier,
-    paceStatus: result.paceStatus,
-    paceModifier: result.paceModifier,
-    performanceScore: result.performanceScore,
-    competitiveScore: result.competitiveScore,
-    winProbability: result.winProbability,
+  const planPaceByWorker = new Map(input.workers.map((worker) => {
+    const plan = evaluateApproachPlan(
+      worker.profile,
+      input.aimId,
+      input.durationMinutes,
+      worker.plan.selectedApproachIds,
+      input.approachLimit,
+    );
+    return [worker.profile.workerKey, plan] as const;
   }));
+  const workerResults = attempt.workerResults.map((result) => {
+    const plan = planPaceByWorker.get(result.workerKey);
+    return {
+      workerKey: result.workerKey,
+      workerName: result.workerName,
+      mentalStateId: result.mentalStateId,
+      mentalStateName: result.mentalStateName,
+      mentalStateScore: result.mentalStateScore,
+      mentalModifier: result.mentalModifier,
+      luck: result.luck,
+      swing: result.swing,
+      consistencyVariance: result.consistencyVariance,
+      averageApproachRating: result.averageApproachRating,
+      approachExecution: result.approachExecution,
+      presentationScore: result.presentationScore,
+      staminaStatus: result.staminaStatus,
+      staminaModifier: result.staminaModifier,
+      actualPace: plan?.actualPace ?? result.actualPace,
+      paceStatus: plan?.pace.status ?? result.paceStatus,
+      paceModifier: plan?.pace.modifier ?? result.paceModifier,
+      performanceScore: result.performanceScore,
+      competitiveScore: result.competitiveScore,
+      winProbability: result.winProbability,
+    };
+  });
   const performanceLeader = [...workerResults].sort((left, right) => right.performanceScore - left.performanceScore)[0];
   const probabilityLeader = [...workerResults].sort((left, right) => right.winProbability - left.winProbability)[0];
   let projectedWinnerKey = "";
