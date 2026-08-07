@@ -166,7 +166,7 @@ export default function MatchPerformancePreviewEditor({
         <div><span>Projected in-ring performance</span><strong>{preview.matchScore.toFixed(1)}</strong><small>Wrestler execution before the crowd</small></div>
         <div><span>Crowd anticipation</span><strong>{anticipation.score.toFixed(1)}</strong><small>{anticipation.label} before the bell</small></div>
         <div><span>Projected crowd reaction</span><strong>{projectedAudience.crowdResponse.toFixed(1)}</strong><small>Expectation adjustment {projectedAudience.expectationAdjustment >= 0 ? "+" : ""}{projectedAudience.expectationAdjustment.toFixed(1)}</small></div>
-        <div><span>Projected final rating</span><strong>{projectedAudience.finalRating.toFixed(1)} · {formatStarRating(advisoryStarRating(projectedAudience.finalRating))}</strong><small>70% performance · 30% crowd reaction</small></div>
+        <div><span>Projected final rating</span><strong>{projectedAudience.finalRating.toFixed(1)} · {formatStarRating(advisoryStarRating(projectedAudience.finalRating))}</strong><small>60% performance · 40% crowd reaction</small></div>
         <div><span>Performance leader</span><strong>{preview.performanceLeaderName}</strong><small>Best projected individual night</small></div>
         <div><span>{preview.authority === "tew-authoritative" ? "Winner" : "Projected winner"}</span><strong>{preview.authority === "tew-authoritative" ? "Determined in TEW" : preview.projectedWinnerName || "Not available"}</strong><small>{preview.authority === "competitive-preview" && preview.confidence ? `${preview.confidence.toFixed(1)}% advisory confidence` : authorityLabel(preview.authority)}</small></div>
       </section>

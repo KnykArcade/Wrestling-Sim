@@ -56,6 +56,7 @@ test("books wrestlers without a winner, runs one official result, and preserves 
   await ledger.getByText("Open full input, weight, bonus, penalty, cap, and rounding breakdown", { exact: true }).click();
   await expect(ledger.getByText("Raw in-ring match score", { exact: true }).first()).toBeVisible();
   await expect(ledger.getByText("Win probability and result roll", { exact: true })).toBeVisible();
+  await expect(ledger.getByText("Momentum confidence above/below 50", { exact: true })).toHaveCount(2);
   await expect(page.getByRole("button", { name: "Create New Calculation After Material Change" })).toBeDisabled();
 
   const engineWinnerText = await page.locator(".match-resolution-result > header h2").textContent();

@@ -1,4 +1,4 @@
-export const CALCULATION_SYSTEM_VERSION = "wrestling-sim-calculations-6b20b-v2";
+export const CALCULATION_SYSTEM_VERSION = "wrestling-sim-calculations-6b20c-v3";
 
 export interface CalculationFormulaDefinition {
   id: string;
@@ -35,7 +35,7 @@ export interface CalculationLedgerStage {
 }
 
 /**
- * Phase 6B20A formula registry. Runtime calculations read their weights from
+ * Calculation formula registry. Runtime calculations read their weights from
  * this object so the written formula and the executed formula cannot drift.
  */
 export const CALCULATION_FORMULAS = {
@@ -136,9 +136,10 @@ export const CALCULATION_FORMULAS = {
   performance: {
     id: "performance.individual",
     label: "Individual performance",
-    formula: "Approach execution 72% + presentation 28% + importance bonus",
+    formula: "Approach execution 72% + presentation 28% + importance bonus + momentum form",
     approachExecutionWeight: 0.72,
     presentationWeight: 0.28,
+    momentumWeight: 0.06,
     capMinimum: 0,
     capMaximum: 100,
     roundingPlaces: 2,
@@ -198,9 +199,9 @@ export const CALCULATION_FORMULAS = {
   anticipation: {
     id: "crowd.anticipation",
     label: "Match anticipation",
-    formula: "Popularity 40% + momentum 25% + skills 20% + style appeal 15%",
-    popularityWeight: 0.4,
-    momentumWeight: 0.25,
+    formula: "Popularity 35% + momentum 30% + skills 20% + style appeal 15%",
+    popularityWeight: 0.35,
+    momentumWeight: 0.3,
     skillsWeight: 0.2,
     styleAppealWeight: 0.15,
     participantPopularityWeight: 0.7,
@@ -218,19 +219,19 @@ export const CALCULATION_FORMULAS = {
   expectationAdjustment: {
     id: "crowd.expectation-adjustment",
     label: "Expectation adjustment",
-    formula: "(Raw performance - anticipation) x 20%",
-    differenceWeight: 0.2,
-    capMinimum: -6,
-    capMaximum: 6,
+    formula: "Overdelivery x 25% or disappointment x 40%",
+    overdeliveryWeight: 0.25,
+    disappointmentWeight: 0.4,
+    capMinimum: -15,
+    capMaximum: 12,
     roundingPlaces: 1,
   },
   crowdResponse: {
     id: "crowd.match-response",
     label: "Live crowd response",
-    formula: "Raw performance 50% + anticipation 30% + incoming crowd 20% + expectation adjustment",
-    performanceWeight: 0.5,
-    anticipationWeight: 0.3,
-    incomingCrowdWeight: 0.2,
+    formula: "Anticipation 55% + incoming crowd 45% + delivery adjustment",
+    anticipationWeight: 0.55,
+    incomingCrowdWeight: 0.45,
     capMinimum: 0,
     capMaximum: 100,
     roundingPlaces: 1,
@@ -238,9 +239,9 @@ export const CALCULATION_FORMULAS = {
   finalRating: {
     id: "crowd.final-rating",
     label: "Final match rating",
-    formula: "Raw performance 70% + live crowd response 30%",
-    performanceWeight: 0.7,
-    crowdResponseWeight: 0.3,
+    formula: "Raw performance 60% + live crowd response 40%",
+    performanceWeight: 0.6,
+    crowdResponseWeight: 0.4,
     capMinimum: 0,
     capMaximum: 100,
     roundingPlaces: 1,
