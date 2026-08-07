@@ -24,10 +24,13 @@ test("generates and persists a TEW-authoritative match performance preview", asy
   await expect(match.getByText("Determined in TEW", { exact: true })).toBeVisible();
   await expect(
     match.getByText(
-      "This is a projected pre-live performance. The official rating is finalized when the match runs with its actual incoming crowd heat.",
+      "This is a projected pre-live result using the expected crowd at this point on the card. The official rating is finalized with actual incoming crowd heat.",
       { exact: true },
     ),
   ).toBeVisible();
+  await expect(match.getByText("Projected crowd reaction", { exact: true })).toBeVisible();
+  await expect(match.getByText("Projected final rating", { exact: true })).toBeVisible();
+  await expect(match.getByLabel("Projected crowd result")).toContainText(/Crowd Reaction \d+\.\d+ · Final Rating \d+\.\d+/);
   await expect(match.locator(".match-performance-worker")).toHaveCount(2);
   await expect(match.getByText(/Mental base/)).toHaveCount(2);
   await expect(match.locator(".match-performance-worker-metrics").first().getByText(/^Pace \d+ · /)).toBeVisible();

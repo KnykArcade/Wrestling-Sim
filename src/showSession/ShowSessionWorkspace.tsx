@@ -661,7 +661,7 @@ export default function ShowSessionWorkspace({
             </section>}
 
             {activeStep === "creative" && <section className="session-creative-step">
-              {selectedSegment.type === "match" && <MatchApproachSetupEditor segment={selectedSegment} universe={matchEngine} onUniverseChange={setMatchEngine} onChange={updateSegment} />}
+              {selectedSegment.type === "match" && <MatchApproachSetupEditor segment={selectedSegment} cardSegments={selectedShow.segments} universe={matchEngine} onUniverseChange={setMatchEngine} onChange={updateSegment} />}
               <NarrativeGenerator segment={selectedSegment} universe={matchEngine} onChange={updateSegment} />
               <section className="session-step-panel"><header><div><p className="eyebrow">APPLIED CREATIVE OUTPUT</p><h3>{selectedSegment.type === "match" ? "Match Story" : "Angle Segment Output"}</h3></div><span>{selectedSummary.outputComplete ? "Complete" : "Draft"}</span></header><label className="field field--full"><span>{selectedSegment.type === "match" ? "Match Story" : "Angle Segment Output"}</span><textarea aria-label="Session current output" rows={14} value={selectedSegment.type === "match" ? selectedSegment.matchStory : selectedSegment.segmentOutput} onChange={(event) => updateSegment(selectedSegment.type === "match" ? { ...selectedSegment, matchStory: event.target.value } : { ...selectedSegment, segmentOutput: event.target.value })} /></label><footer><button className="primary-button" type="button" onClick={markOutputApplied}>Mark Current Output Applied</button><button className="secondary-button" type="button" onClick={() => setStep("package")}>Review Production Package</button></footer></section>
             </section>}

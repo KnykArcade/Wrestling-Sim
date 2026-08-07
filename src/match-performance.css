@@ -44,11 +44,14 @@
 .match-performance-warning span { color: #c7b984; }
 
 .match-performance-results { padding: 16px; }
-.match-performance-scorecard { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: #365170; border: 1px solid #365170; }
+.match-performance-scorecard { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: #365170; border: 1px solid #365170; }
 .match-performance-scorecard > div { display: grid; gap: 4px; padding: 14px; background: #0d2038; }
 .match-performance-scorecard span { color: #8fa9c9; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
 .match-performance-scorecard strong { color: #f3d75d; font-size: 21px; overflow-wrap: anywhere; }
 .match-performance-scorecard small { color: #9eb1c7; }
+.match-performance-crowd-path { display: flex; justify-content: space-between; gap: 16px; margin-top: 10px; padding: 11px 14px; border: 1px solid #466e91; background: #0c2941; }
+.match-performance-crowd-path strong { color: #f3d75d; }
+.match-performance-crowd-path span { color: #b9cadc; }
 
 .match-performance-summary { margin: 13px 0; padding: 12px 14px; border-left: 3px solid #d3b33d; background: #09182b; color: #d8e2ef; line-height: 1.5; }
 .match-performance-worker-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -78,7 +81,8 @@
 
 @media (max-width: 760px) {
   .match-performance-preview__header,
-  .match-performance-seed { flex-direction: column; }
+  .match-performance-seed,
+  .match-performance-crowd-path { flex-direction: column; }
   .match-performance-settings,
   .match-performance-scorecard,
   .match-performance-worker-grid { grid-template-columns: 1fr; }

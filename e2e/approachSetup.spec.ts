@@ -15,6 +15,9 @@ test("selects and persists wrestler approaches inside a planned TEW match", asyn
   await expect(match.getByLabel("Approach limit per wrestler")).toHaveValue("3");
   await expect(match.getByLabel("Approach limit per wrestler")).toHaveAttribute("max", "4");
   await expect(match.getByText("Recommended: 3", { exact: true })).toBeVisible();
+  const aimWidth = (await match.locator(".match-setting-aim").boundingBox())?.width ?? 0;
+  const approachesWidth = (await match.locator(".match-setting-limit").boundingBox())?.width ?? 0;
+  expect(aimWidth).toBeLessThan(approachesWidth);
   await match.getByLabel("Approach limit per wrestler").fill("8");
   await expect(match.getByLabel("Approach limit per wrestler")).toHaveValue("4");
   await match.getByLabel("Approach limit per wrestler").fill("2");
