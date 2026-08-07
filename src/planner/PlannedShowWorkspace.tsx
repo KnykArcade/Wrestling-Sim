@@ -3,6 +3,8 @@ import MatchApproachSetupEditor, { MatchSettingsEditor } from "../matchEngine/Ma
 import { loadMatchEngineUniverse, saveMatchEngineUniverse } from "../matchEngine/storage";
 import type { MatchEngineUniverse } from "../matchEngine/types";
 import NarrativeGenerator from "../narratives/NarrativeGenerator";
+import { startingCrowdForShow } from "../showEvaluation/model";
+import { loadShowEvaluationUniverse } from "../showEvaluation/storage";
 import { loadStartingUniverseActivationState } from "../startingUniverse/activation";
 import { loadActiveStartingUniverse, loadStartingUniverseState } from "../startingUniverse/storage";
 import type { StartingUniverseCompany, StartingUniverseRecord } from "../startingUniverse/types";
@@ -198,6 +200,8 @@ function BasicMatchBooking({ segment, snapshot, company, startingUniverse, onCha
 
 function SegmentEditor({
   segment,
+  cardSegments,
+  crowdStart,
   index,
   count,
   snapshot,
@@ -211,6 +215,8 @@ function SegmentEditor({
   onClose,
 }: {
   segment: PlannedSegment;
+  cardSegments: PlannedSegment[];
+  crowdStart: number;
   index: number;
   count: number;
   snapshot: TewSnapshot | null;
@@ -257,7 +263,7 @@ function SegmentEditor({
 
       {segment.type === "match" && <MatchSettingsEditor segment={segment} onChange={onChange} />}
       {segment.type === "match" && <BasicMatchBooking segment={segment} snapshot={snapshot} company={company} startingUniverse={startingUniverse} onChange={onChange} />}
-      {segment.type === "match" && <MatchApproachSetupEditor segment={segment} universe={matchEngine} onUniverseChange={onMatchEngineChange} onChange={onChange} />}
+      {segment.type === "match" && <MatchApproachSetupEditor segment={segment} cardSegments={cardSegments} crowdStart={crowdStart} universe={matchEngine} onUniverseChange={onMatchEngineChange} onChange={onChange} />}
       <NarrativeEditor segment={segment} availableWorkers={snapshot?.workers ?? []} availableStorylines={snapshot?.storylines ?? []} onChange={onChange} />
       {segment.type === "angle" && <NarrativeGenerator segment={segment} universe={matchEngine} onChange={onChange} />}
     </article>
@@ -298,6 +304,14 @@ export default function PlannedShowWorkspace({
     () => shows.find((show) => show.id === selectedId) ?? shows[0] ?? null,
     [selectedId, shows],
   );
+  const projectedCrowdStart = useMemo(() => {
+    if (!selectedShow) return 50;
+    const evaluations = loadShowEvaluationUniverse(window.localStorage);
+    const company = startingUniverse?.companies.find((item) => item.id === selectedShow.company || bookingCompanyName(item) === selectedShow.company)
+      ?? startingUniverse?.companies.find((item) => item.id === startingUniverse.playableCompanyId)
+      ?? null;
+    return startingCrowdForShow(selectedShow, company, evaluations.promotionPopularity, evaluations.promotionPopularitySeeded);
+  }, [selectedShow, startingUniverse]);
 
   useEffect(() => {
     let cancelled = false;
@@ -458,7 +472,7 @@ export default function PlannedShowWorkspace({
             <section className="planned-card-editor"><header className="card-editor-header"><div><p className="eyebrow">{activeSegment ? "SEGMENT BOOKING" : "CARD / BOOKING"}</p><h3>{activeSegment ? activeSegment.title : `${selectedShow.segments.length} planned segment${selectedShow.segments.length === 1 ? "" : "s"}`}</h3><p>{activeSegment ? "Complete this segment, save it, then return to the running order." : `${totalPlannedMinutes(selectedShow)} of ${selectedShow.expectedMinutes} expected minutes planned · ${completeNarratives} narratives complete`}</p></div>{!activeSegment && <div className="card-editor-actions"><button className="primary-button" type="button" onClick={() => addSegment("match")}>Add Match</button><button className="secondary-button" type="button" onClick={() => addSegment("angle")}>Add Angle</button></div>}</header>
               {!activeSegment && selectedShow.segments.length > 0 && <div className="tew-card-list" aria-label="Current card summary">{selectedShow.segments.map((segment, index) => <button type="button" key={segment.id} className={`tew-card-row tew-card-row--${segment.type}`} onClick={() => setActiveSegmentId(segment.id)}><b>{index + 1}</b><span>{segment.title || (segment.type === "match" ? "Untitled Match" : "Untitled Angle")}</span><small>{segment.type === "match" ? "MATCH" : "ANGLE"}</small></button>)}</div>}
               {!activeSegment && selectedShow.segments.length === 0 && <div className="empty-state card-empty">Add a match or angle to begin building the show in running order.</div>}
-              {activeSegment && <div className="planned-segment-list"><SegmentEditor key={activeSegment.id} segment={activeSegment} index={selectedShow.segments.findIndex((segment) => segment.id === activeSegment.id)} count={selectedShow.segments.length} snapshot={snapshot} company={selectedShow.company} startingUniverse={startingUniverse} matchEngine={matchEngine} onMatchEngineChange={setMatchEngine} onChange={(updated) => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.map((item) => item.id === updated.id ? updated : item) }))} onMove={(direction) => updateShow(selectedShow.id, (show) => ({ ...show, segments: movePlannedSegment(show.segments, activeSegment.id, direction) }))} onDelete={() => { updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.filter((item) => item.id !== activeSegment.id) })); setActiveSegmentId(""); setNotice("Segment removed from the card."); }} onClose={(saved) => { setActiveSegmentId(""); if (saved) setNotice("Segment saved. Returned to the card."); }} /></div>}
+              {activeSegment && <div className="planned-segment-list"><SegmentEditor key={activeSegment.id} segment={activeSegment} cardSegments={selectedShow.segments} crowdStart={projectedCrowdStart} index={selectedShow.segments.findIndex((segment) => segment.id === activeSegment.id)} count={selectedShow.segments.length} snapshot={snapshot} company={selectedShow.company} startingUniverse={startingUniverse} matchEngine={matchEngine} onMatchEngineChange={setMatchEngine} onChange={(updated) => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.map((item) => item.id === updated.id ? updated : item) }))} onMove={(direction) => updateShow(selectedShow.id, (show) => ({ ...show, segments: movePlannedSegment(show.segments, activeSegment.id, direction) }))} onDelete={() => { updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.filter((item) => item.id !== activeSegment.id) })); setActiveSegmentId(""); setNotice("Segment removed from the card."); }} onClose={(saved) => { setActiveSegmentId(""); if (saved) setNotice("Segment saved. Returned to the card."); }} /></div>}
             </section>
           </>}
         </div>}

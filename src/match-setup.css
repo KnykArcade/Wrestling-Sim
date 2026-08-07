@@ -21,7 +21,7 @@
 
 .match-approach-controls {
   display: grid;
-  grid-template-columns: minmax(160px, 1.2fr) 64px minmax(180px, .9fr) 118px 70px;
+  grid-template-columns: minmax(190px, 1fr) 64px 140px 180px 70px;
   gap: 1px;
   background: #31527b;
 }
@@ -278,7 +278,7 @@
 .match-approach-boundary strong { color: #f1df42; white-space: nowrap; }
 
 @media (max-width: 1050px) {
-  .match-approach-controls { grid-template-columns: minmax(140px, 1fr) 62px minmax(170px, .85fr) 112px 68px; }
+  .match-approach-controls { grid-template-columns: minmax(150px, 1fr) 62px 130px 180px 68px; }
   .match-profile-skill-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 

@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { CALCULATION_SYSTEM_VERSION } from "../calculations/foundation";
+import { calculateLiveMatchAudience, calculateMatchAnticipation } from "../crowd/model";
 import type { PlannedSegment, PlannedWorkerReference } from "../planner/types";
-import { generateMatchPerformancePreview, formatStarRating, performancePreviewInputFingerprint } from "./performance";
+import { advisoryStarRating, generateMatchPerformancePreview, formatStarRating, performancePreviewInputFingerprint } from "./performance";
 import { workerProfileKey } from "./model";
 import type {
   MatchEngineProfile,
@@ -30,10 +31,12 @@ function mentalClass(value: string): string {
 export default function MatchPerformancePreviewEditor({
   segment,
   universe,
+  projectedCrowdBefore,
   onChange,
 }: {
   segment: PlannedSegment;
   universe: MatchEngineUniverse;
+  projectedCrowdBefore: number;
   onChange: (segment: PlannedSegment) => void;
 }) {
   const competitors = useMemo(() => segment.workers.filter(isLikelyCompetitor), [segment.workers]);
@@ -57,6 +60,12 @@ export default function MatchPerformancePreviewEditor({
     settings,
   }) : "";
   const preview = storedPreview?.calculationVersion === CALCULATION_SYSTEM_VERSION && storedPreview.inputFingerprint === expectedFingerprint ? storedPreview : null;
+  const anticipation = calculateMatchAnticipation({
+    profiles: previewWorkers.map((worker) => worker.profile),
+    plans: previewWorkers.map((worker) => worker.plan),
+    aimId: segment.matchApproachSetup.matchAimId,
+  });
+  const projectedAudience = preview ? calculateLiveMatchAudience(preview.matchScore, anticipation.score, projectedCrowdBefore) : null;
 
   function updateSettings(patch: Partial<MatchPerformanceSettings>): void {
     onChange({
@@ -95,8 +104,8 @@ export default function MatchPerformancePreviewEditor({
     <header className="match-performance-preview__header">
       <div>
         <p className="eyebrow">MATCH RESULT / RECAP</p>
-        <h4>Performance, mental state, and match-quality result</h4>
-        <p>This is a projected pre-live performance. The official rating is finalized when the match runs with its actual incoming crowd heat.</p>
+        <h4>Performance, crowd reaction, and final match result</h4>
+        <p>This is a projected pre-live result using the expected crowd at this point on the card. The official rating is finalized with actual incoming crowd heat.</p>
       </div>
       <div className="match-performance-actions">
         <button className="primary-button" type="button" disabled={!canGenerate} onClick={() => generate(false)}>Roll New Night</button>
@@ -113,13 +122,17 @@ export default function MatchPerformancePreviewEditor({
 
     {!canGenerate && <div className="match-performance-warning"><strong>Preview needs complete match strategy</strong><span>{incompleteWorkers.length > 0 ? `Create a match profile and select at least one approach for: ${incompleteWorkers.map((item) => item.worker.name).join(", ")}.` : "Add at least one competitor to the match."}</span></div>}
 
-    {preview ? <div className="match-performance-results">
+    {preview && projectedAudience ? <div className="match-performance-results">
       <section className="match-performance-scorecard">
-        <div><span>Projected in-ring performance</span><strong>{preview.matchScore.toFixed(1)}</strong><small>Before live crowd response</small></div>
-        <div><span>Projected performance stars</span><strong>{formatStarRating(preview.starRating)}</strong><small>Official stars use the live final rating</small></div>
+        <div><span>Projected in-ring performance</span><strong>{preview.matchScore.toFixed(1)}</strong><small>Wrestler execution before the crowd</small></div>
+        <div><span>Crowd anticipation</span><strong>{anticipation.score.toFixed(1)}</strong><small>{anticipation.label} before the bell</small></div>
+        <div><span>Projected crowd reaction</span><strong>{projectedAudience.crowdResponse.toFixed(1)}</strong><small>Expectation adjustment {projectedAudience.expectationAdjustment >= 0 ? "+" : ""}{projectedAudience.expectationAdjustment.toFixed(1)}</small></div>
+        <div><span>Projected final rating</span><strong>{projectedAudience.finalRating.toFixed(1)} · {formatStarRating(advisoryStarRating(projectedAudience.finalRating))}</strong><small>70% performance · 30% crowd reaction</small></div>
         <div><span>Performance leader</span><strong>{preview.performanceLeaderName}</strong><small>Best projected individual night</small></div>
         <div><span>{preview.authority === "tew-authoritative" ? "Winner" : "Projected winner"}</span><strong>{preview.authority === "tew-authoritative" ? "Determined in TEW" : preview.projectedWinnerName || "Not available"}</strong><small>{preview.authority === "competitive-preview" && preview.confidence ? `${preview.confidence.toFixed(1)}% advisory confidence` : authorityLabel(preview.authority)}</small></div>
       </section>
+
+      <div className="match-performance-crowd-path" aria-label="Projected crowd result"><strong>Projected Crowd Heat {projectedAudience.crowdBefore.toFixed(1)} {projectedAudience.crowdBeforeLabel} → {projectedAudience.crowdAfter.toFixed(1)} {projectedAudience.crowdAfterLabel}</strong><span>Performance {preview.matchScore.toFixed(1)} · Crowd Reaction {projectedAudience.crowdResponse.toFixed(1)} · Final Rating {projectedAudience.finalRating.toFixed(1)}</span></div>
 
       <p className="match-performance-summary">{preview.summary}</p>
 
@@ -143,7 +156,7 @@ export default function MatchPerformancePreviewEditor({
 
     <footer className="match-approach-boundary">
       <strong>Phase 4C3 boundary</strong>
-      <span>This forecast never becomes the official match rating. Live crowd response finalizes the stored result when the match runs.</span>
+      <span>This projection uses the same crowd formula as the Live Card. Actual incoming crowd heat finalizes the official stored result when the match runs.</span>
     </footer>
   </section>;
 }

@@ -18,7 +18,7 @@ import {
   workerProfileKey,
 } from "./model";
 import { MATCH_ENGINE_SKILLS, WRESTLER_STYLES } from "./profileCatalog";
-import { calculateMatchAnticipation, momentumLabel } from "../crowd/model";
+import { calculateMatchAnticipation, momentumLabel, projectedCrowdBeforeForSegment } from "../crowd/model";
 import type {
   MatchApproachId,
   MatchEngineProfile,
@@ -165,11 +165,15 @@ function RatingsDialog({ profile, worker, onClose, onProfileChange }: { profile:
 export default function MatchApproachSetupEditor({
   segment,
   universe,
+  cardSegments = [],
+  crowdStart = 50,
   onUniverseChange,
   onChange,
 }: {
   segment: PlannedSegment;
   universe: MatchEngineUniverse;
+  cardSegments?: PlannedSegment[];
+  crowdStart?: number;
   onUniverseChange: (universe: MatchEngineUniverse) => void;
   onChange: (segment: PlannedSegment) => void;
 }) {
@@ -258,6 +262,12 @@ export default function MatchApproachSetupEditor({
     plans: competitors.map((worker) => planForWorker(segment, worker)),
     aimId: aim.id,
   });
+  const projectedCrowdBefore = projectedCrowdBeforeForSegment({
+    segments: cardSegments.length ? cardSegments : [segment],
+    segmentId: segment.id,
+    profiles: universe.profiles,
+    crowdStart,
+  });
 
   return <section className="match-approach-setup match-approach-setup--compact" aria-label="Match approach setup">
     <header className="match-strategy-header"><div><p className="eyebrow">MATCH APPROACHES</p><h4>Wrestler strategy</h4></div><div className="match-anticipation" aria-label={`Crowd anticipation ${anticipation.score.toFixed(1)} ${anticipation.label}`}><span>Anticipation</span><strong>{anticipation.score.toFixed(1)} · {anticipation.label}</strong><details><summary>Breakdown</summary><small>Popularity {anticipation.popularity.toFixed(1)} · Momentum {anticipation.momentum.toFixed(1)} · Skills {anticipation.skills.toFixed(1)} · Style {anticipation.styleAppeal.toFixed(1)}</small></details></div><button className="primary-button compact-button" type="button" aria-label="Run AI for All Competitors" onClick={runAll} disabled={competitors.length === 0}>AI All</button></header>
@@ -289,7 +299,7 @@ export default function MatchApproachSetupEditor({
     </div>}
 
     <label className="field match-approach-notes"><span>Approach and road-agent notes</span><textarea rows={2} value={segment.matchApproachSetup.notes} placeholder="Optional notes for the road agent or TEW handoff" onChange={(event) => updateSetup({ notes: event.target.value })} /></label>
-    <MatchPerformancePreviewEditor segment={segment} universe={universe} onChange={onChange} />
+    <MatchPerformancePreviewEditor segment={segment} universe={universe} projectedCrowdBefore={projectedCrowdBefore} onChange={onChange} />
     {editingWorker && editingProfile && <RatingsDialog profile={editingProfile} worker={editingWorker} onClose={() => setEditingProfileKey("")} onProfileChange={upsertProfile} />}
   </section>;
 }

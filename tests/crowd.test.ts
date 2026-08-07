@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { calculateLiveMatchAudience, calculateMatchAnticipation, crowdHeatLabel, momentumLabel } from "../src/crowd/model";
+import { calculateLiveMatchAudience, calculateMatchAnticipation, crowdHeatLabel, momentumLabel, projectedCrowdBeforeForSegment } from "../src/crowd/model";
 import { createMatchEngineProfile } from "../src/matchEngine/model";
+import type { MatchPerformancePreview } from "../src/matchEngine/types";
+import { createPlannedSegment } from "../src/planner/model";
 
 describe("Phase 6B18 momentum, anticipation, and live crowd dynamics", () => {
   test("builds anticipation from popularity, momentum, skills, and style appeal", () => {
@@ -43,5 +45,27 @@ describe("Phase 6B18 momentum, anticipation, and live crowd dynamics", () => {
     expect(momentumLabel(82)).toBe("White Hot");
     expect(crowdHeatLabel(19)).toBe("Dead");
     expect(crowdHeatLabel(65)).toBe("Hot");
+  });
+
+  test("projects incoming heat from earlier rolled matches and responds to card order", () => {
+    const opener = createPlannedSegment("match");
+    opener.id = "opener";
+    opener.workers = [
+      { id: "star", name: "Star", source: "manual", role: "Wrestler", side: "Side 1" },
+      { id: "opponent", name: "Opponent", source: "manual", role: "Wrestler", side: "Side 2" },
+    ];
+    opener.matchApproachSetup.performancePreview = { matchScore: 90 } as MatchPerformancePreview;
+    const second = createPlannedSegment("match");
+    second.id = "second";
+    const star = createMatchEngineProfile(opener.workers[0]);
+    const opponent = createMatchEngineProfile(opener.workers[1]);
+    star.popularity = 85;
+    opponent.popularity = 70;
+
+    const afterOpener = projectedCrowdBeforeForSegment({ segments: [opener, second], segmentId: second.id, profiles: [star, opponent], crowdStart: 50 });
+    const whenOpening = projectedCrowdBeforeForSegment({ segments: [second, opener], segmentId: second.id, profiles: [star, opponent], crowdStart: 50 });
+
+    expect(afterOpener).toBeGreaterThan(50);
+    expect(whenOpening).toBe(50);
   });
 });
