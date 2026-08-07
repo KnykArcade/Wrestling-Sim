@@ -13,7 +13,10 @@ test("selects and persists wrestler approaches inside a planned TEW match", asyn
   await match.getByLabel("Segment name").fill("Manual match title");
   await match.getByLabel("Length (minutes)").fill("20");
   await expect(match.getByLabel("Approach limit per wrestler")).toHaveValue("3");
+  await expect(match.getByLabel("Approach limit per wrestler")).toHaveAttribute("max", "4");
   await expect(match.getByText("Recommended: 3", { exact: true })).toBeVisible();
+  await match.getByLabel("Approach limit per wrestler").fill("8");
+  await expect(match.getByLabel("Approach limit per wrestler")).toHaveValue("4");
   await match.getByLabel("Approach limit per wrestler").fill("2");
 
   await match.getByLabel("Manual worker name").fill("Jay White");

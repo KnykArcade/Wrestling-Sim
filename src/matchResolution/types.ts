@@ -112,6 +112,7 @@ export interface MatchResolutionWorkerResult {
   winProbability: number;
   mentalStateId: MentalStateId;
   mentalStateName: MentalStateDefinition["name"];
+  mentalBase: number;
   mentalStateScore: number;
   mentalModifier: number;
   luck: number;

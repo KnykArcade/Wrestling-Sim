@@ -24,6 +24,7 @@ test("generates and persists a TEW-authoritative match performance preview", asy
   await expect(match.getByText("Determined in TEW", { exact: true })).toBeVisible();
   await expect(match.getByText("Tracker preview only", { exact: true })).toBeVisible();
   await expect(match.locator(".match-performance-worker")).toHaveCount(2);
+  await expect(match.getByText(/Mental base/)).toHaveCount(2);
   await expect(match.locator(".match-performance-worker-metrics").first().getByText(/^Pace \d+ · /)).toBeVisible();
   await expect(match.locator(".match-performance-scorecard strong").first()).not.toHaveText("0.0");
   const savedScore = await match.locator(".match-performance-scorecard strong").first().textContent();
@@ -45,4 +46,6 @@ test("generates and persists a TEW-authoritative match performance preview", asy
   await expect(persistedMatch.getByText(/advisory confidence/)).toBeVisible();
   await expect(persistedMatch.getByText(/Win chance/)).toHaveCount(2);
   await expect(persistedMatch.getByText(/does not change the planned winner or TEW result/)).toBeVisible();
+  await persistedMatch.getByLabel("Match aim").selectOption("technical-showcase");
+  await expect(persistedMatch.getByText("No advisory preview has been generated for this match.", { exact: false })).toBeVisible();
 });

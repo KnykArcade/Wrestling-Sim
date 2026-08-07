@@ -17,6 +17,7 @@ import {
   parseMatchEngineUniverse,
   saveMatchEngineUniverse,
 } from "../matchEngine/storage";
+import { performancePreviewSetupFingerprint } from "../matchEngine/performance";
 import type { MatchEngineUniverse } from "../matchEngine/types";
 import { emptyShowOperationsUniverse } from "../operations/model";
 import { loadShowOperationsUniverse, parseShowOperationsUniverse, saveShowOperationsUniverse } from "../operations/storage";
@@ -194,6 +195,19 @@ function normalizeSegment(value: unknown): PlannedSegment | null {
   const workflowStatus = value.workflowStatus === "Entered in TEW" || value.workflowStatus === "Completed" || value.workflowStatus === "Reconciled" ? value.workflowStatus : "Planned";
   const titlePurposes = ["", "Defense", "Vacant Title", "Tournament Final", "Unification", "Other"];
   const titleDecisions = ["", "Retained", "Changed Hands", "Vacated", "Unresolved"];
+  const durationMinutes = Math.max(1, finiteNumber(value.durationMinutes, defaults.durationMinutes));
+  const plannedWinner = text(value.plannedWinner);
+  const normalizedApproachSetup = normalizeMatchApproachSetup(value.matchApproachSetup);
+  const preview = normalizedApproachSetup.performancePreview;
+  const activeWorkerNames = new Set(workers.map((worker) => worker.name.trim().toLowerCase()));
+  const matchApproachSetup = preview && preview.inputFingerprint !== performancePreviewSetupFingerprint({
+    workerPlans: normalizedApproachSetup.workerPlans.filter((plan) => activeWorkerNames.has(plan.workerName.trim().toLowerCase())),
+    aimId: normalizedApproachSetup.matchAimId,
+    durationMinutes,
+    approachLimit: normalizedApproachSetup.approachLimit,
+    plannedWinner,
+    settings: normalizedApproachSetup.performanceSettings,
+  }) ? { ...normalizedApproachSetup, performancePreview: null } : normalizedApproachSetup;
 
   return {
     ...defaults,
@@ -201,7 +215,7 @@ function normalizeSegment(value: unknown): PlannedSegment | null {
     type: value.type,
     section: value.section,
     title: value.title,
-    durationMinutes: Math.max(1, finiteNumber(value.durationMinutes, defaults.durationMinutes)),
+    durationMinutes,
     notes: text(value.notes),
     workers,
     storylines,
@@ -219,13 +233,13 @@ function normalizeSegment(value: unknown): PlannedSegment | null {
     championshipStakes: text(value.championshipStakes),
     titleResultDecision: titleDecisions.includes(text(value.titleResultDecision)) ? value.titleResultDecision as PlannedSegment["titleResultDecision"] : "",
     titleResultConfirmedAt: text(value.titleResultConfirmedAt),
-    plannedWinner: text(value.plannedWinner),
+    plannedWinner,
     plannedFinish: text(value.plannedFinish),
     matchStory: text(value.matchStory),
     keyMoments: text(value.keyMoments),
     interference: text(value.interference),
     postMatch: text(value.postMatch),
-    matchApproachSetup: normalizeMatchApproachSetup(value.matchApproachSetup),
+    matchApproachSetup,
     competitionId: text(value.competitionId),
     competitionFixtureId: text(value.competitionFixtureId),
     competitionRoundLabel: text(value.competitionRoundLabel),

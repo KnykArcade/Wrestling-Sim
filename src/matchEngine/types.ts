@@ -145,10 +145,8 @@ export interface SourceConflictRecord {
 
 export interface MentalStateInputs {
   health: number;
-  popularity: number;
+  consistency: number;
   experience: number;
-  fanReaction: number;
-  gimmick: number;
   overall: number;
   luck: number;
   swing: number;
@@ -228,6 +226,7 @@ export interface MatchWorkerPerformanceResult {
   workerName: string;
   mentalStateId: MentalStateId;
   mentalStateName: MentalStateDefinition["name"];
+  mentalBase: number;
   mentalStateScore: number;
   mentalModifier: number;
   luck: number;
@@ -252,6 +251,7 @@ export interface MatchPerformancePreview {
   seed: string;
   authority: MatchOutcomeAuthority;
   calculationVersion: string;
+  inputFingerprint: string;
   matchScore: number;
   starRating: number;
   performanceLeaderKey: string;

@@ -1,6 +1,6 @@
 import type { HandoffUniverse, HandoffVersion, ShowHandoffRecord } from "../handoff/types";
 import { MATCH_AIMS, MATCH_APPROACHES } from "../matchEngine/catalog";
-import { approachLimitForSetup, evaluatePace, profileStaminaCapacity } from "../matchEngine/model";
+import { approachLimitForSetup, evaluatePace, profileStaminaCapacity, totalApproachPace } from "../matchEngine/model";
 import type { MatchEngineProfile } from "../matchEngine/types";
 import type { ActualMatchSnapshot, PlannedSegment, PlannedShow } from "../planner/types";
 import type { MatchRecord, ShowRecord, TewSnapshot } from "../tew/types";
@@ -104,14 +104,6 @@ function makeIssue(
   return { id, severity, category, message, detail, segmentId, actionLabel, actionTarget, acknowledged: acknowledged.has(id) };
 }
 
-function averageApproachPace(segment: PlannedSegment): number {
-  const paces: number[] = segment.matchApproachSetup.workerPlans
-    .flatMap((plan) => plan.selectedApproachIds)
-    .map((approachId) => Number(MATCH_APPROACHES.find((approach) => approach.id === approachId)?.pace ?? 0));
-  if (!paces.length) return 0;
-  return Math.round((paces.reduce((total: number, value: number) => total + value, 0) / paces.length) * 20) / 10;
-}
-
 function staminaCost(segment: PlannedSegment, workerKey: string): number {
   const plan = segment.matchApproachSetup.workerPlans.find((item) => item.workerKey === workerKey);
   return plan?.selectedApproachIds.reduce((total: number, approachId) => total + Number(MATCH_APPROACHES.find((approach) => approach.id === approachId)?.staminaCost ?? 0), 0) ?? 0;
@@ -178,6 +170,7 @@ export function buildShowPreflight(
       if (!segment.matchStory.trim()) add("story", "Important", "Match", `${prefix} has no Match Story`, "Generate or write the opening, middle, turning point, finish, and aftermath.", "Open Match Story", "match-story", segment.id);
 
       const requiredSlots = approachLimitForSetup(segment.durationMinutes, segment.matchApproachSetup.approachLimit);
+      const aim = MATCH_AIMS.find((item) => item.id === segment.matchApproachSetup.matchAimId);
       segment.workers.forEach((worker) => {
         const key = `${worker.source}:${worker.id}`;
         const plan = segment.matchApproachSetup.workerPlans.find((item) => item.workerKey === key || normalize(item.workerName) === normalize(worker.name));
@@ -187,15 +180,13 @@ export function buildShowPreflight(
         const staminaAvailable = profile ? profileStaminaCapacity(profile) : null;
         const staminaUsed = staminaCost(segment, plan?.workerKey ?? key);
         if (staminaAvailable !== null && staminaUsed > staminaAvailable) add(`stamina-${key}`, "Important", "Match", `${worker.name} exceeds their approach stamina budget in ${prefix}`, `${staminaUsed}/${staminaAvailable} stamina is planned. Reduce high-cost approaches or acknowledge the fatigue risk.`, "Open Match Setup", "match-setup", segment.id);
+        const paceValue = plan ? totalApproachPace(plan.selectedApproachIds) : 0;
+        if (aim && paceValue > 0) {
+          const pace = evaluatePace(aim.idealPace, paceValue);
+          if (pace.modifier <= -10) add(`pace-conflict-${key}`, "Important", "Match", `${worker.name} has a major pace conflict in ${prefix}`, `${aim.name} expects pace ${aim.idealPace}; ${worker.name}'s selected approaches total ${paceValue} (${pace.status}).`, "Open Match Setup", "match-setup", segment.id);
+          else if (pace.modifier < 0) add(`pace-warning-${key}`, "Advisory", "Match", `${worker.name} is slightly off the intended pace in ${prefix}`, `${aim.name} expects pace ${aim.idealPace}; ${worker.name}'s selected approaches total ${paceValue}.`, "Open Match Setup", "match-setup", segment.id);
+        }
       });
-
-      const aim = MATCH_AIMS.find((item) => item.id === segment.matchApproachSetup.matchAimId);
-      const paceValue = averageApproachPace(segment);
-      if (aim && paceValue > 0) {
-        const pace = evaluatePace(aim.idealPace, paceValue);
-        if (pace.modifier <= -10) add("pace-conflict", "Important", "Match", `${prefix} has a major pace conflict`, `${aim.name} expects pace ${aim.idealPace}; selected approaches average ${paceValue} (${pace.status}).`, "Open Match Setup", "match-setup", segment.id);
-        else if (pace.modifier < 0) add("pace-warning", "Advisory", "Match", `${prefix} is slightly off its intended pace`, `${aim.name} expects pace ${aim.idealPace}; selected approaches average ${paceValue}.`, "Open Match Setup", "match-setup", segment.id);
-      }
       if (segment.championship && !segment.championshipStakes.trim()) add("title-stakes", "Important", "Championship", `${prefix} is a championship match without written stakes`, "Document the title purpose, champion entering, challenger, and expected consequence.", "Open Match", "match-story", segment.id);
       if (segment.competitionId && (!segment.competitionFixtureId || !segment.competitionRoundLabel.trim())) add("competition-link", "Important", "Competition", `${prefix} has an incomplete competition link`, "Reconnect the fixture and round before finalizing the card.", "Open Match", "match-story", segment.id);
     } else {

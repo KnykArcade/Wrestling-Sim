@@ -1,5 +1,6 @@
 import {
   approachLimitForSetup,
+  calculateMentalStateBase,
   calculateMentalStateScore,
   classifyMentalState,
   createMatchEngineId,
@@ -204,7 +205,7 @@ function selectedApproaches(
     const staminaUsed = ids.reduce((total, id) => total + resolutionApproach(id).staminaCost, 0);
     const staminaAvailable = source.workbookMetrics?.staminaCapacity ?? profileStaminaCapacity(source.profile);
     const stamina = evaluateStamina(staminaUsed, staminaAvailable);
-    const actualPace = ids.length ? round(average(ids.map((id) => resolutionApproach(id).pace)) * 2) : 0;
+    const actualPace = ids.reduce((total, id) => total + resolutionApproach(id).pace, 0);
     const pace = evaluatePace(idealPaceForAim(setup.aimId), actualPace);
     const diversity = new Set(ids.map((id) => resolutionApproach(id).pace)).size >= 2 && ids.length >= 3 ? 3 : 0;
     const total = scores.reduce((sum, item) => sum + item.total, 0) + stamina.modifier * 4 + pace.modifier * 1.4 + diversity;
@@ -236,21 +237,23 @@ function presentationScore(profile: MatchEngineProfile): number {
 }
 
 function mentalState(profile: MatchEngineProfile, pressure: number, random: () => number) {
-  const luck = round(random() * 10 - 5);
-  const swingChance = mentalSwingProbability(profile.overall) + pressure * 0.005;
-  const swing = random() < swingChance ? (random() < 0.5 ? -10 : 10) : 0;
-  const score = calculateMentalStateScore({
+  const inputs = {
     health: profile.health,
-    popularity: profile.popularity,
+    consistency: profile.skills.Consistency,
     experience: profile.experience,
-    fanReaction: profile.fanReaction,
-    gimmick: profile.gimmick,
     overall: profile.overall,
+  };
+  const base = calculateMentalStateBase(inputs);
+  const luck = round(random() * 24 - 12);
+  const swingChance = mentalSwingProbability(profile.skills.Consistency) + pressure * 0.002;
+  const swing = random() < swingChance ? (random() < 0.5 ? -18 : 18) : 0;
+  const score = calculateMentalStateScore({
+    ...inputs,
     luck,
     swing,
   });
   const state = classifyMentalState(score);
-  return { luck, swing, score: round(score), state };
+  return { base: round(base), luck, swing, score: round(score), state };
 }
 
 function botchRisk(profile: MatchEngineProfile, metrics: StartingUniverseWorkbookMetrics | null): number {
@@ -289,7 +292,7 @@ function workerResult(
   const staminaUsed = approaches.ids.reduce((total, id) => total + resolutionApproach(id).staminaCost, 0);
   const staminaAvailable = source.workbookMetrics?.staminaCapacity ?? profileStaminaCapacity(profile);
   const stamina = evaluateStamina(staminaUsed, staminaAvailable);
-  const actualPace = approaches.ids.length ? round(average(approaches.ids.map((id) => resolutionApproach(id).pace)) * 2) : 0;
+  const actualPace = approaches.ids.reduce((total, id) => total + resolutionApproach(id).pace, 0);
   const pace = evaluatePace(idealPaceForAim(setup.aimId), actualPace);
   const interactionModifier = average(opponentApproaches.map((ids) => pairInteraction(approaches.ids, ids)));
   const risk = botchRisk(profile, source.workbookMetrics);
@@ -352,6 +355,7 @@ function workerResult(
     winProbability: 0,
     mentalStateId: mental.state.id,
     mentalStateName: mental.state.name,
+    mentalBase: mental.base,
     mentalStateScore: mental.score,
     mentalModifier: mental.state.modifier,
     luck: mental.luck,

@@ -1,4 +1,4 @@
-import { calculateStarRating } from "../calculations/foundation";
+import { CALCULATION_SYSTEM_VERSION, calculateStarRating } from "../calculations/foundation";
 import { importedApproachIdForMatchEngineId } from "../startingUniverse/formulas";
 import { resolveMatch } from "../matchResolution/engine";
 import type { MatchResolutionSetup, MatchResolutionWorkerSettings, ResolutionApproachId } from "../matchResolution/types";
@@ -24,6 +24,51 @@ export interface GenerateMatchPerformanceInput {
   plannedWinner: string;
   settings: MatchPerformanceSettings;
   seed?: string;
+}
+
+export interface PerformancePreviewFingerprintInput {
+  workerPlans: Array<Pick<MatchWorkerApproachPlan, "workerKey" | "selectedApproachIds">>;
+  aimId: MatchAimId;
+  durationMinutes: number;
+  approachLimit?: number | null;
+  plannedWinner: string;
+  settings: MatchPerformanceSettings;
+}
+
+function fingerprintHash(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+export function performancePreviewSetupFingerprint(input: PerformancePreviewFingerprintInput): string {
+  const workers = input.workerPlans.map((plan) => ({
+    workerKey: plan.workerKey,
+    selectedApproachIds: plan.selectedApproachIds.slice(0, 4),
+  })).sort((left, right) => left.workerKey.localeCompare(right.workerKey));
+  return fingerprintHash(JSON.stringify({
+    version: CALCULATION_SYSTEM_VERSION,
+    aimId: input.aimId,
+    durationMinutes: input.durationMinutes,
+    approachLimit: input.approachLimit ?? null,
+    plannedWinner: normalizeApproachName(input.plannedWinner),
+    settings: input.settings,
+    workers,
+  }));
+}
+
+export function performancePreviewInputFingerprint(input: Pick<GenerateMatchPerformanceInput, "workers" | "aimId" | "durationMinutes" | "approachLimit" | "plannedWinner" | "settings">): string {
+  return performancePreviewSetupFingerprint({
+    workerPlans: input.workers.map((worker) => worker.plan),
+    aimId: input.aimId,
+    durationMinutes: input.durationMinutes,
+    approachLimit: input.approachLimit,
+    plannedWinner: input.plannedWinner,
+    settings: input.settings,
+  });
 }
 
 function round(value: number, places = 2): number {
@@ -105,6 +150,7 @@ export function generateMatchPerformancePreview(input: GenerateMatchPerformanceI
       workerName: result.workerName,
       mentalStateId: result.mentalStateId,
       mentalStateName: result.mentalStateName,
+      mentalBase: result.mentalBase,
       mentalStateScore: result.mentalStateScore,
       mentalModifier: result.mentalModifier,
       luck: result.luck,
@@ -151,6 +197,7 @@ export function generateMatchPerformancePreview(input: GenerateMatchPerformanceI
     seed: attempt.seed,
     authority: input.settings.authority,
     calculationVersion: attempt.calculationVersion,
+    inputFingerprint: performancePreviewInputFingerprint(input),
     matchScore: attempt.engineResult.matchScore,
     starRating: attempt.engineResult.starRating,
     performanceLeaderKey: performanceLeader.workerKey,

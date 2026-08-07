@@ -35,6 +35,7 @@ import { emptyTransferUniverse } from "../src/transfer/model";
 import { emptyWorkbenchUniverse } from "../src/workbench/model";
 import { emptyWrapUpUniverse } from "../src/wrapUp/model";
 import { CALCULATION_SYSTEM_VERSION } from "../src/calculations/foundation";
+import { performancePreviewSetupFingerprint } from "../src/matchEngine/performance";
 
 class MemoryStorage {
   private values = new Map<string, string>();
@@ -49,6 +50,14 @@ function addAdvisoryPreview(match: ReturnType<typeof createPlannedSegment>): voi
     seed: "test-night",
     authority: "tew-authoritative",
     calculationVersion: CALCULATION_SYSTEM_VERSION,
+    inputFingerprint: performancePreviewSetupFingerprint({
+      workerPlans: match.matchApproachSetup.workerPlans,
+      aimId: match.matchApproachSetup.matchAimId,
+      durationMinutes: match.durationMinutes,
+      approachLimit: match.matchApproachSetup.approachLimit,
+      plannedWinner: match.plannedWinner,
+      settings: match.matchApproachSetup.performanceSettings,
+    }),
     matchScore: 80,
     starRating: 4,
     performanceLeaderKey: "tew:1",
@@ -62,6 +71,7 @@ function addAdvisoryPreview(match: ReturnType<typeof createPlannedSegment>): voi
       workerName: "Bret Hart",
       mentalStateId: "focused",
       mentalStateName: "FOCUSED",
+      mentalBase: 60,
       mentalStateScore: 74,
       mentalModifier: 2.5,
       luck: 1,

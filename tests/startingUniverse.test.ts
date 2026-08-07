@@ -23,8 +23,8 @@ function importedWorld(): ParsedTewExport {
     warnings: [],
     tables: {
       Companies: [
-        { UID: "1", Initials: "PWL", Profile: "Pro Wrestling League", Currently_Open: 1, User_Controlled: 1 },
-        { UID: "2", Initials: "OTHER", Profile: "Other Wrestling", Currently_Open: 1, User_Controlled: 0 },
+        { UID: "1", Name: "Pro Wrestling League", Initials: "PWL", Profile: "A long promotional biography that must never become the company name in a booking control.", Currently_Open: 1, User_Controlled: 1 },
+        { UID: "2", Name: "Other Wrestling", Initials: "OTHER", Profile: "Another company biography.", Currently_Open: 1, User_Controlled: 0 },
       ],
       Workers: [
         { UID: "w1", Name: "First Wrestler", Active: 1, Wrestler: 1, Stamina: 70, Basics: 70 },
@@ -86,6 +86,8 @@ describe("Phase 6B9 quick universe loading", () => {
     const universe = createStartingUniverse(importedWorld());
 
     expect(universe.playableCompanyId).toBe("1");
+    expect(universe.companies.map((company) => company.name)).toEqual(["Other Wrestling", "Pro Wrestling League"]);
+    expect(universe.companies.find((company) => company.id === "1")?.profile).toContain("promotional biography");
     expect(universe.review.roster).toHaveLength(2);
     expect(universe.review.roster.every((worker) => worker.included && worker.rosterClass === "Wrestler")).toBe(true);
     expect(universe.review.tagTeams[0]).toMatchObject({ selectedVariantId: "company", gameName: "PWL Team", acknowledged: true });
