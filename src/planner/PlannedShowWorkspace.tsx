@@ -85,7 +85,7 @@ function BasicMatchBooking({ segment, snapshot, company, startingUniverse, onCha
     const contractsByWorker = new Map<string, typeof startingUniverse.contracts>();
     for (const contract of startingUniverse.contracts) contractsByWorker.set(contract.workerId, [...(contractsByWorker.get(contract.workerId) ?? []), contract]);
     return startingUniverse.workers
-      .filter((worker) => worker.active && (worker.flags.wrestler || worker.flags.occasionalWrestler || (contractsByWorker.get(worker.id) ?? []).some((contract) => contract.flags.wrestler || contract.flags.occasionalWrestler)))
+      .filter((worker) => worker.active && (worker.flags.wrestler || worker.flags.occasionalWrestler))
       .flatMap((worker) => {
         const contracts = contractsByWorker.get(worker.id) ?? [];
         if (rosterCompany === FREE_AGENTS_FILTER) {

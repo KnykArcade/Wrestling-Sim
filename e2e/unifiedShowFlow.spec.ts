@@ -15,7 +15,7 @@ test("books, runs, resolves, records, and completes one show without losing cont
   }
   await match.getByRole("button", { name: "Run AI for All Competitors" }).click();
   await expect(match.getByText("Match setup is ready.")).toBeVisible();
-  await expect(match.getByText("VS", { exact: true })).toBeVisible();
+  await expect(match.locator(".tew-strategy-row")).toHaveCount(2);
   await expect(match.getByLabel("Match Story", { exact: true })).toHaveCount(1);
   await expect(match.getByLabel("Quick planning outline")).toHaveCount(0);
   await expect(match.getByText("Key moments / spots", { exact: true })).toHaveCount(0);
