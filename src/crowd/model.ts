@@ -1,4 +1,5 @@
 import { MATCH_AIMS } from "../matchEngine/catalog";
+import { CALCULATION_FORMULAS, createCalculationStage, createCalculationTerm } from "../calculations/foundation";
 import {
   calculateApproachRating,
   getApproach,
@@ -19,10 +20,19 @@ function round(value: number, places = 1): number {
   return Math.round(value * scale) / scale;
 }
 
-function fieldValue(values: number[]): number {
-  if (!values.length) return 50;
+function fieldValue(values: number[], label: string) {
+  const formula = CALCULATION_FORMULAS.anticipationField;
+  if (!values.length) {
+    const ledger = createCalculationStage(formula, [createCalculationTerm("fallback", `${label} fallback`, 50)], { notes: ["No participant values were available, so the neutral 50 baseline was used."] });
+    return { value: 50, ledger };
+  }
   const average = values.reduce((total, value) => total + value, 0) / values.length;
-  return round(clamp(average * .65 + Math.max(...values) * .35));
+  const maximum = Math.max(...values);
+  const ledger = createCalculationStage(formula, [
+    createCalculationTerm("average", `${label} participant average`, average, formula.averageWeight),
+    createCalculationTerm("maximum", `${label} highest participant`, maximum, formula.maximumWeight),
+  ], { notes: [`Participant values: ${values.map((value) => round(value)).join(", ")}.`] });
+  return { value: ledger.result, ledger };
 }
 
 export function momentumLabel(value: number): MomentumLabel {
@@ -57,9 +67,10 @@ export function calculateMatchAnticipation(input: {
   plans: MatchWorkerApproachPlan[];
   aimId: MatchAimId;
 }): MatchAnticipation {
+  const formula = CALCULATION_FORMULAS.anticipation;
   const aim = MATCH_AIMS.find((item) => item.id === input.aimId) ?? MATCH_AIMS[0];
   const plans = new Map(input.plans.map((plan) => [plan.workerKey, plan]));
-  const popularityValues = input.profiles.map((profile) => clamp(profile.popularity * .7 + profile.fanReaction * 20 * .3));
+  const popularityValues = input.profiles.map((profile) => clamp(profile.popularity * formula.participantPopularityWeight + profile.fanReaction * 20 * formula.participantFanReactionWeight));
   const momentumValues = input.profiles.map((profile) => clamp(profile.momentum));
   const skillValues = input.profiles.map((profile) => {
     const plan = plans.get(profile.workerKey);
@@ -68,7 +79,7 @@ export function calculateMatchAnticipation(input: {
       return approach ? [calculateApproachRating(approach, profileApproachRatingInputs(profile))] : [];
     }) ?? [];
     const approachScore = approachRatings.length ? approachRatings.reduce((total, value) => total + value, 0) / approachRatings.length : profile.overall;
-    return clamp(profile.overall * .45 + profile.skills.Psychology * .2 + profile.skills.Charisma * .15 + approachScore * .2);
+    return clamp(profile.overall * formula.skillOverallWeight + profile.skills.Psychology * formula.skillPsychologyWeight + profile.skills.Charisma * formula.skillCharismaWeight + approachScore * formula.skillApproachWeight);
   });
   const styleValues = input.profiles.map((profile) => {
     const style = getWrestlerStyle(profile);
@@ -86,25 +97,71 @@ export function calculateMatchAnticipation(input: {
           return total + (approach ? clamp(50 + scoreApproachCandidate(profile, aim.id, approach).aimCompatibility * 4) : 50);
         }, 0) / selected.length
       : 50;
-    return clamp(styleFit * .6 + approachFit * .4);
+    return clamp(styleFit * formula.styleDefinitionWeight + approachFit * formula.styleApproachFitWeight);
   });
-  const popularity = fieldValue(popularityValues);
-  const momentum = fieldValue(momentumValues);
-  const skills = fieldValue(skillValues);
-  const styleAppeal = fieldValue(styleValues);
-  const score = round(clamp(popularity * .4 + momentum * .25 + skills * .2 + styleAppeal * .15));
-  return { score, label: anticipationLabel(score), popularity, momentum, skills, styleAppeal };
+  const popularityResult = fieldValue(popularityValues, "Popularity");
+  const momentumResult = fieldValue(momentumValues, "Momentum");
+  const skillsResult = fieldValue(skillValues, "Skills");
+  const styleResult = fieldValue(styleValues, "Style appeal");
+  const popularity = popularityResult.value;
+  const momentum = momentumResult.value;
+  const skills = skillsResult.value;
+  const styleAppeal = styleResult.value;
+  const total = createCalculationStage(formula, [
+    createCalculationTerm("popularity", "Popularity field", popularity, formula.popularityWeight),
+    createCalculationTerm("momentum", "Momentum field", momentum, formula.momentumWeight),
+    createCalculationTerm("skills", "Skills field", skills, formula.skillsWeight),
+    createCalculationTerm("style", "Style appeal field", styleAppeal, formula.styleAppealWeight),
+  ], { notes: ["Each field first favors both the participant average and the match's highest-rated star."] });
+  const score = total.result;
+  return {
+    score,
+    label: anticipationLabel(score),
+    popularity,
+    momentum,
+    skills,
+    styleAppeal,
+    calculationLedger: {
+      popularity: popularityResult.ledger,
+      momentum: momentumResult.ledger,
+      skills: skillsResult.ledger,
+      styleAppeal: styleResult.ledger,
+      total,
+    },
+  };
 }
 
 export function calculateLiveMatchAudience(performanceRating: number, anticipation: number, crowdBefore: number): LiveAudienceResult {
+  const expectationFormula = CALCULATION_FORMULAS.expectationAdjustment;
+  const responseFormula = CALCULATION_FORMULAS.crowdResponse;
+  const finalFormula = CALCULATION_FORMULAS.finalRating;
+  const movementFormula = CALCULATION_FORMULAS.crowdMovement;
   const performance = clamp(performanceRating);
   const expected = clamp(anticipation);
   const incoming = clamp(crowdBefore);
-  const expectationAdjustment = round(clamp((performance - expected) * .2, -6, 6));
-  const crowdResponse = round(clamp(performance * .5 + expected * .3 + incoming * .2 + expectationAdjustment));
-  const finalRating = round(clamp(performance * .7 + crowdResponse * .3));
-  const movement = clamp((crowdResponse - incoming) / 3, -12, 12);
-  const crowdAfter = round(clamp(incoming + movement));
+  const expectationLedger = createCalculationStage(expectationFormula, [
+    createCalculationTerm("performance-gap", "Performance above/below anticipation", performance - expected, expectationFormula.differenceWeight),
+  ]);
+  const expectationAdjustment = expectationLedger.result;
+  const responseLedger = createCalculationStage(responseFormula, [
+    createCalculationTerm("performance", "Raw in-ring performance", performance, responseFormula.performanceWeight),
+    createCalculationTerm("anticipation", "Anticipation", expected, responseFormula.anticipationWeight),
+    createCalculationTerm("incoming", "Incoming crowd heat", incoming, responseFormula.incomingCrowdWeight),
+    createCalculationTerm("expectation", "Expectation adjustment", expectationAdjustment),
+  ]);
+  const crowdResponse = responseLedger.result;
+  const finalLedger = createCalculationStage(finalFormula, [
+    createCalculationTerm("performance", "Raw in-ring performance", performance, finalFormula.performanceWeight),
+    createCalculationTerm("crowd-response", "Live crowd response", crowdResponse, finalFormula.crowdResponseWeight),
+  ], { notes: ["This final rating replaces the raw in-ring rating only after the result is locked into the live card."] });
+  const finalRating = finalLedger.result;
+  const uncappedMovement = (crowdResponse - incoming) / movementFormula.divisor;
+  const movement = clamp(uncappedMovement, movementFormula.movementMinimum, movementFormula.movementMaximum);
+  const crowdAfterLedger = createCalculationStage(movementFormula, [
+    createCalculationTerm("incoming", "Incoming crowd heat", incoming),
+    createCalculationTerm("movement", "Capped crowd movement", movement),
+  ], { notes: [`Uncapped movement ${(uncappedMovement >= 0 ? "+" : "")}${round(uncappedMovement)} is capped between ${movementFormula.movementMinimum} and +${movementFormula.movementMaximum}.`] });
+  const crowdAfter = crowdAfterLedger.result;
   return {
     performanceRating: round(performance),
     anticipation: round(expected),
@@ -116,6 +173,12 @@ export function calculateLiveMatchAudience(performanceRating: number, anticipati
     finalRating,
     crowdAfter,
     crowdAfterLabel: crowdHeatLabel(crowdAfter),
+    calculationLedger: {
+      expectationAdjustment: expectationLedger,
+      crowdResponse: responseLedger,
+      finalRating: finalLedger,
+      crowdAfter: crowdAfterLedger,
+    },
   };
 }
 
@@ -149,6 +212,10 @@ export function calculateLiveAngleAudience(performanceRating: number, crowdBefor
   const finalRating = round(clamp(performance * .8 + crowdResponse * .2));
   const movement = clamp((crowdResponse - incoming) / 3, -12, 12);
   const crowdAfter = round(clamp(incoming + movement));
+  const expectationLedger = createCalculationStage({ id: "crowd.angle-expectation", label: "Angle expectation adjustment", formula: "Angles do not use match anticipation", capMinimum: null, capMaximum: null, roundingPlaces: 1 }, [createCalculationTerm("adjustment", "Expectation adjustment", 0)]);
+  const responseLedger = createCalculationStage({ id: "crowd.angle-response", label: "Angle crowd response", formula: "Angle performance 80% + incoming crowd 20%", capMinimum: 0, capMaximum: 100, roundingPlaces: 1 }, [createCalculationTerm("performance", "Angle performance", performance, .8), createCalculationTerm("incoming", "Incoming crowd heat", incoming, .2)]);
+  const finalLedger = createCalculationStage({ id: "crowd.angle-final", label: "Final angle rating", formula: "Angle performance 80% + crowd response 20%", capMinimum: 0, capMaximum: 100, roundingPlaces: 1 }, [createCalculationTerm("performance", "Angle performance", performance, .8), createCalculationTerm("response", "Crowd response", crowdResponse, .2)]);
+  const crowdAfterLedger = createCalculationStage(CALCULATION_FORMULAS.crowdMovement, [createCalculationTerm("incoming", "Incoming crowd heat", incoming), createCalculationTerm("movement", "Capped crowd movement", movement)]);
   return {
     performanceRating: round(performance),
     anticipation: round(performance),
@@ -160,5 +227,6 @@ export function calculateLiveAngleAudience(performanceRating: number, crowdBefor
     finalRating,
     crowdAfter,
     crowdAfterLabel: crowdHeatLabel(crowdAfter),
+    calculationLedger: { expectationAdjustment: expectationLedger, crowdResponse: responseLedger, finalRating: finalLedger, crowdAfter: crowdAfterLedger },
   };
 }

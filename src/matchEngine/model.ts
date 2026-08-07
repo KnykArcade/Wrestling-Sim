@@ -1,6 +1,6 @@
 import { APPROACH_ALIASES, MATCH_AIMS, MATCH_APPROACHES, MENTAL_STATES } from "./catalog";
 import { AIM_APPROACH_HINTS, MATCH_ENGINE_SKILLS, WRESTLER_STYLES } from "./profileCatalog";
-import { calculateSuitability } from "../calculations/foundation";
+import { CALCULATION_FORMULAS, calculateSuitability } from "../calculations/foundation";
 import type {
   ApproachFormulaSource,
   ApproachCandidateScore,
@@ -118,12 +118,13 @@ export function classifyMentalState(score: number): MentalStateDefinition {
 }
 
 export function calculateMentalStateBase(inputs: Omit<MentalStateInputs, "luck" | "swing">): number {
-  const raw = 60
-    + (inputs.health - 75) * 0.06
-    + (inputs.consistency - 60) * 0.08
-    + (inputs.experience - 60) * 0.04
-    + (inputs.overall - 60) * 0.04;
-  return Math.max(56, Math.min(64, raw));
+  const formula = CALCULATION_FORMULAS.mentalBase;
+  const raw = formula.baseline
+    + (inputs.health - formula.healthReference) * formula.healthWeight
+    + (inputs.consistency - formula.consistencyReference) * formula.consistencyWeight
+    + (inputs.experience - formula.experienceReference) * formula.experienceWeight
+    + (inputs.overall - formula.overallReference) * formula.overallWeight;
+  return Math.max(formula.capMinimum, Math.min(formula.capMaximum, raw));
 }
 
 export function calculateMentalStateScore(inputs: MentalStateInputs): number {
@@ -131,7 +132,8 @@ export function calculateMentalStateScore(inputs: MentalStateInputs): number {
 }
 
 export function mentalSwingProbability(consistency: number): number {
-  return 0.04 + (100 - Math.max(0, Math.min(100, consistency))) / 2500;
+  const formula = CALCULATION_FORMULAS.executionRandomness;
+  return formula.swingBaseProbability + (100 - Math.max(0, Math.min(100, consistency))) / formula.swingConsistencyDivisor;
 }
 
 export function totalApproachPace(approachIds: MatchApproachId[]): number {
@@ -290,6 +292,7 @@ export function evaluateApproachPlan(
   approachIds: MatchApproachId[],
   configuredLimit?: number | null,
 ): ApproachPlanResult {
+  const planFormula = CALCULATION_FORMULAS.workbenchApproachPlan;
   const aim = aimForId(aimId);
   const limit = approachLimitForSetup(durationMinutes, configuredLimit);
   const selected = Array.from(new Set(approachIds)).filter((id) => MATCH_APPROACHES.some((approach) => approach.id === id)).slice(0, limit);
@@ -300,13 +303,13 @@ export function evaluateApproachPlan(
   const actualPace = totalApproachPace(selected);
   const pace = evaluatePace(aim.idealPace, actualPace);
   const distinctPaces = new Set(selected.map((id) => getApproach(id)?.pace ?? 0)).size;
-  const diversityBonus = selected.length >= 3 && distinctPaces >= 2 ? 3 : 0;
-  const longMatchBonus = durationMinutes >= 16 && selected.includes("big-match-performer") ? 4 : 0;
-  const overBudgetPenalty = Math.max(0, usedStamina - availableStamina) * 25;
+  const diversityBonus = selected.length >= 3 && distinctPaces >= 2 ? planFormula.diversityBonus : 0;
+  const longMatchBonus = durationMinutes >= 16 && selected.includes("big-match-performer") ? planFormula.longMatchBonus : 0;
+  const overBudgetPenalty = Math.max(0, usedStamina - availableStamina) * planFormula.staminaOverBudgetPenalty;
   const totalScore = Math.round((
     candidateScores.reduce((sum, candidate) => sum + candidate.total, 0) +
-    pace.modifier * 1.5 +
-    stamina.modifier * 3 +
+    pace.modifier * planFormula.paceModifierWeight +
+    stamina.modifier * planFormula.staminaModifierWeight +
     diversityBonus +
     longMatchBonus -
     overBudgetPenalty

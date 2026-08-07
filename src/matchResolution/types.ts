@@ -1,6 +1,7 @@
 import type { MatchAimId, MatchEngineProfile, MentalStateDefinition, MentalStateId, PaceStatus, StaminaStatus } from "../matchEngine/types";
 import type { LiveAudienceResult, MatchAnticipation } from "../crowd/types";
 import type { ImportedApproachFormulaId, StartingUniverseWorkbookMetrics } from "../startingUniverse/types";
+import type { CalculationLedgerStage } from "../calculations/foundation";
 
 export type ResolutionApproachId = ImportedApproachFormulaId;
 export type ResolutionApproachMode = "AI" | "Manual";
@@ -97,6 +98,50 @@ export interface MatchResolutionApproachScore {
   staminaEfficiency: number;
   total: number;
   reasons: string[];
+  calculation?: CalculationLedgerStage;
+}
+
+export interface MatchResolutionWorkerCalculationLedger {
+  approachPlan: CalculationLedgerStage;
+  mentalBase: CalculationLedgerStage;
+  mentalState: CalculationLedgerStage;
+  approachExecution: CalculationLedgerStage;
+  presentation: CalculationLedgerStage;
+  performance: CalculationLedgerStage;
+  competitive: CalculationLedgerStage;
+}
+
+export interface MatchResolutionProbabilityEntry {
+  key: string;
+  label: string;
+  memberScores: number[];
+  teamSizeBonus: number;
+  competitiveScore: number;
+  scoreAboveMinimum: number;
+  exponentialWeight: number;
+  probability: number;
+}
+
+export interface MatchResolutionOutcomeLedger {
+  formulaId: string;
+  label: string;
+  formula: string;
+  volatility: number;
+  temperature: number;
+  fieldMinimum: number;
+  totalExponentialWeight: number;
+  entries: MatchResolutionProbabilityEntry[];
+  resultRoll: number;
+  selectedKey: string;
+  selectedLabel: string;
+  roundingPlaces: number;
+  notes: string[];
+}
+
+export interface MatchResolutionCalculationLedger {
+  version: string;
+  matchQuality: CalculationLedgerStage;
+  outcome: MatchResolutionOutcomeLedger;
 }
 
 export interface MatchResolutionWorkerResult {
@@ -135,6 +180,7 @@ export interface MatchResolutionWorkerResult {
   botchRisk: number;
   incident: string;
   decisiveComponents: Array<{ label: string; value: number }>;
+  calculationLedger?: MatchResolutionWorkerCalculationLedger;
 }
 
 export interface MatchResolutionEngineResult {
@@ -209,6 +255,7 @@ export interface MatchResolutionAttempt {
   workerResults: MatchResolutionWorkerResult[];
   engineResult: MatchResolutionEngineResult;
   finalResult: MatchResolutionFinalResult | null;
+  calculationLedger?: MatchResolutionCalculationLedger;
 }
 
 export interface MatchResolutionRecord {
