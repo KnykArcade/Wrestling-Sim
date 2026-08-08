@@ -218,8 +218,10 @@ export default function App() {
   const needsSnapshot = (view === "shows" || view === "tew-storylines" || view === "schema") && snapshot === null;
   const standaloneViews: ViewName[] = ["universe", "runner", "resolution", "consequences", "session", "calendar", "operations", "workbench", "outputs", "profiles", "transfer", "results", "bridge", "control", "planner", "handoff", "competitions", "match-engine", "storyline-hub", "worker-hub", "championship-hub"];
 
+  const buildLabel = `${__APP_RELEASE_LABEL__} · ${__APP_BUILD_COMMIT__}${__APP_BUILD_HAS_CHANGES__ ? " · LOCAL CHANGES" : ""}`;
+
   return <div className="app-shell">
-    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>Wrestling Sim</h1></div><div className="phase-badge">{activeGame.gameDate ? `GAME DATE · ${activeGame.gameDate}` : "BOOK · RUN · RECORD"}</div></header>
+    <header className="topbar"><div><span className="brand-kicker">WRESTLING SIM</span><h1>Wrestling Sim</h1></div><div className="topbar__status"><div className="phase-badge">{activeGame.gameDate ? `GAME DATE · ${activeGame.gameDate}` : "BOOK · RUN · RECORD"}</div><div className="build-badge" aria-label={`Game build version: ${buildLabel}`}><span>VERSION</span><strong>{buildLabel}</strong></div></div></header>
     <nav className="global-tabbar" aria-label="Wrestling Sim sections">
       <button className={view === "home" ? "active" : ""} onClick={() => setView("home")} type="button">Game Home</button>
       <button className={view === "universe" ? "active" : ""} onClick={() => setView("universe")} type="button">Starting Universe</button>

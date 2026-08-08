@@ -1,11 +1,12 @@
 {
-  "name": "TEW Story Tracker",
+  "name": "Wrestling Sim",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
-  "postCreateCommand": "npm install",
+  "postCreateCommand": "npm ci --no-audit --no-fund",
+  "postStartCommand": "cp .devcontainer/start-codespace.sh /tmp/wrestling-sim-start.sh && bash /tmp/wrestling-sim-start.sh",
   "forwardPorts": [5173],
   "portsAttributes": {
     "5173": {
-      "label": "TEW Story Tracker Preview",
+      "label": "Wrestling Sim",
       "onAutoForward": "openPreview"
     }
   }
