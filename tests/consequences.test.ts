@@ -10,6 +10,7 @@ import {
   emptyResultConsequenceUniverse,
   resolveFutureConflict,
   rollbackCoreResultConsequences,
+  synchronizeWorkerRecordsFromProfiles,
 } from "../src/consequences/model";
 import { parseResultConsequenceUniverse } from "../src/consequences/storage";
 import { createMatchEngineProfile } from "../src/matchEngine/model";
@@ -210,11 +211,16 @@ describe("Phase 6B3 standalone result consequences", () => {
     const white = result.universe.workerRecords.find((record) => record.workerName === "Jay White")!;
     expect(pac).toMatchObject({ wins: 1, losses: 0, rankingPosition: 1, currentStreakType: "W", currentStreakCount: 1, momentum: 56, momentumScale: "0-100-v1" });
     expect(white).toMatchObject({ wins: 0, losses: 1, currentStreakType: "L", currentStreakCount: 1, momentum: 49, momentumScale: "0-100-v1" });
-    expect(pac.fatigue).toBeGreaterThan(0);
-    expect(pac.health).toBeLessThan(95);
+    expect(pac).toMatchObject({ fatigue: 7.68, health: 93.75, popularity: 51.9, rankingPoints: 4.8 });
+    expect(white).toMatchObject({ fatigue: 7.07, health: 92.87, popularity: 51.46, rankingPoints: -0.48 });
     expect(result.profiles.find((profile) => profile.workerName === "PAC")?.momentum).toBe(pac.momentum);
     expect(result.profiles.find((profile) => profile.workerName === "PAC")?.popularity).toBe(pac.popularity);
-    expect(result.universe.applications[0]).toMatchObject({ calculationVersion: "wrestling-sim-calculations-6b20c-v3", idempotencyKey: expect.stringContaining("match-consequences") });
+    expect(result.universe.applications[0]).toMatchObject({ calculationVersion: "wrestling-sim-consequences-6b20d-v1", idempotencyKey: expect.stringContaining("match-consequences") });
+    const pacChange = result.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")!;
+    expect(pacChange).toMatchObject({ healthRecovery: 0, ordinaryWear: 1.25, incidentDamage: 0, fatigueRecovery: 0, fatigueGain: 7.68, fullRestDays: 0, rankingPositionBefore: 0, rankingPositionAfter: 1 });
+    expect(pacChange.calculationLedger?.ordinaryWear.terms.map((term) => term.contribution)).toEqual([0.6545, 0.6, 0, 0]);
+    expect(pacChange.calculationLedger?.fatigueGain.terms.map((term) => term.contribution)).toEqual([4.675, 3, 0, 0]);
+    expect(pacChange.calculationLedger?.ranking.terms.map((term) => term.contribution)).toEqual([3, 1.3, 0, 0.5]);
     expect(pac.matchHistory[0].result).toBe("W");
     expect(result.shows[0].segments[0]).toMatchObject({ workflowStatus: "Reconciled", reconciliation: { actualMatch: { winner: "PAC", rating: 86 }, finalNarrative: "PAC forced Jay White to submit." } });
     expect(() => applyCoreResultConsequences({
@@ -225,6 +231,112 @@ describe("Phase 6B3 standalone result consequences", () => {
       championships: emptyChampionshipUniverse(),
       competitions: emptyCompetitionUniverse(),
     })).toThrow("already been applied");
+  });
+
+  test("keeps physical wear, fatigue, and rankings identical when only the live crowd changes", () => {
+    const { show, segment } = showWithMatch();
+    const lowCrowd = resolution(show.id, segment.id);
+    const highCrowd = structuredClone(lowCrowd);
+    lowCrowd.attempts[0].finalResult!.matchScore = 50;
+    lowCrowd.attempts[0].finalResult!.starRating = 2;
+    highCrowd.attempts[0].finalResult!.matchScore = 90;
+    highCrowd.attempts[0].finalResult!.starRating = 5;
+    const low = applyCoreResultConsequences({ universe: emptyResultConsequenceUniverse(), resolution: lowCrowd, shows: [structuredClone(show)], profiles: profiles(), championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+    const high = applyCoreResultConsequences({ universe: emptyResultConsequenceUniverse(), resolution: highCrowd, shows: [structuredClone(show)], profiles: profiles(), championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+    const relevant = (value: typeof low) => value.universe.applications[0].conditionChanges.map((change) => ({
+      worker: change.workerName,
+      healthAfter: change.healthAfter,
+      fatigueAfter: change.fatigueAfter,
+      rankingPointsAfter: change.rankingPointsAfter,
+      wear: change.ordinaryWear,
+      fatigueGain: change.fatigueGain,
+      rankingDelta: change.calculationLedger?.ranking.result,
+    }));
+    expect(relevant(low)).toEqual(relevant(high));
+    expect(low.universe.workerRecords[0].matchHistory[0].matchScore).toBe(50);
+    expect(high.universe.workerRecords[0].matchHistory[0].matchScore).toBe(90);
+    expect(low.universe.workerRecords[0].matchHistory[0].rawMatchScore).toBe(86);
+    expect(high.universe.workerRecords[0].matchHistory[0].rawMatchScore).toBe(86);
+  });
+
+  test("caps long exhausting matches and applies botch or major-incident damage afterward", () => {
+    const { show, segment } = showWithMatch();
+    const exhausting = resolution(show.id, segment.id);
+    exhausting.attempts[0].finalResult!.actualDurationMinutes = 60;
+    const [pacResult, whiteResult] = exhausting.attempts[0].workerResults;
+    Object.assign(pacResult, { staminaStatus: "DEAD", staminaUsed: 10, actualPace: 5, incident: "Visible botch on the landing." });
+    Object.assign(whiteResult, { staminaStatus: "DEAD", staminaUsed: 10, actualPace: 5, incident: "Major execution mistake caused a hard landing." });
+    const applied = applyCoreResultConsequences({ universe: emptyResultConsequenceUniverse(), resolution: exhausting, shows: [show], profiles: profiles(), championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+    const pac = applied.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")!;
+    const white = applied.universe.applications[0].conditionChanges.find((change) => change.workerName === "Jay White")!;
+    expect(pac).toMatchObject({ ordinaryWear: 5.5, incidentDamage: 3, fatigueGain: 25, healthAfter: 86.5, fatigueAfter: 25, injuryStatus: "Minor Concern" });
+    expect(white).toMatchObject({ ordinaryWear: 5.5, incidentDamage: 8, fatigueGain: 25, healthAfter: 80.5, fatigueAfter: 25, injuryStatus: "Injured" });
+    expect(pac.calculationLedger?.ordinaryWear.capApplied).toBe(true);
+    expect(pac.calculationLedger?.fatigueGain.capApplied).toBe(true);
+  });
+
+  test("recovers two fatigue points per full rest day and none between same-night matches", () => {
+    const firstShow = showWithMatch();
+    const first = applyCoreResultConsequences({ universe: emptyResultConsequenceUniverse(), resolution: resolution(firstShow.show.id, firstShow.segment.id), shows: [firstShow.show], profiles: profiles(), championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+
+    const sameNight = showWithMatch();
+    sameNight.show.id = "show-same-night";
+    sameNight.segment.id = "match-same-night";
+    sameNight.show.segments = [sameNight.segment];
+    const sameNightApplied = applyCoreResultConsequences({ universe: first.universe, resolution: resolution(sameNight.show.id, sameNight.segment.id), shows: [...first.shows, sameNight.show], profiles: first.profiles, championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+    const sameNightPac = sameNightApplied.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")!;
+    expect(sameNightPac).toMatchObject({ fullRestDays: 0, fatigueStoredBefore: 7.68, fatigueRecovery: 0, fatigueBefore: 7.68, fatigueAfter: 15.36 });
+
+    const weekly = showWithMatch();
+    weekly.show.id = "show-weekly";
+    weekly.show.date = "2019-01-15";
+    weekly.segment.id = "match-weekly";
+    weekly.show.segments = [weekly.segment];
+    const recoveredProfiles = first.profiles.map((profile) => profile.workerName === "PAC" ? { ...profile, health: 95 } : profile);
+    const synchronizedUniverse = synchronizeWorkerRecordsFromProfiles(first.universe, recoveredProfiles);
+    expect(synchronizedUniverse.workerRecords.find((record) => record.workerName === "PAC")).toMatchObject({ health: 95, lastMatchHealth: 93.75 });
+    const weeklyApplied = applyCoreResultConsequences({ universe: synchronizedUniverse, resolution: resolution(weekly.show.id, weekly.segment.id), shows: [...first.shows, weekly.show], profiles: recoveredProfiles, championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+    const weeklyPac = weeklyApplied.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")!;
+    expect(weeklyPac).toMatchObject({ fullRestDays: 6, fatigueStoredBefore: 7.68, fatigueRecovery: 7.68, fatigueBefore: 0, fatigueAfter: 7.68, healthStoredBefore: 93.75, healthRecovery: 1.25, healthBefore: 95, healthAfter: 93.75 });
+    expect(weeklyPac.calculationLedger?.fatigueRecovery.capApplied).toBe(true);
+
+    const longRest = showWithMatch();
+    longRest.show.id = "show-long-rest";
+    longRest.show.date = "2019-01-30";
+    longRest.segment.id = "match-long-rest";
+    longRest.show.segments = [longRest.segment];
+    const longRestApplied = applyCoreResultConsequences({ universe: first.universe, resolution: resolution(longRest.show.id, longRest.segment.id), shows: [...first.shows, longRest.show], profiles: first.profiles, championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+    const longRestPac = longRestApplied.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")!;
+    expect(longRestPac).toMatchObject({ fullRestDays: 21, fatigueRecovery: 7.68, fatigueBefore: 0, fatigueAfter: 7.68 });
+  });
+
+  test("uses the official multi-person upset flag instead of treating every sub-50% winner as an upset", () => {
+    const { show, segment } = showWithMatch();
+    const expectedWinner = resolution(show.id, segment.id);
+    const thirdResult = { ...expectedWinner.attempts[0].workerResults[1], workerKey: "tew:third", workerId: "third", workerName: "Third Wrestler", winProbability: 0.3 };
+    expectedWinner.attempts[0].workerResults[0].winProbability = 0.4;
+    expectedWinner.attempts[0].workerResults.push(thirdResult);
+    expectedWinner.attempts[0].finalResult!.upset = false;
+    segment.workers.push({ id: "third", name: "Third Wrestler", role: "Competitor", side: "Side 3", source: "tew" });
+    const thirdProfile = createMatchEngineProfile({ id: "third", name: "Third Wrestler", source: "tew" });
+    const expected = applyCoreResultConsequences({ universe: emptyResultConsequenceUniverse(), resolution: expectedWinner, shows: [show], profiles: [...profiles(), thirdProfile], championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+    const expectedPac = expected.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")!;
+    expect(expectedPac.calculationLedger?.ranking.terms.find((term) => term.id === "upset")?.contribution).toBe(0);
+    expect(expectedPac.rankingPointsAfter).toBe(4.8);
+
+    const officialUpset = structuredClone(expectedWinner);
+    officialUpset.id = "resolution-official-upset";
+    officialUpset.attempts[0].id = "attempt-official-upset";
+    officialUpset.activeAttemptId = "attempt-official-upset";
+    officialUpset.status = "Overridden";
+    officialUpset.attempts[0].status = "Overridden";
+    officialUpset.attempts[0].finalResult!.upset = true;
+    officialUpset.attempts[0].finalResult!.acceptedEngineResult = false;
+    officialUpset.attempts[0].finalResult!.overrideReason = "The final overridden winner is an official upset.";
+    const upset = applyCoreResultConsequences({ universe: emptyResultConsequenceUniverse(), resolution: officialUpset, shows: [structuredClone(show)], profiles: [...profiles(), thirdProfile], championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+    const upsetPac = upset.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")!;
+    expect(upsetPac.calculationLedger?.ranking.terms.find((term) => term.id === "upset")?.contribution).toBe(2);
+    expect(upsetPac.rankingPointsAfter).toBe(6.8);
   });
 
   test("applies the real stamina statuses and individual popularity performance", () => {
@@ -359,6 +471,10 @@ describe("Phase 6B3 standalone result consequences", () => {
     });
     expect(applied.universe.workerRecords.every((record) => record.noContests === 1 && record.wins === 0 && record.losses === 0 && record.rankingPoints === 0)).toBe(true);
     expect(applied.universe.workerRecords.every((record) => record.fatigue > 0 && record.health < sourceProfiles.find((profile) => profile.workerKey === record.workerKey)!.health)).toBe(true);
+    const noContestPac = applied.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")!;
+    expect(noContestPac.calculationLedger?.ranking.result).toBe(0);
+    expect(noContestPac.calculationLedger?.momentum.terms.filter((term) => term.id === "result" || term.id === "upset").every((term) => term.contribution === 0)).toBe(true);
+    expect(noContestPac.calculationLedger?.popularity.terms.find((term) => term.id === "result")?.contribution).toBe(0);
     expect(applied.universe.teamRecords).toEqual([]);
     expect(applied.universe.championshipProposals).toEqual([]);
     expect(applied.universe.competitionProposals[0]).toMatchObject({ resultType: "No Contest", status: "Pending", proposedWinnerParticipantId: "" });
@@ -430,7 +546,16 @@ describe("Phase 6B3 standalone result consequences", () => {
     const parsed = parseResultConsequenceUniverse(JSON.parse(JSON.stringify(applied.universe)) as unknown);
     expect(parsed.workerRecords[0].matchHistory[0].resolutionAttemptId).toBe(`attempt-${segment.id}`);
     expect(parsed.applications[0].conditionChanges).toHaveLength(2);
+    expect(parsed.applications[0].conditionChanges[0].calculationLedger?.version).toBe("wrestling-sim-consequences-6b20d-v1");
     expect(parsed.prompts.length).toBeGreaterThanOrEqual(3);
+
+    const legacy = JSON.parse(JSON.stringify(applied.universe)) as any;
+    legacy.applications[0].calculationVersion = "legacy-consequences-v0";
+    delete legacy.applications[0].conditionChanges[0].calculationLedger;
+    const migratedLegacy = parseResultConsequenceUniverse(legacy);
+    expect(migratedLegacy.applications[0].calculationVersion).toBe("legacy-consequences-v0");
+    expect(migratedLegacy.applications[0].conditionChanges[0].calculationLedger).toBeUndefined();
+    expect(migratedLegacy.applications[0].conditionChanges[0].healthAfter).toBe(applied.universe.applications[0].conditionChanges[0].healthAfter);
   });
 
   test("applies team wins to every teammate and maintains separate team records", () => {
@@ -486,6 +611,8 @@ describe("Phase 6B3 standalone result consequences", () => {
     segment.competitionFixtureId = competition.fixtures[0].id;
     segment.competitionRoundLabel = competition.fixtures[0].roundLabel;
     const accepted = acceptEngineResult(createMatchResolutionRecord(setup, attempt));
+    accepted.attempts[0].finalResult!.upset = false;
+    accepted.attempts[0].engineResult.teamResults!.find((team) => team.id === attempt.engineResult.winnerTeamId)!.winProbability = 0.2;
     const applied = applyCoreResultConsequences({
       universe: emptyResultConsequenceUniverse(), resolution: accepted, shows: [show], profiles: workerProfiles,
       championships: { championships: [championship] }, competitions: { competitions: [competition] },
@@ -494,7 +621,10 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(applied.universe.workerRecords.filter((record) => winningKeys.includes(record.workerKey)).every((record) => record.wins === 1)).toBe(true);
     expect(applied.universe.workerRecords.filter((record) => !winningKeys.includes(record.workerKey)).every((record) => record.losses === 1)).toBe(true);
     expect(applied.universe.teamRecords).toHaveLength(2);
-    expect(applied.universe.teamRecords.find((record) => record.teamKey === attempt.engineResult.winnerTeamId)).toMatchObject({ wins: 1, losses: 0, rankingPosition: 1 });
+    const winningRecord = applied.universe.teamRecords.find((record) => record.teamKey === attempt.engineResult.winnerTeamId)!;
+    expect(winningRecord).toMatchObject({ wins: 1, losses: 0, rankingPosition: 1 });
+    expect(winningRecord.matchHistory[0].rankingCalculation?.terms.find((term) => term.id === "upset")?.contribution).toBe(0);
+    expect(winningRecord.matchHistory[0].rawMatchScore).toBe(attempt.engineResult.matchScore);
     expect(applied.universe.applications[0].conditionChanges).toHaveLength(4);
     expect(applied.universe.championshipProposals[0]).toMatchObject({ suggestedDecision: "Changed Hands", status: "Pending" });
     expect(applied.universe.competitionProposals[0]).toMatchObject({ proposedWinnerParticipantId: firstTeam.id, status: "Pending" });

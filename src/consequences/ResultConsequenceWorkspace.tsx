@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { CalculationStage } from "../calculations/CalculationLedgerView";
 import { loadChampionshipUniverse, saveChampionshipUniverse } from "../championships/storage";
 import type { TitleResultDecision } from "../championships/types";
 import { loadCompetitionUniverse, saveCompetitionUniverse } from "../competitions/storage";
@@ -23,6 +24,7 @@ import { loadResultConsequenceUniverse, saveResultConsequenceUniverse } from "./
 import type {
   ChampionshipConsequenceProposal,
   CompetitionConsequenceProposal,
+  ConditionChange,
   ResultConsequenceUniverse,
 } from "./types";
 
@@ -49,6 +51,23 @@ function resultHeadline(result: NonNullable<ReturnType<typeof activeResolutionAt
 
 function statusClass(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
+function ConsequenceChangeCard({ change }: { change: ConditionChange }) {
+  const ledger = change.calculationLedger;
+  return <article>
+    <header><strong>{change.workerName}</strong><span>{change.injuryStatus}</span></header>
+    <dl>
+      <div><dt>Health</dt><dd>{change.healthBefore.toFixed(1)} → {change.healthAfter.toFixed(1)}</dd></div>
+      <div><dt>Fatigue</dt><dd>{change.fatigueBefore.toFixed(1)} → {change.fatigueAfter.toFixed(1)}</dd></div>
+      <div><dt>Momentum</dt><dd>{change.momentumBefore.toFixed(1)} → {change.momentumAfter.toFixed(1)}</dd></div>
+      <div><dt>Popularity</dt><dd>{change.popularityBefore.toFixed(1)} → {change.popularityAfter.toFixed(1)}</dd></div>
+      <div><dt>Ranking points</dt><dd>{change.rankingPointsBefore.toFixed(1)} → {change.rankingPointsAfter.toFixed(1)}</dd></div>
+      <div><dt>Ranking position</dt><dd>#{change.rankingPositionBefore || "—"} → #{change.rankingPositionAfter || "—"}</dd></div>
+    </dl>
+    {change.explanation.map((item) => <p key={item}>{item}</p>)}
+    {ledger ? <details className="calculation-ledger-details consequence-ledger"><summary>Open exact consequence calculation · {ledger.version}</summary><div className="calculation-stage-stack"><CalculationStage stage={ledger.healthRecovery} /><CalculationStage stage={ledger.ordinaryWear} /><CalculationStage stage={ledger.incidentDamage} /><CalculationStage stage={ledger.fatigueRecovery} /><CalculationStage stage={ledger.fatigueGain} /><CalculationStage stage={ledger.momentum} /><CalculationStage stage={ledger.popularity} /><CalculationStage stage={ledger.ranking} /></div></details> : <small>This locked historical result predates the Phase 6B20D consequence ledger. Its recorded values remain unchanged.</small>}
+  </article>;
 }
 
 export default function ResultConsequenceWorkspace({ onOpenLiveCard, onOpenPlanner }: ResultConsequenceWorkspaceProps) {
@@ -176,7 +195,7 @@ export default function ResultConsequenceWorkspace({ onOpenLiveCard, onOpenPlann
     {universe.settings.activeTab === "overview" && <div className="consequence-overview">
       <section className="consequence-pending"><header><div><p className="eyebrow">UNAPPLIED OFFICIAL RESULTS</p><h3>Apply each result exactly once</h3></div><span>{pending.length}</span></header>{pending.length === 0 ? <div className="empty-state compact">No Accepted or Overridden result is waiting for consequences.</div> : pending.map((record) => { const attempt = activeResolutionAttempt(record)!; return <article key={record.id}><div><strong>{record.segmentTitle}</strong><span>{record.showName}</span><small>{resultHeadline(attempt.finalResult)} · {attempt.finalResult?.matchScore.toFixed(1)} rating</small></div><button className="primary-button" type="button" onClick={() => apply(record)}>Apply Official Consequences</button></article>; })}</section>
       <section className="consequence-applications"><header><div><p className="eyebrow">APPLICATION HISTORY</p><h3>Official standalone result records</h3></div><span>{universe.applications.length}</span></header>{universe.applications.length === 0 ? <div className="empty-state compact">No standalone result has been applied yet.</div> : universe.applications.map((application) => <button key={application.id} type="button" className={`${selectedApplication?.id === application.id ? "active" : ""} consequence-status--${statusClass(application.status)}`} onClick={() => setUniverse((current) => ({ ...current, settings: { ...current.settings, selectedApplicationId: application.id } }))}><strong>{resultHeadline(application.finalResult)}</strong><span>{application.showName} · {application.segmentTitle}</span><small>{application.status} · {formatDate(application.appliedAt)}</small></button>)}</section>
-      {selectedApplication && <section className="consequence-detail"><header><div><p className="eyebrow">SELECTED RESULT</p><h3>{resultHeadline(selectedApplication.finalResult)}</h3><p>{selectedApplication.finalResult.finishDescription}</p></div><span>{selectedApplication.status}</span></header><div className="consequence-change-grid">{selectedApplication.conditionChanges.map((change) => <article key={change.workerKey}><header><strong>{change.workerName}</strong><span>{change.injuryStatus}</span></header><dl><div><dt>Health</dt><dd>{change.healthBefore.toFixed(1)} → {change.healthAfter.toFixed(1)}</dd></div><div><dt>Fatigue</dt><dd>{change.fatigueBefore.toFixed(1)} → {change.fatigueAfter.toFixed(1)}</dd></div><div><dt>Momentum</dt><dd>{change.momentumBefore.toFixed(1)} → {change.momentumAfter.toFixed(1)}</dd></div><div><dt>Ranking points</dt><dd>{change.rankingPointsBefore.toFixed(1)} → {change.rankingPointsAfter.toFixed(1)}</dd></div></dl>{change.explanation.map((item) => <p key={item}>{item}</p>)}</article>)}</div><button className="secondary-button" type="button" onClick={() => onOpenPlanner(selectedApplication.showId, selectedApplication.segmentId)}>Open Permanent Match Record</button></section>}
+      {selectedApplication && <section className="consequence-detail"><header><div><p className="eyebrow">SELECTED RESULT</p><h3>{resultHeadline(selectedApplication.finalResult)}</h3><p>{selectedApplication.finalResult.finishDescription}</p></div><span>{selectedApplication.status}</span></header><div className="consequence-change-grid">{selectedApplication.conditionChanges.map((change) => <ConsequenceChangeCard key={change.workerKey} change={change} />)}</div><button className="secondary-button" type="button" onClick={() => onOpenPlanner(selectedApplication.showId, selectedApplication.segmentId)}>Open Permanent Match Record</button></section>}
     </div>}
 
     {universe.settings.activeTab === "records" && <div className="consequence-records"><aside><h3>Standalone rankings</h3>{[...universe.workerRecords].sort((left, right) => left.rankingPosition - right.rankingPosition).map((record) => <button type="button" key={record.workerKey} className={selectedWorker?.workerKey === record.workerKey ? "active" : ""} onClick={() => setUniverse((current) => ({ ...current, settings: { ...current.settings, selectedWorkerKey: record.workerKey } }))}><b>#{record.rankingPosition || "—"}</b><span><strong>{record.workerName}</strong><small>{record.wins}-{record.losses}-{record.draws} · {record.rankingPoints.toFixed(1)} pts</small></span></button>)}</aside>{selectedWorker ? <main><header><div><p className="eyebrow">WORKER RECORD</p><h3>{selectedWorker.workerName}</h3></div><span>Rank #{selectedWorker.rankingPosition || "—"}</span></header><section className="record-scorecard"><article><span>Record</span><strong>{selectedWorker.wins}-{selectedWorker.losses}-{selectedWorker.draws}</strong></article><article><span>Streak</span><strong>{selectedWorker.currentStreakCount ? `${selectedWorker.currentStreakCount}${selectedWorker.currentStreakType}` : "—"}</strong></article><article><span>Momentum</span><strong>{selectedWorker.momentum.toFixed(1)}</strong></article><article><span>Health</span><strong>{selectedWorker.health.toFixed(1)}</strong></article><article><span>Fatigue</span><strong>{selectedWorker.fatigue.toFixed(1)}</strong></article><article><span>Condition</span><strong>{selectedWorker.injuryStatus}</strong></article></section><section className="record-history"><h4>Match history</h4>{selectedWorker.matchHistory.length === 0 ? <p>No applied matches.</p> : selectedWorker.matchHistory.map((entry) => <article key={entry.id}><b>{entry.result}</b><div><strong>{entry.segmentTitle}</strong><span>vs. {entry.opponentNames.join(" & ")} · {entry.showName}</span><small>{entry.finishDescription}</small></div><em>{entry.matchScore.toFixed(1)} · {entry.starRating}★</em></article>)}</section></main> : <main className="empty-state">Apply a result to create standalone records and rankings.</main>}</div>}

@@ -19,7 +19,7 @@ function capLabel(stage: CalculationLedgerStage): string {
   return `${stage.capMinimum}–${stage.capMaximum}`;
 }
 
-function CalculationStage({ stage }: { stage: CalculationLedgerStage }) {
+export function CalculationStage({ stage }: { stage: CalculationLedgerStage }) {
   return <article className="calculation-stage" data-formula-id={stage.formulaId}>
     <header><div><strong>{stage.label}</strong><span>{stage.formulaId}</span></div><b>{formatNumber(stage.result, stage.roundingPlaces)}</b></header>
     <p>{stage.formula}</p>
