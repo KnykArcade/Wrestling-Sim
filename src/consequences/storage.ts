@@ -45,6 +45,9 @@ function workerRecord(value: unknown): StandaloneWorkerRecord | null {
     momentum: currentScale && typeof value.momentum === "number" && Number.isFinite(value.momentum) ? Math.max(0, Math.min(100, value.momentum)) : replayLegacyMomentum(value),
     momentumScale: "0-100-v1",
     popularity: typeof value.popularity === "number" && Number.isFinite(value.popularity) ? Math.max(0, Math.min(100, value.popularity)) : 50,
+    lastMatchHealth: typeof value.lastMatchHealth === "number" && Number.isFinite(value.lastMatchHealth)
+      ? Math.max(0, Math.min(100, value.lastMatchHealth))
+      : typeof value.health === "number" && Number.isFinite(value.health) ? Math.max(0, Math.min(100, value.health)) : 100,
   } as unknown as StandaloneWorkerRecord;
 }
 

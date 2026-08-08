@@ -7,7 +7,14 @@ import type { MatchResolutionRecord } from "../matchResolution/types";
 import { createPlannerId, touchShow } from "../planner/model";
 import type { PlannedSegment, PlannedShow } from "../planner/types";
 import type { MatchEngineProfile } from "../matchEngine/types";
-import { CALCULATION_SYSTEM_VERSION } from "../calculations/foundation";
+import {
+  CALCULATION_FORMULAS,
+  CONSEQUENCE_CALCULATION_SYSTEM_VERSION,
+  createCalculationStage,
+  createCalculationTerm,
+} from "../calculations/foundation";
+import type { CalculationLedgerStage } from "../calculations/foundation";
+import type { MatchResolutionWorkerResult } from "../matchResolution/types";
 import type {
   ChampionshipConsequenceProposal,
   CompetitionConsequenceProposal,
@@ -94,6 +101,7 @@ function defaultWorkerRecord(workerKey: string, workerId: string, workerName: st
     momentumScale: "0-100-v1",
     popularity: profile?.popularity ?? 50,
     health: profile?.health ?? 100,
+    lastMatchHealth: profile?.health ?? 100,
     fatigue: 0,
     injuryStatus: "Healthy",
     injuryNote: "",
@@ -110,49 +118,129 @@ function updateStreak(record: StandaloneWorkerRecord, result: "W" | "L" | "D" | 
 
 function injuryFromIncident(incident: string): { status: StandaloneWorkerRecord["injuryStatus"]; note: string; healthPenalty: number } {
   const normalized = normalize(incident);
-  if (normalized.includes("major execution mistake")) return { status: "Injured", note: incident, healthPenalty: 8 };
-  if (normalized.includes("visible botch")) return { status: "Minor Concern", note: incident, healthPenalty: 3 };
+  if (normalized.includes("major execution mistake")) return { status: "Injured", note: incident, healthPenalty: CALCULATION_FORMULAS.incidentDamage.majorIncidentPenalty };
+  if (normalized.includes("visible botch")) return { status: "Minor Concern", note: incident, healthPenalty: CALCULATION_FORMULAS.incidentDamage.visibleBotchPenalty };
   return { status: "Healthy", note: "", healthPenalty: 0 };
 }
 
-function rankingDelta(result: "W" | "L" | "D" | "NC", matchScore: number, winProbability: number, performanceLeader: boolean): number {
-  const quality = Math.max(0, matchScore - 60) / 20;
-  if (result === "W") return round(3 + quality + (winProbability < 0.5 ? 2 : 0) + (performanceLeader ? 0.5 : 0));
-  if (result === "L") return round(-1 + quality * 0.4 + (performanceLeader ? 1.25 : 0));
-  if (result === "D") return round(1 + quality * 0.5);
-  return 0;
+type ResultCode = "W" | "L" | "D" | "NC";
+
+function rankingCalculation(result: ResultCode, rawMatchScore: number, performanceLeader: boolean, upset: boolean): CalculationLedgerStage {
+  const formula = CALCULATION_FORMULAS.rankingConsequence;
+  const quality = Math.max(0, rawMatchScore - formula.qualityThreshold) / formula.qualityDivisor;
+  const base = result === "W" ? formula.winBase : result === "L" ? formula.lossBase : result === "D" ? formula.drawBase : 0;
+  const qualityWeight = result === "W" ? formula.winnerQualityWeight : result === "L" ? formula.loserQualityWeight : result === "D" ? formula.drawQualityWeight : 0;
+  const upsetChange = result === "W" && upset ? formula.upsetWinChange : 0;
+  const leaderChange = performanceLeader ? result === "W" ? formula.winnerLeaderChange : result === "L" ? formula.loserLeaderChange : 0 : 0;
+  return createCalculationStage(formula, [
+    createCalculationTerm("result", `${result === "W" ? "Win" : result === "L" ? "Loss" : result === "D" ? "Draw" : "No Contest"} base`, base),
+    createCalculationTerm("raw-quality", "Raw in-ring quality above 60", quality, qualityWeight, `Raw in-ring score ${rawMatchScore.toFixed(2)}; live crowd and final rating are excluded.`),
+    createCalculationTerm("upset", "Official upset bonus", upsetChange),
+    createCalculationTerm("performance-leader", "Performance-leader bonus", leaderChange),
+  ], { notes: ["The official final-result upset flag is authoritative for singles, teams, multi-person matches, and overrides."] });
 }
 
-function momentumDelta(result: "W" | "L" | "D" | "NC", performanceScore: number, expectedPerformance: number, performanceLeader: boolean, upset: boolean): number {
-  const resultChange = result === "W" ? 3 : result === "L" ? -3 : 0;
-  const upsetChange = result === "W" && upset ? 2 : 0;
-  const leaderChange = performanceLeader ? 1 : 0;
-  const expectationChange = clamp(Math.round((performanceScore - expectedPerformance) / 8), -2, 2);
-  return clamp(resultChange + upsetChange + leaderChange + expectationChange, -6, 6);
+function momentumCalculation(result: ResultCode, performanceScore: number, expectedPerformance: number, performanceLeader: boolean, upset: boolean): CalculationLedgerStage {
+  const formula = CALCULATION_FORMULAS.momentumConsequence;
+  const resultChange = result === "W" ? formula.winChange : result === "L" ? formula.lossChange : 0;
+  const upsetChange = result === "W" && upset ? formula.upsetWinChange : 0;
+  const leaderChange = performanceLeader ? formula.performanceLeaderChange : 0;
+  const expectationChange = clamp(Math.round((performanceScore - expectedPerformance) / formula.expectationDivisor), formula.expectationMinimum, formula.expectationMaximum);
+  return createCalculationStage(formula, [
+    createCalculationTerm("result", "Official result", resultChange),
+    createCalculationTerm("upset", "Official upset", upsetChange),
+    createCalculationTerm("performance-leader", "Performance leadership", leaderChange),
+    createCalculationTerm("expectation", "Performance versus expectation", expectationChange, 1, `${performanceScore.toFixed(2)} performance versus ${expectedPerformance.toFixed(2)} expectation, divided by ${formula.expectationDivisor}, rounded, then capped from ${formula.expectationMinimum} to +${formula.expectationMaximum}.`),
+  ], { notes: [result === "NC" ? "No Contest contributes no result or upset component; actual performance can still change momentum." : "Momentum change is capped between -6 and +6."] });
+}
+
+function popularityCalculation(result: ResultCode, performanceScore: number, popularity: number): CalculationLedgerStage {
+  const formula = CALCULATION_FORMULAS.popularityConsequence;
+  const resultChange = result === "W" ? formula.winChange : result === "L" ? formula.lossChange : 0;
+  return createCalculationStage(formula, [
+    createCalculationTerm("performance-gap", "Performance above/below current popularity", performanceScore - popularity, formula.performanceGapWeight),
+    createCalculationTerm("result", "Official result adjustment", resultChange),
+  ], { notes: [result === "NC" ? "No Contest contributes no win or loss adjustment; actual performance can still change popularity." : "Popularity change is capped between -2 and +2."] });
+}
+
+function officialDate(value: string): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+  if (!match) return null;
+  const timestamp = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function restBeforeMatch(history: StandaloneMatchHistoryEntry[], showDate: string): { previousMatchDate: string; fullRestDays: number } {
+  const current = officialDate(showDate);
+  if (current === null) return { previousMatchDate: "", fullRestDays: 0 };
+  const previous = history
+    .map((entry) => ({ date: entry.showDate, timestamp: officialDate(entry.showDate) }))
+    .filter((entry): entry is { date: string; timestamp: number } => entry.timestamp !== null && entry.timestamp <= current)
+    .sort((left, right) => right.timestamp - left.timestamp)[0];
+  if (!previous) return { previousMatchDate: "", fullRestDays: 0 };
+  const calendarDays = Math.floor((current - previous.timestamp) / 86_400_000);
+  return { previousMatchDate: previous.date, fullRestDays: Math.max(0, calendarDays - 1) };
 }
 
 function conditionForWorker(input: {
   existing: StandaloneWorkerRecord;
-  workerResult: ReturnType<typeof activeResolutionAttempt> extends infer _ ? any : never;
-  resultCode: "W" | "L" | "D" | "NC";
+  storedHealthBefore: number;
+  workerResult: MatchResolutionWorkerResult;
+  resultCode: ResultCode;
   finalResult: NonNullable<ReturnType<typeof activeResolutionAttempt>>["finalResult"];
+  rawMatchScore: number;
+  showDate: string;
   performanceLeader: boolean;
   upset: boolean;
   expectedPerformance: number;
 }): { record: StandaloneWorkerRecord; change: ConditionChange } {
-  const { existing, workerResult, resultCode, finalResult, performanceLeader, upset, expectedPerformance } = input;
+  const { existing, storedHealthBefore, workerResult, resultCode, finalResult, rawMatchScore, showDate, performanceLeader, upset, expectedPerformance } = input;
   if (!finalResult) throw new Error("A finalized result is required.");
-  const staminaFatigue = workerResult.staminaStatus === "DEAD" ? 8 : workerResult.staminaStatus === "GASSED" ? 4 : workerResult.staminaStatus === "WINDED" ? 2 : 0;
-  const fatigueGain = round(finalResult.actualDurationMinutes * 0.7 + workerResult.staminaUsed * 1.8 + Math.max(0, workerResult.actualPace - 3) * 0.8 + staminaFatigue);
-  const baseHealthLoss = finalResult.matchScore >= 90 ? 2.5 : finalResult.matchScore >= 80 ? 1.7 : finalResult.matchScore >= 70 ? 1 : 0.5;
-  const staminaPenalty = workerResult.staminaStatus === "DEAD" ? 5 : workerResult.staminaStatus === "GASSED" ? 2.5 : workerResult.staminaStatus === "WINDED" ? 1 : 0;
+  const excessPace = Math.max(0, workerResult.actualPace - 3);
+  const wearFormula = CALCULATION_FORMULAS.ordinaryWear;
+  const wearCalculation = createCalculationStage(wearFormula, [
+    createCalculationTerm("duration", "Actual duration (minutes)", finalResult.actualDurationMinutes, wearFormula.durationWeight),
+    createCalculationTerm("stamina-cost", "Stamina cost", workerResult.staminaUsed, wearFormula.staminaCostWeight),
+    createCalculationTerm("excess-pace", "Pace above 3", excessPace, wearFormula.excessPaceWeight),
+    createCalculationTerm("stamina-state", `${workerResult.staminaStatus} stamina-state penalty`, wearFormula.staminaPenalties[workerResult.staminaStatus]),
+  ], { notes: ["Crowd response, popularity, star rating, and final rating have no physical effect."] });
   const incident = injuryFromIncident(workerResult.incident);
-  const healthAfter = round(clamp(existing.health - baseHealthLoss - staminaPenalty - incident.healthPenalty, 0, 100));
-  const fatigueAfter = round(clamp(existing.fatigue + fatigueGain, 0, 100));
-  const momentumChange = momentumDelta(resultCode, workerResult.performanceScore, expectedPerformance, performanceLeader, upset);
-  const resultPopularity = resultCode === "W" ? 0.3 : resultCode === "L" ? -0.1 : 0;
-  const popularityChange = round(clamp((workerResult.performanceScore - existing.popularity) / 25 + resultPopularity, -2, 2));
-  const rankingChange = rankingDelta(resultCode, finalResult.matchScore, workerResult.winProbability, performanceLeader);
+  const incidentCalculation = createCalculationStage(CALCULATION_FORMULAS.incidentDamage, [
+    createCalculationTerm("incident", incident.note ? incident.status === "Injured" ? "Major execution incident" : "Visible botch" : "No physical incident", incident.healthPenalty),
+  ]);
+  const healthRecoveryCalculation = createCalculationStage(CALCULATION_FORMULAS.healthRecovery, [
+    createCalculationTerm("current-profile", "Current pre-match profile health", existing.health),
+    createCalculationTerm("stored-health", "Stored health after previous match", storedHealthBefore, -1),
+  ], { notes: ["Health recovery is synchronized from the current wrestler profile; Phase 6B20D does not invent an automatic health-regeneration rate."] });
+  const healthRecovery = healthRecoveryCalculation.result;
+  const ordinaryWear = wearCalculation.result;
+  const incidentDamage = incidentCalculation.result;
+  const healthAfter = round(clamp(existing.health - ordinaryWear - incidentDamage, 0, 100));
+
+  const rest = restBeforeMatch(existing.matchHistory, showDate);
+  const fatigueRecoveryFormula = CALCULATION_FORMULAS.fatigueRecovery;
+  const fatigueRecoveryCalculation = createCalculationStage(
+    { ...fatigueRecoveryFormula, capMaximum: existing.fatigue },
+    [createCalculationTerm("full-rest-days", "Full rest days", rest.fullRestDays, fatigueRecoveryFormula.recoveryPerFullRestDay)],
+    { notes: [rest.previousMatchDate ? `Previous official match date: ${rest.previousMatchDate}. Same-night matches receive no recovery.` : "No prior official match date was available, so no stored fatigue recovery was needed."] },
+  );
+  const fatigueRecovery = fatigueRecoveryCalculation.result;
+  const fatigueBefore = round(clamp(existing.fatigue - fatigueRecovery, 0, 100));
+  const fatigueFormula = CALCULATION_FORMULAS.fatigueGain;
+  const fatigueCalculation = createCalculationStage(fatigueFormula, [
+    createCalculationTerm("duration", "Actual duration (minutes)", finalResult.actualDurationMinutes, fatigueFormula.durationWeight),
+    createCalculationTerm("stamina-cost", "Stamina cost", workerResult.staminaUsed, fatigueFormula.staminaCostWeight),
+    createCalculationTerm("excess-pace", "Pace above 3", excessPace, fatigueFormula.excessPaceWeight),
+    createCalculationTerm("stamina-state", `${workerResult.staminaStatus} stamina-state penalty`, fatigueFormula.staminaPenalties[workerResult.staminaStatus]),
+  ]);
+  const fatigueGain = fatigueCalculation.result;
+  const fatigueAfter = round(clamp(fatigueBefore + fatigueGain, 0, 100));
+  const momentumCalculationLedger = momentumCalculation(resultCode, workerResult.performanceScore, expectedPerformance, performanceLeader, upset);
+  const momentumChange = momentumCalculationLedger.result;
+  const popularityCalculationLedger = popularityCalculation(resultCode, workerResult.performanceScore, existing.popularity);
+  const popularityChange = popularityCalculationLedger.result;
+  const rankingCalculationLedger = rankingCalculation(resultCode, rawMatchScore, performanceLeader, upset);
+  const rankingChange = rankingCalculationLedger.result;
   const streak = updateStreak(existing, resultCode);
   const next: StandaloneWorkerRecord = {
     ...existing,
@@ -168,6 +256,7 @@ function conditionForWorker(input: {
     momentumScale: "0-100-v1",
     popularity: round(clamp(existing.popularity + popularityChange, 0, 100)),
     health: healthAfter,
+    lastMatchHealth: healthAfter,
     fatigue: fatigueAfter,
     injuryStatus: incident.status === "Healthy" ? existing.injuryStatus === "Injured" ? "Injured" : healthAfter < 65 ? "Minor Concern" : "Healthy" : incident.status,
     injuryNote: incident.note || existing.injuryNote,
@@ -178,21 +267,42 @@ function conditionForWorker(input: {
     workerName: existing.workerName,
     healthBefore: existing.health,
     healthAfter,
-    fatigueBefore: existing.fatigue,
+    healthStoredBefore: storedHealthBefore,
+    healthRecovery,
+    ordinaryWear,
+    incidentDamage,
+    fatigueBefore,
     fatigueAfter,
+    fatigueStoredBefore: existing.fatigue,
+    fatigueRecovery,
+    fatigueGain,
+    fullRestDays: rest.fullRestDays,
     momentumBefore: existing.momentum,
     momentumAfter: next.momentum,
     popularityBefore: existing.popularity,
     popularityAfter: next.popularity,
     rankingPointsBefore: existing.rankingPoints,
     rankingPointsAfter: next.rankingPoints,
+    rankingPositionBefore: existing.rankingPosition,
+    rankingPositionAfter: existing.rankingPosition,
     injuryStatus: next.injuryStatus,
+    calculationLedger: {
+      version: CONSEQUENCE_CALCULATION_SYSTEM_VERSION,
+      healthRecovery: healthRecoveryCalculation,
+      ordinaryWear: wearCalculation,
+      incidentDamage: incidentCalculation,
+      fatigueRecovery: fatigueRecoveryCalculation,
+      fatigueGain: fatigueCalculation,
+      momentum: momentumCalculationLedger,
+      popularity: popularityCalculationLedger,
+      ranking: rankingCalculationLedger,
+    },
     explanation: [
-      `${resultCode === "W" ? "Win" : resultCode === "L" ? "Loss" : resultCode === "D" ? "Draw" : "No contest"}, upset status, performance leadership, and performance versus the ${expectedPerformance.toFixed(1)} expectation changed momentum by ${momentumChange >= 0 ? "+" : ""}${momentumChange}.`,
-      `Individual performance against current popularity changed popularity by ${popularityChange >= 0 ? "+" : ""}${popularityChange}.`,
-      `Match quality changed ranking points by ${rankingChange >= 0 ? "+" : ""}${rankingChange}.`,
-      `${finalResult.actualDurationMinutes.toFixed(2)} minutes and ${workerResult.staminaUsed} stamina cost added ${fatigueGain.toFixed(1)} fatigue.`,
-      `Health changed by ${(healthAfter - existing.health).toFixed(1)}.`,
+      `${resultCode === "W" ? "Win" : resultCode === "L" ? "Loss" : resultCode === "D" ? "Draw" : "No Contest"}, official upset status, performance leadership, and performance versus the ${expectedPerformance.toFixed(1)} expectation changed momentum by ${momentumChange >= 0 ? "+" : ""}${momentumChange}.`,
+      `Individual performance against ${existing.popularity.toFixed(1)} current popularity changed popularity by ${popularityChange >= 0 ? "+" : ""}${popularityChange}.`,
+      `Raw in-ring score ${rawMatchScore.toFixed(1)} changed ranking points by ${rankingChange >= 0 ? "+" : ""}${rankingChange}; the crowd-adjusted ${finalResult.matchScore.toFixed(1)} final rating was excluded.`,
+      `${rest.fullRestDays} full rest day${rest.fullRestDays === 1 ? "" : "s"} recovered ${fatigueRecovery.toFixed(1)} fatigue before this match; the match then added ${fatigueGain.toFixed(1)}.`,
+      `Current profile health included ${healthRecovery.toFixed(1)} recovery since the stored result; ordinary match wear removed ${ordinaryWear.toFixed(1)} and incident damage removed ${incidentDamage.toFixed(1)}.`,
       incident.note || "No match incident produced an injury flag.",
     ],
   };
@@ -233,13 +343,16 @@ function updateTeamRecords(
       wins: 0, losses: 0, draws: 0, noContests: 0, rankingPoints: 0, rankingPosition: 0,
       previousRankingPosition: 0, momentum: 0, matchHistory: [], updatedAt: now(),
     };
-    const quality = Math.max(0, attempt.finalResult.matchScore - 60) / 20;
-    const rankingDelta = result === "W" ? 3 + quality + (team.winProbability < 0.5 ? 2 : 0) : result === "L" ? -1 + quality * 0.4 : 0;
+    const performanceLeader = team.memberKeys.includes(attempt.engineResult.performanceLeaderKey);
+    const officialUpset = result === "W" && Boolean(attempt.finalResult.upset);
+    const rankingLedger = rankingCalculation(result, attempt.engineResult.matchScore, performanceLeader, officialUpset);
+    const rankingDelta = rankingLedger.result;
     const history = {
       id: createPlannerId(), resolutionRecordId: resolution.id, resolutionAttemptId: attempt.id,
       showId: show.id, showName: show.name, showDate: show.date, segmentId: segment.id, segmentTitle: segment.title,
       opponentTeamNames: attempt.engineResult.teamResults.filter((candidate) => candidate.id !== team.id).map((candidate) => candidate.name),
       result, finishDescription: attempt.finalResult.finishDescription, matchScore: attempt.finalResult.matchScore,
+      rawMatchScore: attempt.engineResult.matchScore, rankingChange: rankingDelta, rankingCalculation: rankingLedger,
       occurredAt: attempt.finalResult.finalizedAt,
     } as const;
     const next: StandaloneTeamRecord = {
@@ -494,14 +607,26 @@ export function applyCoreResultConsequences(input: {
   for (const workerResult of attempt.workerResults) {
     const profile = input.profiles.find((item) => item.workerKey === workerResult.workerKey) ?? null;
     const savedRecord = records.find((item) => item.workerKey === workerResult.workerKey);
+    const storedHealthBefore = savedRecord?.lastMatchHealth ?? savedRecord?.health ?? profile?.health ?? 100;
     const existing = savedRecord
-      ? { ...savedRecord, momentum: profile?.momentum ?? savedRecord.momentum, popularity: profile?.popularity ?? savedRecord.popularity ?? 50 }
+      ? { ...savedRecord, momentum: profile?.momentum ?? savedRecord.momentum, popularity: profile?.popularity ?? savedRecord.popularity ?? 50, health: profile?.health ?? savedRecord.health }
       : defaultWorkerRecord(workerResult.workerKey, workerResult.workerId, workerResult.workerName, profile);
     const noContest = attempt.finalResult.finishType === "No Contest";
     const winningKeys = noContest ? [] : attempt.finalResult.winnerMemberKeys?.length ? attempt.finalResult.winnerMemberKeys : [attempt.finalResult.winnerKey];
     const resultCode: "W" | "L" | "NC" = noContest ? "NC" : winningKeys.includes(workerResult.workerKey) ? "W" : "L";
     const isLeader = workerResult.workerKey === attempt.engineResult.performanceLeaderKey;
-    const condition = conditionForWorker({ existing, workerResult, resultCode, finalResult: attempt.finalResult, performanceLeader: isLeader, upset: Boolean(attempt.finalResult.upset) && resultCode === "W", expectedPerformance: profile?.overall ?? existing.popularity });
+    const condition = conditionForWorker({
+      existing,
+      storedHealthBefore,
+      workerResult,
+      resultCode,
+      finalResult: attempt.finalResult,
+      rawMatchScore: attempt.engineResult.matchScore,
+      showDate: show.date,
+      performanceLeader: isLeader,
+      upset: Boolean(attempt.finalResult.upset) && resultCode === "W",
+      expectedPerformance: profile?.overall ?? existing.popularity,
+    });
     const opponents = noContest ? attempt.workerResults.filter((item) => item.workerKey !== workerResult.workerKey) : attempt.workerResults.filter((item) => winningKeys.includes(item.workerKey) !== winningKeys.includes(workerResult.workerKey));
     const history: StandaloneMatchHistoryEntry = {
       id: createPlannerId(),
@@ -519,6 +644,7 @@ export function applyCoreResultConsequences(input: {
       finishDescription: attempt.finalResult.finishDescription,
       durationMinutes: attempt.finalResult.actualDurationMinutes,
       matchScore: attempt.finalResult.matchScore,
+      rawMatchScore: attempt.engineResult.matchScore,
       starRating: attempt.finalResult.starRating,
       performanceScore: workerResult.performanceScore,
       competitiveScore: workerResult.competitiveScore,
@@ -535,6 +661,9 @@ export function applyCoreResultConsequences(input: {
     historyEntries.push(history);
   }
   records = applyRankingPositions(records);
+  for (const change of changes) {
+    change.rankingPositionAfter = records.find((record) => record.workerKey === change.workerKey)?.rankingPosition ?? change.rankingPositionBefore ?? 0;
+  }
   const teamRecords = updateTeamRecords(input.universe.teamRecords, input.resolution, show, segment);
   const updatedShow = applyResultToShow(show, segment.id, input.resolution);
   const shows = input.shows.map((item) => item.id === show.id ? updatedShow : item);
@@ -551,7 +680,7 @@ export function applyCoreResultConsequences(input: {
     id: applicationId,
     resolutionRecordId: input.resolution.id,
     resolutionAttemptId: attempt.id,
-    calculationVersion: CALCULATION_SYSTEM_VERSION,
+    calculationVersion: CONSEQUENCE_CALCULATION_SYSTEM_VERSION,
     idempotencyKey,
     showId: show.id,
     showName: show.name,

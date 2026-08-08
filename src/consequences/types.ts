@@ -3,6 +3,7 @@ import type { CompetitionResultType, CompetitionUniverse } from "../competitions
 import type { MatchResolutionAttempt, MatchResolutionFinalResult } from "../matchResolution/types";
 import type { MatchEngineProfile } from "../matchEngine/types";
 import type { PlannedShow } from "../planner/types";
+import type { CalculationLedgerStage } from "../calculations/foundation";
 
 export type ConsequenceApplicationStatus = "Applied" | "Rolled Back";
 export type ConsequenceDecisionStatus = "Pending" | "Confirmed" | "Deferred" | "Blocked";
@@ -24,6 +25,7 @@ export interface StandaloneMatchHistoryEntry {
   finishDescription: string;
   durationMinutes: number;
   matchScore: number;
+  rawMatchScore?: number;
   starRating: number;
   performanceScore: number;
   competitiveScore: number;
@@ -52,6 +54,7 @@ export interface StandaloneWorkerRecord {
   momentumScale: "0-100-v1";
   popularity: number;
   health: number;
+  lastMatchHealth?: number;
   fatigue: number;
   injuryStatus: "Healthy" | "Minor Concern" | "Injured";
   injuryNote: string;
@@ -72,6 +75,9 @@ export interface StandaloneTeamHistoryEntry {
   result: "W" | "L" | "D" | "NC";
   finishDescription: string;
   matchScore: number;
+  rawMatchScore?: number;
+  rankingChange?: number;
+  rankingCalculation?: CalculationLedgerStage;
   occurredAt: string;
 }
 
@@ -97,16 +103,39 @@ export interface ConditionChange {
   workerName: string;
   healthBefore: number;
   healthAfter: number;
+  healthStoredBefore?: number;
+  healthRecovery?: number;
+  ordinaryWear?: number;
+  incidentDamage?: number;
   fatigueBefore: number;
   fatigueAfter: number;
+  fatigueStoredBefore?: number;
+  fatigueRecovery?: number;
+  fatigueGain?: number;
+  fullRestDays?: number;
   momentumBefore: number;
   momentumAfter: number;
   popularityBefore: number;
   popularityAfter: number;
   rankingPointsBefore: number;
   rankingPointsAfter: number;
+  rankingPositionBefore?: number;
+  rankingPositionAfter?: number;
   injuryStatus: StandaloneWorkerRecord["injuryStatus"];
+  calculationLedger?: ConsequenceCalculationLedger;
   explanation: string[];
+}
+
+export interface ConsequenceCalculationLedger {
+  version: string;
+  healthRecovery: CalculationLedgerStage;
+  ordinaryWear: CalculationLedgerStage;
+  incidentDamage: CalculationLedgerStage;
+  fatigueRecovery: CalculationLedgerStage;
+  fatigueGain: CalculationLedgerStage;
+  momentum: CalculationLedgerStage;
+  popularity: CalculationLedgerStage;
+  ranking: CalculationLedgerStage;
 }
 
 export interface FutureBookingConflict {

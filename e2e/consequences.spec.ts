@@ -89,6 +89,13 @@ test("applies one official result to records and forces a future booking review"
   await pending.getByRole("button", { name: "Apply Official Consequences" }).click();
   await expect(page.getByRole("status")).toContainText("updated standalone records");
   await expect(page.locator(".consequence-metrics")).toContainText("2");
+  const detail = page.locator(".consequence-detail");
+  await expect(detail.getByText("Popularity", { exact: true })).toHaveCount(2);
+  await detail.locator(".consequence-ledger").first().getByText(/Open exact consequence calculation/).click();
+  await expect(detail.getByText("Ordinary match wear", { exact: true }).first()).toBeVisible();
+  await expect(detail.getByText("Match fatigue gained", { exact: true }).first()).toBeVisible();
+  await expect(detail.getByText("Ranking-points change", { exact: true }).first()).toBeVisible();
+  await expect(detail.getByText(/crowd-adjusted .* final rating was excluded/i).first()).toBeVisible();
 
   await page.getByRole("button", { name: "Records & Rankings" }).click();
   await expect(page.locator(".consequence-records > aside")).toContainText(finalNames.winnerName ?? "");
@@ -119,7 +126,7 @@ test("applies one official result to records and forces a future booking review"
     const showsRaw = window.localStorage.getItem("tew-story-tracker:planned-shows:v1");
     return {
       consequences: consequencesRaw ? JSON.parse(consequencesRaw) as {
-        applications?: Array<{ status?: string }>;
+        applications?: Array<{ status?: string; calculationVersion?: string }>;
         workerRecords?: Array<{ workerName?: string; wins?: number; losses?: number }>;
         futureConflicts?: Array<{ resolved?: boolean; resolutionNote?: string }>;
       } : {},
@@ -128,6 +135,7 @@ test("applies one official result to records and forces a future booking review"
   });
   expect(stored.consequences.applications).toHaveLength(1);
   expect(stored.consequences.applications?.[0]?.status).toBe("Applied");
+  expect(stored.consequences.applications?.[0]?.calculationVersion).toBe("wrestling-sim-consequences-6b20d-v1");
   expect(stored.consequences.workerRecords).toHaveLength(2);
   expect(stored.consequences.futureConflicts?.[0]).toMatchObject({ resolved: true, resolutionNote: "Keep the rematch tentative and review rankings after the next show." });
   const currentShow = stored.shows.find((show) => show.name === "PWL Consequence Test");
