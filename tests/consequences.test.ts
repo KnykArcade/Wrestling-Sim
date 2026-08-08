@@ -216,7 +216,7 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(white).toMatchObject({ fatigue: 6.68, health: 92.75, popularity: 51.46, rankingPoints: -0.48 });
     expect(result.profiles.find((profile) => profile.workerName === "PAC")?.momentum).toBe(pac.momentum);
     expect(result.profiles.find((profile) => profile.workerName === "PAC")?.popularity).toBe(pac.popularity);
-    expect(result.universe.applications[0]).toMatchObject({ calculationVersion: "wrestling-sim-consequences-6b21-v1", idempotencyKey: expect.stringContaining("match-consequences") });
+    expect(result.universe.applications[0]).toMatchObject({ calculationVersion: "wrestling-sim-consequences-6b22-v1", idempotencyKey: expect.stringContaining("match-consequences") });
     const pacChange = result.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")!;
     expect(pacChange).toMatchObject({ healthRecovery: 0, ordinaryWear: 1.25, incidentDamage: 0, fatigueRecovery: 0, fatigueGain: 6.68, fullRestDays: 0, rankingPositionBefore: 0, rankingPositionAfter: 1 });
     expect(pacChange.calculationLedger?.ordinaryWear.terms.map((term) => term.contribution)).toEqual([0.6545, 0.6, 0, 0]);
@@ -404,7 +404,7 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(confirmed.universe.championshipProposals[0].status).toBe("Confirmed");
   });
 
-  test("creates and explicitly confirms competition advancement", () => {
+  test("automatically confirms exact competition advancement", () => {
     const { show, segment } = showWithMatch();
     let competition = createCompetition(1);
     competition.id = "cup-1";
@@ -428,11 +428,9 @@ describe("Phase 6B3 standalone result consequences", () => {
       competitions: { competitions: [competition] },
     });
     const proposal = applied.universe.competitionProposals[0];
-    expect(proposal).toMatchObject({ proposedWinnerParticipantId: pac.id, status: "Pending", resultType: "Decision" });
-    const confirmed = confirmCompetitionConsequence({ universe: applied.universe, proposalId: proposal.id, competitions: { competitions: [competition] } });
-    const updatedFixture = confirmed.competitions.competitions[0].fixtures.find((item) => item.id === fixture.id)!;
+    expect(proposal).toMatchObject({ proposedWinnerParticipantId: pac.id, status: "Confirmed", resultType: "Decision" });
+    const updatedFixture = applied.competitions.competitions[0].fixtures.find((item) => item.id === fixture.id)!;
     expect(updatedFixture).toMatchObject({ winnerId: pac.id, status: "Completed" });
-    expect(confirmed.universe.competitionProposals[0].status).toBe("Confirmed");
   });
 
   test("applies a No Contest as neutral records while preserving wear and blocking title or tournament advancement", () => {
@@ -478,12 +476,11 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(noContestPac.calculationLedger?.popularity.terms.find((term) => term.id === "result")?.contribution).toBe(0);
     expect(applied.universe.teamRecords).toEqual([]);
     expect(applied.universe.championshipProposals[0]).toMatchObject({ suggestedDecision: "No Contest", selectedDecision: "No Contest", status: "Pending" });
-    expect(applied.universe.competitionProposals[0]).toMatchObject({ resultType: "No Contest", status: "Pending", proposedWinnerParticipantId: "" });
+    expect(applied.universe.competitionProposals[0]).toMatchObject({ resultType: "No Contest", status: "Confirmed", proposedWinnerParticipantId: "" });
     expect(applied.shows[0].segments[0].reconciliation).toMatchObject({ happenedAsPlannedDetail: "No Contest", actualMatch: { winner: "No Contest" } });
     expect(applied.universe.prompts.some((prompt) => prompt.kind === "Winner Celebration" || prompt.kind === "Loser Reaction")).toBe(false);
-    const confirmed = confirmCompetitionConsequence({ universe: applied.universe, proposalId: applied.universe.competitionProposals[0].id, competitions: { competitions: [competition] } });
-    expect(confirmed.competitions.competitions[0].fixtures[0]).toMatchObject({ resultType: "No Contest", winnerId: "", loserId: "", status: "Completed" });
-    expect(confirmed.competitions.competitions[0].fixtures.some((fixture) => Boolean(fixture.winnerId))).toBe(false);
+    expect(applied.competitions.competitions[0].fixtures[0]).toMatchObject({ resultType: "No Contest", winnerId: "", loserId: "", status: "Completed" });
+    expect(applied.competitions.competitions[0].fixtures.some((fixture) => Boolean(fixture.winnerId))).toBe(false);
     expect(championship.currentChampions[0].name).toBe("Jay White");
     expect(championship.defenses).toBe(2);
     const titleConfirmed = confirmChampionshipConsequence({ universe: applied.universe, proposalId: applied.universe.championshipProposals[0].id, shows: applied.shows, championships: { championships: [championship] } });
@@ -639,7 +636,7 @@ describe("Phase 6B3 standalone result consequences", () => {
     const parsed = parseResultConsequenceUniverse(JSON.parse(JSON.stringify(applied.universe)) as unknown);
     expect(parsed.workerRecords[0].matchHistory[0].resolutionAttemptId).toBe(`attempt-${segment.id}`);
     expect(parsed.applications[0].conditionChanges).toHaveLength(2);
-    expect(parsed.applications[0].conditionChanges[0].calculationLedger?.version).toBe("wrestling-sim-consequences-6b21-v1");
+    expect(parsed.applications[0].conditionChanges[0].calculationLedger?.version).toBe("wrestling-sim-consequences-6b22-v1");
     expect(parsed.prompts.length).toBeGreaterThanOrEqual(3);
 
     const legacy = JSON.parse(JSON.stringify(applied.universe)) as any;
@@ -720,14 +717,13 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(winningRecord.matchHistory[0].rawMatchScore).toBe(attempt.engineResult.matchScore);
     expect(applied.universe.applications[0].conditionChanges).toHaveLength(4);
     expect(applied.universe.championshipProposals[0]).toMatchObject({ suggestedDecision: "Changed Hands", status: "Pending" });
-    expect(applied.universe.competitionProposals[0]).toMatchObject({ proposedWinnerParticipantId: firstTeam.id, status: "Pending" });
+    expect(applied.universe.competitionProposals[0]).toMatchObject({ proposedWinnerParticipantId: firstTeam.id, status: "Confirmed" });
     const confirmedTitle = confirmChampionshipConsequence({
       universe: applied.universe, proposalId: applied.universe.championshipProposals[0].id, shows: applied.shows,
       championships: { championships: [championship] }, knownWorkers: workerProfiles.map((profile) => ({ id: profile.workerId, name: profile.workerName })),
     });
     expect(confirmedTitle.championships.championships[0].currentChampions.map((champion) => champion.name)).toEqual(winningTeam.memberNames);
-    const confirmedCompetition = confirmCompetitionConsequence({ universe: applied.universe, proposalId: applied.universe.competitionProposals[0].id, competitions: { competitions: [competition] } });
-    expect(confirmedCompetition.competitions.competitions[0].fixtures[0].winnerId).toBe(firstTeam.id);
+    expect(applied.competitions.competitions[0].fixtures[0].winnerId).toBe(firstTeam.id);
   });
 
   test("applies a tag-team No Contest to every wrestler and both team records", () => {

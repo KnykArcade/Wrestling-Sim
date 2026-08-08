@@ -106,6 +106,7 @@ function normalizeWorkerPlan(value: unknown): MatchWorkerApproachPlan | null {
     workerName: text(value.workerName),
     selectedApproachIds,
     lockedApproachIds,
+    requiredApproachId: validApproachIds([value.requiredApproachId])[0] ?? "",
     mode: value.mode === "Manual" ? "Manual" : "AI",
     generatedAt: text(value.generatedAt),
   };

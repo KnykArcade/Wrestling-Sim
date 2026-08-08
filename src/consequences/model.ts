@@ -533,7 +533,7 @@ function competitionProposal(applicationId: string, show: PlannedShow, segment: 
   const beforeStandings = buildCompetitionStandings(competition);
   const proposedCompetition = winner ? recordCompetitionResult(competition, fixture.id, "Decision", winner.id, `${finalWinner} won in Wrestling Sim.`) : competition;
   const afterStandings = buildCompetitionStandings(proposedCompetition);
-  const preview = competition.format === "Single Elimination"
+  const preview = fixture.stageType === "Knockout"
     ? winner ? [`${winner.name} completes ${fixture.roundLabel}.`, "The winner advances into the next available bracket position."] : ["Advancement is blocked until the final winner maps to exactly one fixture participant."]
     : winner ? afterStandings.filter((standing) => standing.participantId === winner.id).map((standing) => `${standing.participantName}: ${standing.wins} wins, ${standing.losses} losses, ${standing.draws} draws, ${standing.points} points, rank ${standing.rank}.`) : ["Standings are blocked until the winner identity is resolved."];
   return {
@@ -845,7 +845,8 @@ export function applyCoreResultConsequences(input: {
       ? rebuildChampionshipFromEvents({ ...championship, resultEvents: championship.resultEvents.filter((event) => !supersededApplicationIds.includes(event.sourceResultId)) })
       : championship),
   } : input.championships;
-  const correctedCompetitions: CompetitionUniverse = supersededApplicationIds.length ? {
+  let correctedCompetitions: CompetitionUniverse = supersededApplicationIds.length ? {
+    ...input.competitions,
     competitions: input.competitions.competitions.map((competition) => {
       const fixture = competition.fixtures.find((item) => supersededApplicationIds.includes(item.sourceResultId));
       return fixture ? resetCompetitionResult(competition, fixture.id) : competition;
@@ -939,7 +940,17 @@ export function applyCoreResultConsequences(input: {
   const winnerMemberNames = attempt.finalResult.winnerMemberNames?.length ? attempt.finalResult.winnerMemberNames : [attempt.finalResult.winnerName];
   const winnerMemberKeys = attempt.finalResult.winnerMemberKeys?.length ? attempt.finalResult.winnerMemberKeys : noContest ? [] : [attempt.finalResult.winnerKey];
   const titleProposal = championshipProposal(applicationId, updatedShow, refreshedSegment, attempt.finalResult.winnerName, winnerMemberNames, correctedChampionships, noContest, winnerMemberKeys);
-  const competition = competitionProposal(applicationId, updatedShow, refreshedSegment, attempt.finalResult.winnerName, winnerMemberNames, correctedCompetitions, noContest, winnerMemberKeys, attempt.finalResult.finishType);
+  let competition = competitionProposal(applicationId, updatedShow, refreshedSegment, attempt.finalResult.winnerName, winnerMemberNames, correctedCompetitions, noContest, winnerMemberKeys, attempt.finalResult.finishType);
+  if (competition && competition.status === "Pending") {
+    const linked = correctedCompetitions.competitions.find((item) => item.id === competition!.competitionId);
+    if (linked) {
+      const applied = recordCompetitionResult(linked, competition.fixtureId, competition.resultType, competition.proposedWinnerParticipantId, competition.resultType === "No Contest" ? "No Contest confirmed from Wrestling Sim." : `${competition.finalWinner} result confirmed from Wrestling Sim.`, { sourceResultId: applicationId, winnerSubmissions: competition.winnerSubmissions, loserSubmissions: competition.loserSubmissions, matchRating: attempt.finalResult.matchScore });
+      if (applied !== linked && JSON.stringify(applied.fixtures) !== JSON.stringify(linked.fixtures)) {
+        correctedCompetitions = { ...correctedCompetitions, competitions: correctedCompetitions.competitions.map((item) => item.id === linked.id ? applied : item) };
+        competition = { ...competition, status: "Confirmed", confirmedAt: now(), preview: [...competition.preview, "Exact participant identity matched; the official result updated the competition automatically."] };
+      }
+    }
+  }
   const application: ResultConsequenceApplication = {
     id: applicationId,
     resolutionRecordId: input.resolution.id,

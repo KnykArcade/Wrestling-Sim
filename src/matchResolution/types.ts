@@ -34,6 +34,7 @@ export interface MatchResolutionWorkerSettings {
   workerName: string;
   approachMode: ResolutionApproachMode;
   lockedApproachIds: ResolutionApproachId[];
+  requiredApproachId?: ResolutionApproachId | "";
   manualApproachIds: ResolutionApproachId[];
   storyNeed: number;
   momentum: number;
@@ -68,6 +69,7 @@ export interface MatchResolutionSetup {
   segmentId: string;
   segmentTitle: string;
   matchType: string;
+  stipulation?: string;
   durationMinutes: number;
   approachLimit?: number | null;
   aimId: MatchAimId;

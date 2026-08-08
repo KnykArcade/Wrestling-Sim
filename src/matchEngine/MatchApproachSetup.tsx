@@ -18,6 +18,7 @@ import {
 } from "./model";
 import { MATCH_ENGINE_SKILLS, WRESTLER_STYLES } from "./profileCatalog";
 import { calculateMatchAnticipation, momentumLabel, projectedCrowdBeforeForSegment } from "../crowd/model";
+import { enforceRequiredApproachPlan, MATCH_STIPULATIONS, requiredApproachForMatch } from "./requiredApproaches";
 import type {
   MatchApproachId,
   MatchEngineProfile,
@@ -28,7 +29,7 @@ import type {
 
 function planForWorker(segment: PlannedSegment, worker: PlannedWorkerReference): MatchWorkerApproachPlan {
   const workerKey = workerProfileKey(worker);
-  return segment.matchApproachSetup.workerPlans.find((plan) => plan.workerKey === workerKey) ?? {
+  const plan = segment.matchApproachSetup.workerPlans.find((plan) => plan.workerKey === workerKey) ?? {
     workerKey,
     workerName: worker.name,
     selectedApproachIds: [],
@@ -36,6 +37,8 @@ function planForWorker(segment: PlannedSegment, worker: PlannedWorkerReference):
     mode: "AI",
     generatedAt: "",
   };
+  const required = requiredApproachForMatch(segment.matchStipulation, segment.matchApproachSetup.matchAimId);
+  return enforceRequiredApproachPlan(plan, required?.approachId ?? "", approachLimitForSetup(segment.durationMinutes, segment.matchApproachSetup.approachLimit));
 }
 
 function profileForWorker(universe: MatchEngineUniverse, worker: PlannedWorkerReference): MatchEngineProfile | null {
@@ -53,24 +56,29 @@ export function MatchSettingsEditor({ segment, onChange }: { segment: PlannedSeg
   const recommendedSlots = approachSlotsForDuration(segment.durationMinutes);
   const slots = approachLimitForSetup(segment.durationMinutes, segment.matchApproachSetup.approachLimit);
   const aim = MATCH_AIMS.find((item) => item.id === segment.matchApproachSetup.matchAimId) ?? MATCH_AIMS[0];
+  const required = requiredApproachForMatch(segment.matchStipulation, aim.id);
   const updateSetup = (patch: Partial<PlannedSegment["matchApproachSetup"]>) => onChange({ ...segment, matchApproachSetup: { ...segment.matchApproachSetup, ...patch, performancePreview: null, updatedAt: new Date().toISOString() } });
   const setApproachLimit = (value: number) => {
     const limit = Math.max(1, Math.min(MAX_MATCH_APPROACHES, value || recommendedSlots));
     updateSetup({
       approachLimit: limit,
       workerPlans: segment.matchApproachSetup.workerPlans.map((plan) => {
-        const selectedApproachIds = plan.selectedApproachIds.slice(0, limit);
-        return { ...plan, selectedApproachIds, lockedApproachIds: plan.lockedApproachIds.filter((id) => selectedApproachIds.includes(id)) };
+        return enforceRequiredApproachPlan(plan, required?.approachId ?? "", limit);
       }),
     });
+  };
+  const updateRule = (stipulation: string, matchAimId: PlannedSegment["matchApproachSetup"]["matchAimId"]) => {
+    const nextRequired = requiredApproachForMatch(stipulation, matchAimId);
+    onChange({ ...segment, matchStipulation: stipulation, matchApproachSetup: { ...segment.matchApproachSetup, matchAimId, workerPlans: segment.matchApproachSetup.workerPlans.map((plan) => enforceRequiredApproachPlan(plan, nextRequired?.approachId ?? "", slots)), performancePreview: null, updatedAt: new Date().toISOString() } });
   };
 
   return <section className="match-settings-panel" aria-label="Match Settings">
     <div className="match-settings-heading"><p className="eyebrow">MATCH SETTINGS</p><strong>Core match instructions</strong></div>
     <div className="match-approach-controls">
-      <label className="field match-setting-type"><span>Match type</span><select aria-label="Match type" value={normalizeMatchFormat(segment.matchType)} onChange={(event) => onChange(assignAutomaticMatchSides(segment, event.target.value as ReturnType<typeof normalizeMatchFormat>))}>{MATCH_FORMATS.map((item) => <option key={item}>{item}</option>)}</select></label>
+      <label className="field match-setting-type"><span>Format</span><select aria-label="Match type" value={normalizeMatchFormat(segment.matchType)} onChange={(event) => onChange(assignAutomaticMatchSides(segment, event.target.value as ReturnType<typeof normalizeMatchFormat>))}>{MATCH_FORMATS.map((item) => <option key={item}>{item}</option>)}</select></label>
+      <label className="field match-setting-stipulation"><span>Stipulation</span><select aria-label="Match stipulation" value={segment.matchStipulation || "Standard"} onChange={(event) => updateRule(event.target.value, aim.id)}>{MATCH_STIPULATIONS.map((item) => <option key={item}>{item}</option>)}</select></label>
       <label className="field match-setting-length"><span>Length</span><input aria-label="Length (minutes)" type="number" min={1} max={180} value={segment.durationMinutes} onChange={(event) => onChange({ ...segment, durationMinutes: Math.max(1, Number(event.target.value) || 1), matchApproachSetup: { ...segment.matchApproachSetup, performancePreview: null } })} /></label>
-      <label className="field match-setting-aim"><span>Match aim</span><select aria-label="Match aim" value={aim.id} onChange={(event) => updateSetup({ matchAimId: event.target.value as PlannedSegment["matchApproachSetup"]["matchAimId"] })}>{MATCH_AIMS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+      <label className="field match-setting-aim"><span>Match aim</span><select aria-label="Match aim" value={aim.id} onChange={(event) => updateRule(segment.matchStipulation || "Standard", event.target.value as PlannedSegment["matchApproachSetup"]["matchAimId"])}>{MATCH_AIMS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select>{required && <small>Requires {getApproach(required.approachId)?.name ?? required.approachId}</small>}</label>
       <label className="field match-setting-limit"><span>Approaches</span><input aria-label="Approach limit per wrestler" type="number" min={1} max={MAX_MATCH_APPROACHES} value={slots} onChange={(event) => setApproachLimit(Number(event.target.value))} /><small><span>Recommended: {recommendedSlots}</span> · Max {MAX_MATCH_APPROACHES}</small></label>
       <div className="match-setting-pace"><span>Ideal pace</span><strong>{aim.idealPace === 0 ? "Open" : aim.idealPace}</strong></div>
     </div>
@@ -84,6 +92,7 @@ function ApproachSlotDropdown({
   selectedId,
   selectedIds,
   locked,
+  required,
   open,
   onToggle,
   onSelect,
@@ -95,6 +104,7 @@ function ApproachSlotDropdown({
   selectedId: MatchApproachId | undefined;
   selectedIds: MatchApproachId[];
   locked: boolean;
+  required: boolean;
   open: boolean;
   onToggle: () => void;
   onSelect: (id: MatchApproachId | null) => void;
@@ -114,7 +124,8 @@ function ApproachSlotDropdown({
       aria-label={`${worker.name} approach ${slotIndex + 1}`}
       aria-haspopup="listbox"
       aria-expanded={open}
-      onClick={onToggle}
+      onClick={() => { if (!required) onToggle(); }}
+      disabled={required}
       onKeyDown={(event) => {
         if (event.key === "ArrowDown") { event.preventDefault(); onToggle(); }
         if (event.key === "Escape" && open) { event.preventDefault(); onToggle(); }
@@ -123,7 +134,7 @@ function ApproachSlotDropdown({
       <span>{selected?.name ?? `Approach ${slotIndex + 1}`}</span>
       <small>{selected ? `${selectedRating.toFixed(1)} · Cost ${selected.staminaCost} · Pace ${selected.pace}` : "Select"}</small>
     </button>
-    {selected && <button className={`approach-slot-lock${locked ? " approach-slot-lock--active" : ""}`} type="button" aria-label={`${locked ? "Unlock" : "Lock"} ${selected.name} for ${worker.name}`} aria-pressed={locked} onClick={onLock}>{locked ? "LOCKED" : "LOCK"}</button>}
+    {selected && (required ? <span className="approach-slot-required">REQUIRED</span> : <button className={`approach-slot-lock${locked ? " approach-slot-lock--active" : ""}`} type="button" aria-label={`${locked ? "Unlock" : "Lock"} ${selected.name} for ${worker.name}`} aria-pressed={locked} onClick={onLock}>{locked ? "LOCKED" : "LOCK"}</button>)}
     {open && <div className="approach-slot-menu" role="listbox" aria-label={`Approach choices for ${worker.name}, slot ${slotIndex + 1}`}>
       <button className="approach-slot-option approach-slot-option--clear" type="button" role="option" aria-selected={!selectedId} onClick={() => onSelect(null)}>Clear selection</button>
       {choices.map(({ approach, rating }) => <button
@@ -182,6 +193,7 @@ export default function MatchApproachSetupEditor({
   const recommendedSlots = approachSlotsForDuration(segment.durationMinutes);
   const slots = approachLimitForSetup(segment.durationMinutes, segment.matchApproachSetup.approachLimit);
   const aim = MATCH_AIMS.find((item) => item.id === segment.matchApproachSetup.matchAimId) ?? MATCH_AIMS[0];
+  const required = requiredApproachForMatch(segment.matchStipulation, aim.id);
 
   function updateSetup(patch: Partial<PlannedSegment["matchApproachSetup"]>): void {
     onChange({ ...segment, matchApproachSetup: { ...segment.matchApproachSetup, ...patch, performancePreview: patch.performancePreview === undefined ? null : patch.performancePreview, updatedAt: new Date().toISOString() } });
@@ -211,8 +223,8 @@ export default function MatchApproachSetupEditor({
   function runAI(worker: PlannedWorkerReference): void {
     const profile = ensureProfile(worker);
     const current = planForWorker(segment, worker);
-    const result = chooseApproachPlan(profile, aim.id, segment.durationMinutes, current.lockedApproachIds, slots);
-    savePlan(worker, { ...current, selectedApproachIds: result.selectedApproachIds, lockedApproachIds: current.lockedApproachIds.filter((id) => result.selectedApproachIds.includes(id)), mode: "AI", generatedAt: new Date().toISOString() });
+    const result = chooseApproachPlan(profile, aim.id, segment.durationMinutes, Array.from(new Set([...(required ? [required.approachId] : []), ...current.lockedApproachIds])), slots);
+    savePlan(worker, enforceRequiredApproachPlan({ ...current, selectedApproachIds: result.selectedApproachIds, lockedApproachIds: current.lockedApproachIds.filter((id) => result.selectedApproachIds.includes(id)), mode: "AI", generatedAt: new Date().toISOString() }, required?.approachId ?? "", slots));
   }
 
   function runAll(): void {
@@ -223,8 +235,8 @@ export default function MatchApproachSetupEditor({
       let profile = nextProfiles.find((item) => item.workerKey === key);
       if (!profile) { profile = createMatchEngineProfile(worker); nextProfiles.push(profile); }
       const current = nextPlans.find((item) => item.workerKey === key) ?? planForWorker(segment, worker);
-      const result = chooseApproachPlan(profile, aim.id, segment.durationMinutes, current.lockedApproachIds, slots);
-      const replacement: MatchWorkerApproachPlan = { ...current, workerKey: key, workerName: worker.name, selectedApproachIds: result.selectedApproachIds, lockedApproachIds: current.lockedApproachIds.filter((id) => result.selectedApproachIds.includes(id)), mode: "AI", generatedAt: new Date().toISOString() };
+      const result = chooseApproachPlan(profile, aim.id, segment.durationMinutes, Array.from(new Set([...(required ? [required.approachId] : []), ...current.lockedApproachIds])), slots);
+      const replacement: MatchWorkerApproachPlan = enforceRequiredApproachPlan({ ...current, workerKey: key, workerName: worker.name, selectedApproachIds: result.selectedApproachIds, lockedApproachIds: current.lockedApproachIds.filter((id) => result.selectedApproachIds.includes(id)), mode: "AI", generatedAt: new Date().toISOString() }, required?.approachId ?? "", slots);
       nextPlans = nextPlans.some((item) => item.workerKey === key) ? nextPlans.map((item) => item.workerKey === key ? replacement : item) : [...nextPlans, replacement];
     }
     onUniverseChange({ profiles: nextProfiles });
@@ -232,6 +244,7 @@ export default function MatchApproachSetupEditor({
   }
 
   function selectApproach(worker: PlannedWorkerReference, slotIndex: number, approachId: MatchApproachId | null): void {
+    if (required && slotIndex === 0) return;
     ensureProfile(worker);
     const current = planForWorker(segment, worker);
     const next = [...current.selectedApproachIds];
@@ -244,11 +257,12 @@ export default function MatchApproachSetupEditor({
       next[slotIndex] = approachId;
     }
     const selectedApproachIds = next.filter((id): id is MatchApproachId => Boolean(id)).slice(0, slots);
-    savePlan(worker, { ...current, selectedApproachIds, lockedApproachIds: current.lockedApproachIds.filter((id) => selectedApproachIds.includes(id)), mode: "Manual", generatedAt: "" });
+    savePlan(worker, enforceRequiredApproachPlan({ ...current, selectedApproachIds, lockedApproachIds: current.lockedApproachIds.filter((id) => selectedApproachIds.includes(id)), mode: "Manual", generatedAt: "" }, required?.approachId ?? "", slots));
     setOpenSlotKey("");
   }
 
   function toggleLock(worker: PlannedWorkerReference, approachId: MatchApproachId): void {
+    if (required?.approachId === approachId) return;
     const current = planForWorker(segment, worker);
     savePlan(worker, { ...current, lockedApproachIds: current.lockedApproachIds.includes(approachId) ? current.lockedApproachIds.filter((id) => id !== approachId) : [...current.lockedApproachIds, approachId] });
   }
@@ -289,7 +303,7 @@ export default function MatchApproachSetupEditor({
           {Array.from({ length: slots }, (_, slotIndex) => {
             const selectedId = plan.selectedApproachIds[slotIndex];
             const slotKey = `${key}:${slotIndex}`;
-            return <ApproachSlotDropdown key={slotKey} worker={worker} profile={profile} slotIndex={slotIndex} selectedId={selectedId} selectedIds={plan.selectedApproachIds} locked={Boolean(selectedId && plan.lockedApproachIds.includes(selectedId))} open={openSlotKey === slotKey} onToggle={() => setOpenSlotKey(openSlotKey === slotKey ? "" : slotKey)} onSelect={(id) => selectApproach(worker, slotIndex, id)} onLock={() => { if (selectedId) toggleLock(worker, selectedId); }} />;
+            return <ApproachSlotDropdown key={slotKey} worker={worker} profile={profile} slotIndex={slotIndex} selectedId={selectedId} selectedIds={plan.selectedApproachIds} locked={Boolean(selectedId && plan.lockedApproachIds.includes(selectedId))} required={Boolean(required && selectedId === required.approachId && slotIndex === 0)} open={openSlotKey === slotKey} onToggle={() => setOpenSlotKey(openSlotKey === slotKey ? "" : slotKey)} onSelect={(id) => selectApproach(worker, slotIndex, id)} onLock={() => { if (selectedId) toggleLock(worker, selectedId); }} />;
           })}
           <div className={`tew-strategy-result tew-strategy-result--${plan.selectedApproachIds.length ? ratingTone(averageRating) : "empty"}`}><strong>{plan.selectedApproachIds.length ? `Pace ${result.actualPace} · ${result.pace.status}` : "Not set"}</strong><small>{plan.selectedApproachIds.length ? `Rating ${averageRating.toFixed(1)} · Load ${result.usedStamina}/${result.availableStamina} · ${result.stamina.status}` : `${slots} approach slots`}</small></div>
           <div className="tew-strategy-actions"><button className="secondary-button compact-button" type="button" onClick={() => { const created = ensureProfile(worker); setEditingProfileKey(created.workerKey); }}>Ratings</button><button className="primary-button compact-button" type="button" aria-label={`Run Approach AI for ${worker.name}`} onClick={() => runAI(worker)}>AI</button></div>

@@ -16,7 +16,7 @@ export default defineConfig({
   define: {
     __APP_BUILD_COMMIT__: JSON.stringify(buildCommit),
     __APP_BUILD_HAS_CHANGES__: JSON.stringify(buildHasChanges),
-    __APP_RELEASE_LABEL__: JSON.stringify("Phase 6B21"),
+    __APP_RELEASE_LABEL__: JSON.stringify("Phase 6B22"),
   },
   server: {
     host: "0.0.0.0",

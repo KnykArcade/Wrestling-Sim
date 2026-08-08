@@ -135,7 +135,7 @@ test("applies one official result to records and forces a future booking review"
   });
   expect(stored.consequences.applications).toHaveLength(1);
   expect(stored.consequences.applications?.[0]?.status).toBe("Applied");
-  expect(stored.consequences.applications?.[0]?.calculationVersion).toBe("wrestling-sim-consequences-6b21-v1");
+  expect(stored.consequences.applications?.[0]?.calculationVersion).toBe("wrestling-sim-consequences-6b22-v1");
   expect(stored.consequences.applications?.[0]).toMatchObject({ competitiveCalculationVersion: "wrestling-sim-competitive-6b20f-v1", officialShowDate: "2019-01-08", runningOrderPosition: 0, replayStatus: "Original" });
   expect(stored.consequences.workerRecords).toHaveLength(2);
   expect(stored.consequences.futureConflicts?.[0]).toMatchObject({ resolved: true, resolutionNote: "Keep the rematch tentative and review rankings after the next show." });

@@ -21,7 +21,7 @@
 
 .match-approach-controls {
   display: grid;
-  grid-template-columns: 180px 58px minmax(180px, 240px) 130px 62px;
+  grid-template-columns: 150px 145px 58px minmax(180px, 240px) 115px 62px;
   gap: 1px;
   background: #31527b;
 }
@@ -172,6 +172,8 @@
   cursor: pointer;
 }
 .approach-slot-lock--active { border-color: #f1df42; background: #4a4112; color: #fff170; }
+.approach-slot-required { display: grid; place-items: center; width: 25px; border: 1px solid #55c987; background: #153d2a; color: #83e8ad; font-size: 6px; font-weight: 900; writing-mode: vertical-rl; }
+.approach-slot-trigger:disabled { cursor: not-allowed; opacity: 1; border-color: #55c987; background: #102f25; }
 
 .approach-slot-menu {
   position: absolute;
@@ -279,12 +281,13 @@
 .match-approach-boundary strong { color: #f1df42; white-space: nowrap; }
 
 @media (max-width: 1050px) {
-  .match-approach-controls { grid-template-columns: 160px 56px minmax(160px, 220px) 120px 60px; }
+  .match-approach-controls { grid-template-columns: 130px 130px 56px minmax(160px, 220px) 105px 60px; }
   .match-profile-skill-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 720px) {
   .match-approach-controls { grid-template-columns: 1fr 72px; }
+  .match-setting-type, .match-setting-stipulation { grid-column: auto; }
   .match-setting-aim { grid-column: 1 / -1; }
   .match-profile-core-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .match-profile-core-grid .field:first-child { grid-column: 1 / -1; }

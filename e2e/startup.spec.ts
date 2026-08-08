@@ -11,7 +11,7 @@ test("creates and persists match and angle narratives without browser errors", a
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Wrestling Sim" })).toBeVisible();
-  await expect(page.getByLabel(/Game build version: Phase 6B21 · [a-f0-9]{7}/)).toBeVisible();
+  await expect(page.getByLabel(/Game build version: Phase 6B22 · [a-f0-9]{7}/)).toBeVisible();
   await expect(page.getByRole("heading", { name: showSessionHeading })).toBeVisible();
   await openAdvancedTools(page);
   await page.getByRole("button", { name: "Planned Shows", exact: true }).click();

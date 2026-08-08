@@ -48,7 +48,9 @@ test("selects and persists wrestler approaches inside a planned TEW match", asyn
   await jay.getByRole("button", { name: `Lock ${lockedName} for Jay White` }).click();
   await match.getByLabel("Match aim").selectOption("technical-showcase");
   await jay.getByRole("button", { name: "Run Approach AI for Jay White" }).click();
-  await expect(jay.getByRole("button", { name: "Jay White approach 1" })).toContainText(lockedName ?? "");
+  await expect(jay.getByRole("button", { name: "Jay White approach 1" })).toContainText("Chain Technician");
+  await expect(jay.getByRole("button", { name: "Jay White approach 1" })).toBeDisabled();
+  await expect(jay.locator(".approach-slot-required")).toHaveText("REQUIRED");
   await expect(jay.getByRole("button", { name: `Unlock ${lockedName} for Jay White` })).toHaveAttribute("aria-pressed", "true");
 
   await page.reload();

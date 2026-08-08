@@ -1,14 +1,18 @@
 import { describe, expect, test } from "vitest";
 import {
   addFixtureToPlannedShow,
+  addCompetitionToUniverse,
   buildCompetitionStandings,
   competitionWarnings,
   createCompetitionParticipant,
   createCompetitionTemplate,
+  createNextCompetitionEdition,
+  emptyCompetitionUniverse,
   generateCompetitionStructure,
   recordCompetitionResult,
   resetCompetitionResult,
   syncCompetitionFromPlannedShows,
+  synchronizeCompetitionUniverse,
 } from "../src/competitions/model";
 import {
   COMPETITION_STORAGE_KEY,
@@ -181,9 +185,59 @@ describe("Phase 4D competition management", () => {
 
   test("persists the competition universe", () => {
     const storage = new MemoryStorage();
-    const universe = { competitions: [generateCompetitionStructure(withParticipants(4))] };
+    const universe = addCompetitionToUniverse(emptyCompetitionUniverse(), generateCompetitionStructure(withParticipants(4)));
     saveCompetitionUniverse(storage, universe);
     expect(storage.getItem(COMPETITION_STORAGE_KEY)).toContain("PWL World Classic");
     expect(loadCompetitionUniverse(storage)).toEqual(universe);
+  });
+
+  test("runs two groups into a connected knockout bracket and preserves the champion", () => {
+    let competition = withParticipants(8);
+    competition.format = "Group Stage + Knockout";
+    competition.groupCount = 2;
+    competition.qualifiersPerGroup = 2;
+    competition = generateCompetitionStructure(competition);
+    expect(competition.groups).toHaveLength(2);
+    expect(competition.fixtures.filter((fixture) => fixture.stageType === "Group")).toHaveLength(12);
+    expect(competition.fixtures.filter((fixture) => fixture.stageType === "Knockout")).toHaveLength(3);
+    for (const fixture of competition.fixtures.filter((item) => item.stageType === "Group")) {
+      const leftSeed = competition.participants.find((participant) => participant.id === fixture.participantAId)!.seed;
+      const rightSeed = competition.participants.find((participant) => participant.id === fixture.participantBId)!.seed;
+      competition = recordCompetitionResult(competition, fixture.id, "Decision", leftSeed < rightSeed ? fixture.participantAId : fixture.participantBId);
+    }
+    const semifinals = competition.fixtures.filter((fixture) => fixture.roundLabel === "Semifinal");
+    expect(semifinals.every((fixture) => fixture.participantAId && fixture.participantBId)).toBe(true);
+    for (const semifinal of semifinals) competition = recordCompetitionResult(competition, semifinal.id, "Decision", semifinal.participantAId);
+    const final = competition.fixtures.find((fixture) => fixture.roundLabel === "Final")!;
+    competition = recordCompetitionResult(competition, final.id, "Decision", final.participantBId);
+    expect(competition.status).toBe("Completed");
+    expect(competition.championParticipantId).toBe(final.participantBId);
+    expect(competition.audit.some((entry) => entry.action === "Result Recorded")).toBe(true);
+  });
+
+  test("copies recurring rules into a new edition without copying results", () => {
+    const source = generateCompetitionStructure(withParticipants(4));
+    source.seriesId = "series-world-classic";
+    source.companyId = "company-pwl";
+    source.companyName = "PWL";
+    const edition = createNextCompetitionEdition(source, "2020 edition");
+    expect(edition).toMatchObject({ seriesId: source.seriesId, name: source.name, format: source.format, companyId: "company-pwl", editionLabel: "2020 edition", status: "Planning" });
+    expect(edition.fixtures).toEqual([]);
+    expect(edition.participants).toEqual([]);
+    expect(source.fixtures.length).toBeGreaterThan(0);
+  });
+
+  test("queues a participant mismatch instead of guessing an official winner", () => {
+    const show = createPlannedShow(1);
+    let competition = generateCompetitionStructure(withParticipants(2));
+    const fixture = competition.fixtures[0];
+    const scheduled = addFixtureToPlannedShow(competition, fixture.id, show.id, [show]);
+    competition = scheduled.competition;
+    scheduled.shows[0].segments[0].reconciliation.actualMatch = { id: "official-mismatch", description: "Cup match", rating: 40, winner: "Unknown Wrestler", matchTime: "10:00", notes: "", placement: "Main Show", workers: [] };
+    const result = synchronizeCompetitionUniverse({ competitions: [competition], series: [], actionQueue: [] }, scheduled.shows);
+    expect(result.synced).toBe(0);
+    expect(result.universe.actionQueue).toHaveLength(1);
+    expect(result.universe.actionQueue?.[0].type).toBe("Participant Mismatch");
+    expect(result.universe.competitions[0].fixtures[0].winnerId).toBe("");
   });
 });

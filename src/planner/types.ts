@@ -98,6 +98,7 @@ export interface PlannedSegment {
   privateNotes: string;
 
   matchType: string;
+  matchStipulation: string;
   championship: string;
   championshipId: string;
   championshipMatchPurpose: ChampionshipMatchPurpose;

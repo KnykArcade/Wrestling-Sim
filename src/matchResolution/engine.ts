@@ -231,9 +231,10 @@ function selectedApproaches(
 ): { ids: ResolutionApproachId[]; scores: MatchResolutionApproachScore[]; plan: ReturnType<typeof createCalculationStage> } {
   const planFormula = CALCULATION_FORMULAS.approachPlan;
   const slots = approachLimitForSetup(setup.durationMinutes, setup.approachLimit);
-  const locked = worker.approachMode === "AI" ? uniqueApproaches(worker.lockedApproachIds).slice(0, slots) : [];
+  const required = worker.requiredApproachId ? uniqueApproaches([worker.requiredApproachId]) : [];
+  const locked = worker.approachMode === "AI" ? uniqueApproaches(worker.lockedApproachIds).filter((id) => !required.includes(id)).slice(0, slots) : [];
   const manual = uniqueApproaches(worker.manualApproachIds).filter((id) => !locked.includes(id));
-  const fixed = uniqueApproaches([...locked, ...(worker.approachMode === "Manual" ? manual : [])]).slice(0, slots);
+  const fixed = uniqueApproaches([...required, ...locked, ...(worker.approachMode === "Manual" ? manual : [])]).slice(0, slots);
   const candidates = RESOLUTION_APPROACHES.map((approach) => approach.id).filter((id) => !fixed.includes(id));
   const candidateSets = combinations(candidates, Math.max(0, slots - fixed.length)).map((values) => [...fixed, ...values]);
   let bestIds = fixed;
@@ -291,7 +292,7 @@ function selectedApproaches(
     scores: bestScores,
     plan: createCalculationStage(planFormula, terms, {
       notes: [
-        worker.approachMode === "AI" ? "The AI selected the highest-scoring eligible combination after honoring locked approaches." : "Manual approaches were preserved; the AI filled any unused slots.",
+        required.length ? `${resolutionApproach(required[0]).name} was required by the match stipulation or aim.` : worker.approachMode === "AI" ? "The AI selected the highest-scoring eligible combination after honoring locked approaches." : "Manual approaches were preserved; the AI filled any unused slots.",
         "This plan score selects approaches only and is not added directly to in-ring performance.",
       ],
     }),
