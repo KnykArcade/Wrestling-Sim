@@ -77,6 +77,7 @@ function session(value: unknown): LiveCardSession | null {
     audit: Array.isArray(value.audit) ? value.audit.map(audit).filter((item): item is LiveCardAuditEntry => item !== null).slice(0, 500) : [],
     crowdStart: typeof value.crowdStart === "number" && Number.isFinite(value.crowdStart) ? Math.max(0, Math.min(100, value.crowdStart)) : 50,
     currentCrowd: typeof value.currentCrowd === "number" && Number.isFinite(value.currentCrowd) ? Math.max(0, Math.min(100, value.currentCrowd)) : 50,
+    expectationSnapshot: isRecord(value.expectationSnapshot) ? value.expectationSnapshot as unknown as LiveCardSession["expectationSnapshot"] : null,
     startedAt: text(value.startedAt),
     completedAt: text(value.completedAt),
     createdAt: text(value.createdAt),

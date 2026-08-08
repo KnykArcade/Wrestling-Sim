@@ -19,6 +19,7 @@ import { emptyLiveCardUniverse } from "../src/liveCard/model";
 import { parseLiveCardUniverse, upsertLiveCardSession } from "../src/liveCard/storage";
 import type { MatchResolutionRecord, MatchResolutionUniverse } from "../src/matchResolution/types";
 import { createPlannedSegment, createPlannedShow } from "../src/planner/model";
+import { createShowExpectationSnapshot, emptyShowEvaluationUniverse } from "../src/showEvaluation/model";
 
 function acceptedResolution(showId: string, segmentId: string): MatchResolutionRecord {
   return {
@@ -149,6 +150,17 @@ describe("Phase 6B2 reactive live card runner", () => {
     const parsed = parseLiveCardUniverse(JSON.parse(JSON.stringify(upsertLiveCardSession(emptyLiveCardUniverse(), session))) as unknown);
     expect(parsed.sessions[0].currentSegmentId).toBe(match.id);
     expect(parsed.sessions[0].status).toBe("In Progress");
+  });
+
+  test("persists the pre-show expectation and attendance snapshot when the live show starts", () => {
+    const { show } = card();
+    show.venueCapacity = 1200;
+    show.marketDemand = 80;
+    const snapshot = createShowExpectationSnapshot(emptyShowEvaluationUniverse(), show);
+    const started = startLiveCardSession(createLiveCardSession(show, { records: [], settings: { defaultImportance: "Television", defaultChemistry: 0, defaultVolatility: 8, requireOverrideReason: true, selectedShowId: "", selectedSegmentId: "" } }), snapshot.crowdStart, snapshot);
+    const parsed = parseLiveCardUniverse(JSON.parse(JSON.stringify(upsertLiveCardSession(emptyLiveCardUniverse(), started))) as unknown);
+    expect(parsed.sessions[0].expectationSnapshot).toMatchObject({ calculationVersion: "wrestling-sim-shows-6b20e-v1", expectedShowScore: expect.any(Number), expectedCardStrength: expect.any(Number), estimatedAttendance: expect.any(Number), crowdStart: snapshot.crowdStart });
+    expect(parsed.sessions[0].expectationSnapshot?.calculationLedger).toMatchObject({ promotionStrength: { formulaId: "show.promotion-strength" }, expectedCardStrength: { formulaId: "show.expected-card-strength" }, startingCrowd: { formulaId: "show.starting-crowd" }, expectedShowScore: { formulaId: "show.expected-score" }, attendanceDemand: { formulaId: "show.attendance-demand" } });
   });
 
   test("locks only a finalized match result and prevents silent replacement", () => {

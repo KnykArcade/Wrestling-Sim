@@ -209,28 +209,44 @@ export function projectedCrowdBeforeForSegment(input: {
   return crowd;
 }
 
-export function calculateLiveAngleAudience(performanceRating: number, crowdBefore: number): LiveAudienceResult {
+export function calculateLiveAngleAudience(performanceRating: number, anticipation: number, crowdBefore: number): LiveAudienceResult {
+  const expectationFormula = CALCULATION_FORMULAS.angleExpectationAdjustment;
+  const responseFormula = CALCULATION_FORMULAS.angleCrowdResponse;
+  const finalFormula = CALCULATION_FORMULAS.angleFinalRating;
+  const movementFormula = CALCULATION_FORMULAS.angleCrowdMovement;
   const performance = clamp(performanceRating);
+  const expected = clamp(anticipation);
   const incoming = clamp(crowdBefore);
-  const crowdResponse = round(clamp(performance * .8 + incoming * .2));
-  const finalRating = round(clamp(performance * .8 + crowdResponse * .2));
-  const movement = clamp((crowdResponse - incoming) / 3, -12, 12);
-  const crowdAfter = round(clamp(incoming + movement));
-  const expectationLedger = createCalculationStage({ id: "crowd.angle-expectation", label: "Angle expectation adjustment", formula: "Angles do not use match anticipation", capMinimum: null, capMaximum: null, roundingPlaces: 1 }, [createCalculationTerm("adjustment", "Expectation adjustment", 0)]);
-  const responseLedger = createCalculationStage({ id: "crowd.angle-response", label: "Angle crowd response", formula: "Angle performance 80% + incoming crowd 20%", capMinimum: 0, capMaximum: 100, roundingPlaces: 1 }, [createCalculationTerm("performance", "Angle performance", performance, .8), createCalculationTerm("incoming", "Incoming crowd heat", incoming, .2)]);
-  const finalLedger = createCalculationStage({ id: "crowd.angle-final", label: "Final angle rating", formula: "Angle performance 80% + crowd response 20%", capMinimum: 0, capMaximum: 100, roundingPlaces: 1 }, [createCalculationTerm("performance", "Angle performance", performance, .8), createCalculationTerm("response", "Crowd response", crowdResponse, .2)]);
-  const crowdAfterLedger = createCalculationStage(CALCULATION_FORMULAS.crowdMovement, [createCalculationTerm("incoming", "Incoming crowd heat", incoming), createCalculationTerm("movement", "Capped crowd movement", movement)]);
+  const performanceGap = performance - expected;
+  const deliveryWeight = performanceGap >= 0 ? expectationFormula.overdeliveryWeight : expectationFormula.disappointmentWeight;
+  const expectationLedger = createCalculationStage(expectationFormula, [createCalculationTerm("performance-gap", performanceGap >= 0 ? "Performance above anticipation" : "Performance below anticipation", performanceGap, deliveryWeight)]);
+  const expectationAdjustment = expectationLedger.result;
+  const responseLedger = createCalculationStage(responseFormula, [
+    createCalculationTerm("anticipation", "Angle anticipation", expected, responseFormula.anticipationWeight),
+    createCalculationTerm("incoming", "Incoming crowd heat", incoming, responseFormula.incomingCrowdWeight),
+    createCalculationTerm("expectation", "Delivery adjustment", expectationAdjustment),
+  ], { notes: ["Raw angle performance affects crowd response only through overdelivery or disappointment; it is not directly counted again."] });
+  const crowdResponse = responseLedger.result;
+  const finalLedger = createCalculationStage(finalFormula, [
+    createCalculationTerm("performance", "Raw angle performance", performance, finalFormula.performanceWeight),
+    createCalculationTerm("crowd-response", "Live angle crowd response", crowdResponse, finalFormula.crowdResponseWeight),
+  ]);
+  const movement = clamp((crowdResponse - incoming) / movementFormula.divisor, movementFormula.movementMinimum, movementFormula.movementMaximum);
+  const crowdAfterLedger = createCalculationStage(movementFormula, [
+    createCalculationTerm("incoming", "Incoming crowd heat", incoming),
+    createCalculationTerm("movement", "Capped crowd movement", movement),
+  ]);
   return {
     performanceRating: round(performance),
-    anticipation: round(performance),
-    anticipationLabel: anticipationLabel(performance),
+    anticipation: round(expected),
+    anticipationLabel: anticipationLabel(expected),
     crowdBefore: round(incoming),
     crowdBeforeLabel: crowdHeatLabel(incoming),
     crowdResponse,
-    expectationAdjustment: 0,
-    finalRating,
-    crowdAfter,
-    crowdAfterLabel: crowdHeatLabel(crowdAfter),
+    expectationAdjustment,
+    finalRating: finalLedger.result,
+    crowdAfter: crowdAfterLedger.result,
+    crowdAfterLabel: crowdHeatLabel(crowdAfterLedger.result),
     calculationLedger: { expectationAdjustment: expectationLedger, crowdResponse: responseLedger, finalRating: finalLedger, crowdAfter: crowdAfterLedger },
   };
 }

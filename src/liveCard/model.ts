@@ -1,5 +1,6 @@
 import { activeResolutionAttempt, finalizeResolutionForLiveCrowd } from "../matchResolution/engine";
 import { calculateLiveAngleAudience } from "../crowd/model";
+import type { CalculationLedgerStage } from "../calculations/foundation";
 import type { MatchAnticipation } from "../crowd/types";
 import type { MatchResolutionRecord, MatchResolutionUniverse } from "../matchResolution/types";
 import { createPlannedSegment, createPlannerId, matchBookingValidation, touchShow } from "../planner/model";
@@ -100,6 +101,7 @@ export function createLiveCardSession(show: PlannedShow, resolutions: MatchResol
     audit: [audit("Session Created", show.id, "", `${show.name} live card session created with ${show.segments.length} segments.`)],
     crowdStart: 50,
     currentCrowd: 50,
+    expectationSnapshot: null,
     startedAt: "",
     completedAt: "",
     createdAt: timestamp,
@@ -156,7 +158,7 @@ function currentStatus(progress: LiveCardSegmentProgress): LiveCardSegmentProgre
   return "Current";
 }
 
-export function startLiveCardSession(session: LiveCardSession, crowdStart = session.crowdStart || 50): LiveCardSession {
+export function startLiveCardSession(session: LiveCardSession, crowdStart = session.crowdStart || 50, expectationSnapshot = session.expectationSnapshot): LiveCardSession {
   if (session.status === "Completed") return session;
   const timestamp = now();
   const currentSegmentId = session.currentSegmentId || session.progress.find((item) => !["Completed", "Skipped"].includes(item.status))?.segmentId || "";
@@ -165,6 +167,7 @@ export function startLiveCardSession(session: LiveCardSession, crowdStart = sess
     status: "In Progress",
     crowdStart,
     currentCrowd: crowdStart,
+    expectationSnapshot,
     currentSegmentId,
     progress: session.progress.map((item) => item.segmentId === currentSegmentId && item.status === "Planned"
       ? { ...item, status: currentStatus(item), startedAt: item.startedAt || timestamp, updatedAt: timestamp }
@@ -247,13 +250,21 @@ export function completeAngleSegment(
   consequences: string,
   followUp: string,
   performanceRating = 50,
+  anticipation = 50,
+  officialFinalRating?: number,
+  officialFinalCalculation?: CalculationLedgerStage,
 ): LiveCardSession {
   const progress = session.progress.find((item) => item.segmentId === segmentId);
   if (!progress || progress.type !== "angle") throw new Error("Choose an angle from this live card.");
   if (!output.trim()) throw new Error("Record the final Angle Output before completing the segment.");
   if (progress.status === "Completed") throw new Error("The angle is already completed. Open a correction rather than silently replacing it.");
   const timestamp = now();
-  const audience = calculateLiveAngleAudience(performanceRating, session.currentCrowd);
+  const calculatedAudience = calculateLiveAngleAudience(performanceRating, anticipation, session.currentCrowd);
+  const audience = officialFinalRating !== undefined && officialFinalCalculation && calculatedAudience.calculationLedger ? {
+    ...calculatedAudience,
+    finalRating: Math.max(0, Math.min(100, officialFinalRating)),
+    calculationLedger: { ...calculatedAudience.calculationLedger, finalRating: officialFinalCalculation },
+  } : calculatedAudience;
   return {
     ...session,
     currentCrowd: audience.crowdAfter,

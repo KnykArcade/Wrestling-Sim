@@ -92,7 +92,15 @@
 }
 
 .live-card-evaluation-factors {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.live-card-participant-results article {
+  flex-wrap: wrap;
+}
+
+.live-card-participant-results .calculation-ledger-details {
+  flex: 1 0 100%;
 }
 
 .live-card-evaluation-factors article,
