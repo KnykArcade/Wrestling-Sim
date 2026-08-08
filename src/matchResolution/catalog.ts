@@ -5,22 +5,22 @@ import type { MatchAimId } from "../matchEngine/types";
 import type { ResolutionApproachDefinition, ResolutionApproachId } from "./types";
 
 const META: Record<ResolutionApproachId, Omit<ResolutionApproachDefinition, "id" | "name" | "workbookName">> = {
-  "aerial-specialist": { pace: 3, staminaCost: 3, paceSource: "Workbook", summary: "Dives, springboards, and high-risk aerial offense." },
-  "big-match-performer": { pace: 2, staminaCost: 2, paceSource: "Workbook", summary: "Escalating drama, near falls, and major-match execution." },
-  "chain-technician": { pace: 1, staminaCost: 1, paceSource: "Workbook", summary: "Fluid transitions, mat control, and technical exchanges." },
-  "counter-specialist": { pace: 1, staminaCost: 1, paceSource: "Wrestling Sim Extension", summary: "Anticipates offense and turns an opponent's strengths against them." },
-  "dirty-rulebreaker": { pace: 1, staminaCost: 1, paceSource: "Workbook", summary: "Shortcuts, cheating, and intelligent rule bending." },
-  "hardcore-daredevil": { pace: 3, staminaCost: 3, paceSource: "Workbook", summary: "Weapons, stunt bumps, and dangerous chaos." },
-  "heavy-striker-brawler": { pace: 2, staminaCost: 2, paceSource: "Workbook", summary: "Heavy strikes, fists, and rough fighting." },
-  "high-tempo-hybrid": { pace: 3, staminaCost: 3, paceSource: "Workbook", summary: "Fast sequences and relentless workrate." },
-  "opportunistic-schemer": { pace: 1, staminaCost: 1, paceSource: "Workbook", summary: "Waits for openings and steals decisive moments." },
-  "power-dominance": { pace: 2, staminaCost: 3, paceSource: "Workbook", summary: "Strength, control, and overwhelming offense." },
-  "psychological-manipulator": { pace: 1, staminaCost: 1, paceSource: "Workbook", summary: "Mind games, taunts, and emotional disruption." },
-  "resilient-underdog": { pace: 2, staminaCost: 2, paceSource: "Workbook", summary: "Damage selling, survival, and fiery comebacks." },
-  "ring-general-pace-controller": { pace: 1, staminaCost: 1, paceSource: "Workbook", summary: "Controls structure, tempo, and the direction of the match." },
-  "showman": { pace: 1, staminaCost: 2, paceSource: "Workbook", summary: "Crowd interaction, personality, and presentation." },
-  "strong-style-specialist": { pace: 2, staminaCost: 2, paceSource: "Workbook", summary: "Stiff strikes, fighting spirit, and high intensity." },
-  "submission-specialist": { pace: 1, staminaCost: 2, paceSource: "Workbook", summary: "Limb targeting, holds, and submission control." },
+  "aerial-specialist": { pace: 6, staminaCost: 3, paceSource: "Workbook", summary: "Dives, springboards, and high-risk aerial offense." },
+  "big-match-performer": { pace: 4, staminaCost: 2, paceSource: "Workbook", summary: "Escalating drama, near falls, and major-match execution." },
+  "chain-technician": { pace: 2, staminaCost: 1, paceSource: "Workbook", summary: "Fluid transitions, mat control, and technical exchanges." },
+  "counter-specialist": { pace: 2, staminaCost: 1, paceSource: "Wrestling Sim Extension", summary: "Anticipates offense and turns an opponent's strengths against them." },
+  "dirty-rulebreaker": { pace: 2, staminaCost: 1, paceSource: "Workbook", summary: "Shortcuts, cheating, and intelligent rule bending." },
+  "hardcore-daredevil": { pace: 6, staminaCost: 3, paceSource: "Workbook", summary: "Weapons, stunt bumps, and dangerous chaos." },
+  "heavy-striker-brawler": { pace: 4, staminaCost: 2, paceSource: "Workbook", summary: "Heavy strikes, fists, and rough fighting." },
+  "high-tempo-hybrid": { pace: 6, staminaCost: 3, paceSource: "Workbook", summary: "Fast sequences and relentless workrate." },
+  "opportunistic-schemer": { pace: 2, staminaCost: 1, paceSource: "Workbook", summary: "Waits for openings and steals decisive moments." },
+  "power-dominance": { pace: 4, staminaCost: 3, paceSource: "Workbook", summary: "Strength, control, and overwhelming offense." },
+  "psychological-manipulator": { pace: 2, staminaCost: 1, paceSource: "Workbook", summary: "Mind games, taunts, and emotional disruption." },
+  "resilient-underdog": { pace: 4, staminaCost: 2, paceSource: "Workbook", summary: "Damage selling, survival, and fiery comebacks." },
+  "ring-general-pace-controller": { pace: 2, staminaCost: 1, paceSource: "Workbook", summary: "Controls structure, tempo, and the direction of the match." },
+  "showman": { pace: 2, staminaCost: 2, paceSource: "Workbook", summary: "Crowd interaction, personality, and presentation." },
+  "strong-style-specialist": { pace: 4, staminaCost: 2, paceSource: "Workbook", summary: "Stiff strikes, fighting spirit, and high intensity." },
+  "submission-specialist": { pace: 2, staminaCost: 2, paceSource: "Workbook", summary: "Limb targeting, holds, and submission control." },
 };
 
 export const RESOLUTION_APPROACHES: ResolutionApproachDefinition[] = IMPORTED_APPROACH_FORMULAS.map((formula) => {

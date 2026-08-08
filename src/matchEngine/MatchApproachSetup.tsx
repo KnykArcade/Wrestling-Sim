@@ -14,7 +14,6 @@ import {
   getApproach,
   MAX_MATCH_APPROACHES,
   profileApproachRatingInputs,
-  profileStaminaCapacity,
   workerProfileKey,
 } from "./model";
 import { MATCH_ENGINE_SKILLS, WRESTLER_STYLES } from "./profileCatalog";
@@ -273,7 +272,7 @@ export default function MatchApproachSetupEditor({
     <header className="match-strategy-header"><div><p className="eyebrow">MATCH APPROACHES</p><h4>Wrestler strategy</h4></div><div className="match-anticipation" aria-label={`Crowd anticipation ${anticipation.score.toFixed(1)} ${anticipation.label}`}><span>Anticipation</span><strong>{anticipation.score.toFixed(1)} · {anticipation.label}</strong><details><summary>Breakdown</summary><small>Popularity {anticipation.popularity.toFixed(1)} · Momentum {anticipation.momentum.toFixed(1)} · Skills {anticipation.skills.toFixed(1)} · Style {anticipation.styleAppeal.toFixed(1)}</small></details></div><button className="primary-button compact-button" type="button" aria-label="Run AI for All Competitors" onClick={runAll} disabled={competitors.length === 0}>AI All</button></header>
 
     {competitors.length === 0 ? <div className="match-approach-empty">Add wrestlers above to choose their match approaches.</div> : <div className="tew-strategy-table" style={tableStyle} aria-label="Compact wrestler approach table">
-      <div className="tew-strategy-table__header"><span>Wrestler</span><span>Style</span><span>OVR</span><span>MOM</span><span>Stamina</span>{Array.from({ length: slots }, (_, index) => <span key={index}>Approach {index + 1}</span>)}<span>Individual result</span><span>Actions</span></div>
+      <div className="tew-strategy-table__header"><span>Wrestler</span><span>Style</span><span>OVR</span><span>MOM</span><span>Endurance</span>{Array.from({ length: slots }, (_, index) => <span key={index}>Approach {index + 1}</span>)}<span>Individual result</span><span>Actions</span></div>
       {competitors.map((worker) => {
         const key = workerProfileKey(worker);
         const savedProfile = profileForWorker(universe, worker);
@@ -286,13 +285,13 @@ export default function MatchApproachSetupEditor({
           <span>{WRESTLER_STYLES.find((style) => style.id === profile.styleId)?.name ?? "All-Rounder"}</span>
           <b>{profile.overall}</b>
           <label className="tew-strategy-momentum"><input aria-label={`${worker.name} momentum`} title={`${momentumLabel(profile.momentum)} momentum`} type="number" min={0} max={100} value={profile.momentum} onChange={(event) => upsertProfile({ ...profile, momentum: Math.max(0, Math.min(100, Number(event.target.value) || 0)), momentumScale: "0-100-v1" })} /><small>{momentumLabel(profile.momentum)}</small></label>
-          <span>{calculateProfileStaminaRating(profile).toFixed(1)} / {profileStaminaCapacity(profile)}</span>
+          <span>{calculateProfileStaminaRating(profile).toFixed(1)}</span>
           {Array.from({ length: slots }, (_, slotIndex) => {
             const selectedId = plan.selectedApproachIds[slotIndex];
             const slotKey = `${key}:${slotIndex}`;
             return <ApproachSlotDropdown key={slotKey} worker={worker} profile={profile} slotIndex={slotIndex} selectedId={selectedId} selectedIds={plan.selectedApproachIds} locked={Boolean(selectedId && plan.lockedApproachIds.includes(selectedId))} open={openSlotKey === slotKey} onToggle={() => setOpenSlotKey(openSlotKey === slotKey ? "" : slotKey)} onSelect={(id) => selectApproach(worker, slotIndex, id)} onLock={() => { if (selectedId) toggleLock(worker, selectedId); }} />;
           })}
-          <div className={`tew-strategy-result tew-strategy-result--${plan.selectedApproachIds.length ? ratingTone(averageRating) : "empty"}`}><strong>{plan.selectedApproachIds.length ? `Pace ${result.actualPace} · ${result.pace.status}` : "Not set"}</strong><small>{plan.selectedApproachIds.length ? `Rating ${averageRating.toFixed(1)} · Cost ${result.usedStamina}/${result.availableStamina} · ${result.stamina.status}` : `${slots} approach slots`}</small></div>
+          <div className={`tew-strategy-result tew-strategy-result--${plan.selectedApproachIds.length ? ratingTone(averageRating) : "empty"}`}><strong>{plan.selectedApproachIds.length ? `Pace ${result.actualPace} · ${result.pace.status}` : "Not set"}</strong><small>{plan.selectedApproachIds.length ? `Rating ${averageRating.toFixed(1)} · Load ${result.usedStamina}/${result.availableStamina} · ${result.stamina.status}` : `${slots} approach slots`}</small></div>
           <div className="tew-strategy-actions"><button className="secondary-button compact-button" type="button" onClick={() => { const created = ensureProfile(worker); setEditingProfileKey(created.workerKey); }}>Ratings</button><button className="primary-button compact-button" type="button" aria-label={`Run Approach AI for ${worker.name}`} onClick={() => runAI(worker)}>AI</button></div>
         </article>;
       })}

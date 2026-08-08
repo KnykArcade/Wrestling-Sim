@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { calculateProfileStaminaRating, createMatchEngineProfile, profileStaminaCapacity } from "../matchEngine/model";
+import { calculateProfileStaminaRating, createMatchEngineProfile } from "../matchEngine/model";
 import { MATCH_ENGINE_SKILLS, WRESTLER_STYLES } from "../matchEngine/profileCatalog";
 import { loadMatchEngineUniverse, saveMatchEngineUniverse } from "../matchEngine/storage";
 import type { MatchEngineProfile, WrestlerSkill, WrestlerStyleId } from "../matchEngine/types";
@@ -379,7 +379,7 @@ export default function ProfileLibraryWorkspace({ snapshot }: { snapshot: TewSna
         {!selectedProfile || !selectedRecord ? <section className="empty-state profile-library-empty"><h3>Select or create a wrestler profile</h3><p>The library will show rating values, provenance, stamina, TEW identity, and readiness.</p></section> : <section className="profile-library-detail">
           <header className="profile-library-detail-header"><div><p className="eyebrow">CENTRAL MATCH-APPROACH PROFILE</p><input aria-label="Profile wrestler name" value={selectedProfile.workerName} onChange={(event) => editField("name", event.target.value)} /><span>{workerSourceLabel(selectedProfile)} · Updated {formatDate(selectedRecord.updatedAt)}</span></div><div className={`profile-readiness-card profile-readiness-card--${readinessClass(selectedRecord.readiness)}`}><span>Profile readiness</span><strong>{selectedRecord.readiness}</strong><small>{selectedRecord.completenessPercent}% required fields verified</small></div></header>
 
-          <section className="profile-library-metrics"><div><span>Overall</span><strong>{selectedProfile.overall}</strong></div><div><span>Stamina rating</span><strong>{calculateProfileStaminaRating(selectedProfile).toFixed(1)}</strong></div><div><span>Approach capacity</span><strong>{profileStaminaCapacity(selectedProfile)}</strong></div><div><span>Style</span><strong>{WRESTLER_STYLES.find((style) => style.id === selectedProfile.styleId)?.name}</strong></div></section>
+          <section className="profile-library-metrics"><div><span>Overall</span><strong>{selectedProfile.overall}</strong></div><div><span>Endurance</span><strong>{calculateProfileStaminaRating(selectedProfile).toFixed(1)}</strong></div><div><span>Health</span><strong>{selectedProfile.health}</strong></div><div><span>Style</span><strong>{WRESTLER_STYLES.find((style) => style.id === selectedProfile.styleId)?.name}</strong></div></section>
 
           <section className="profile-library-identity">
             <header><div><p className="eyebrow">TEW IDENTITY LINK</p><h3>{selectedRecord.identity.status}</h3></div><span>{selectedRecord.identity.method}</span></header>

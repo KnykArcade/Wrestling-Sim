@@ -11,6 +11,7 @@ import {
   approachSlotsForDuration,
   approachLimitForSetup,
   calculateApproachRating,
+  calculateMatchLoad,
   calculateMentalStateBase,
   calculateMentalStateScore,
   calculateProfileStaminaRating,
@@ -135,7 +136,7 @@ describe("native match engine data foundation", () => {
     expect(normalizeRating(-4)).toBe(0);
     expect(calculationQualityLabel(85)).toBe("Elite");
     expect(calculationQualityLabel(49.99)).toBe("Weak");
-    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b20c-v3");
+    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b21-v1");
   });
 
   test("migrates saved resolver IDs without losing selected or locked approaches", () => {
@@ -197,12 +198,12 @@ describe("native match engine data foundation", () => {
     expect(evaluatePace(6, 1)).toEqual({ difference: 5, status: "FAILED", modifier: -25 });
   });
 
-  test("matches the workbook stamina states and penalties", () => {
-    expect(evaluateStamina(6, 6)).toEqual({ overBudget: 0, status: "PASS", modifier: 2 });
-    expect(evaluateStamina(5, 6)).toEqual({ overBudget: -1, status: "PASS", modifier: 2 });
-    expect(evaluateStamina(7, 6)).toEqual({ overBudget: 1, status: "WINDED", modifier: -2 });
-    expect(evaluateStamina(8, 6)).toEqual({ overBudget: 2, status: "GASSED", modifier: -5 });
-    expect(evaluateStamina(9, 6)).toEqual({ overBudget: 3, status: "DEAD", modifier: -15 });
+  test("maps match load against endurance to useful fatigue states", () => {
+    expect(evaluateStamina(60, 60)).toEqual({ overBudget: 0, status: "PASS", modifier: 2 });
+    expect(evaluateStamina(59, 60)).toEqual({ overBudget: -1, status: "PASS", modifier: 2 });
+    expect(evaluateStamina(68, 60)).toEqual({ overBudget: 8, status: "WINDED", modifier: -3 });
+    expect(evaluateStamina(75, 60)).toEqual({ overBudget: 15, status: "GASSED", modifier: -8 });
+    expect(evaluateStamina(81, 60)).toEqual({ overBudget: 21, status: "DEAD", modifier: -15 });
   });
 
   test("centers ordinary mental form on neutral with rare extremes", () => {
@@ -230,19 +231,17 @@ describe("native match engine data foundation", () => {
 });
 
 describe("Phase 4C2 match setup and approach AI", () => {
-  test("reproduces the workbook stamina rating and capacity bands", () => {
+  test("uses the actual stamina rating and a duration-intensity-pace match load", () => {
     const profile = testProfile();
-    const expected = (74 + 84 + 75 + 75 + 85 + 70) / 6;
-    expect(calculateProfileStaminaRating(profile)).toBeCloseTo(expected, 2);
-    expect(staminaCapacityFromRating(75)).toBe(9);
-    expect(staminaCapacityFromRating(70)).toBe(7);
-    expect(staminaCapacityFromRating(65)).toBe(6);
-    expect(staminaCapacityFromRating(60)).toBe(5);
-    expect(staminaCapacityFromRating(50)).toBe(4);
-    expect(staminaCapacityFromRating(30)).toBe(3);
-    expect(staminaCapacityFromRating(20)).toBe(2);
-    expect(staminaCapacityFromRating(19.99)).toBe(1);
-    expect(profileStaminaCapacity(profile)).toBe(9);
+    expect(calculateProfileStaminaRating(profile)).toBe(84);
+    expect(staminaCapacityFromRating(75)).toBe(75);
+    expect(staminaCapacityFromRating(19.99)).toBe(20);
+    expect(profileStaminaCapacity(profile)).toBe(84);
+    expect(calculateMatchLoad(12, [2], 4)).toBe(44);
+    expect(calculateMatchLoad(20, [2], 4)).toBe(56);
+    expect(calculateMatchLoad(30, [3], 6)).toBe(84);
+    expect(calculateMatchLoad(45, [1], 2)).toBe(80.5);
+    expect(calculateMatchLoad(60, [1], 2)).toBe(103);
   });
 
   test("selects the correct number of approaches for each duration band", () => {
@@ -364,7 +363,7 @@ describe("Phase 4C3 advisory match performance preview", () => {
     expect(preview.summary).toContain("does not change the planned winner or TEW result");
   });
 
-  test("sums the exact visible Andrade and Lashley approach pace to five", () => {
+  test("averages every selected approach on the shared one-to-six pace scale", () => {
     const andrade = testProfile("Andrade", "andrade");
     const lashley = testProfile("Bobby Lashley", "bobby-lashley");
     const preview = generateMatchPerformancePreview({
@@ -380,10 +379,12 @@ describe("Phase 4C3 advisory match performance preview", () => {
       seed: "phase-6b17-pace-integrity",
     })!;
 
-    expect(totalApproachPace(["aerial-showstopper", "opportunistic-schemer", "chain-technician"])).toBe(5);
+    expect(totalApproachPace(["aerial-showstopper", "opportunistic-schemer", "chain-technician"])).toBe(3);
+    expect(totalApproachPace(["chain-technician", "big-match-performer"])).toBe(3);
+    expect(totalApproachPace(["big-match-performer", "aerial-showstopper"])).toBe(5);
     expect(preview.workerResults.map((result) => ({ name: result.workerName, pace: result.actualPace, status: result.paceStatus }))).toEqual([
-      { name: "Andrade", pace: 5, status: "IDEAL PACE" },
-      { name: "Bobby Lashley", pace: 5, status: "IDEAL PACE" },
+      { name: "Andrade", pace: 3, status: "NOTICEABLY OFF" },
+      { name: "Bobby Lashley", pace: 3, status: "NOTICEABLY OFF" },
     ]);
   });
 
@@ -506,7 +507,7 @@ describe("Phase 4C3 advisory match performance preview", () => {
     const result = evaluateApproachPlan(worker, "competitive-tv-match", 20, ["big-match-performer", "aerial-showstopper", "hardcore-daredevil", "power-dominance"]);
     const recommendationTotal = result.candidateScores.reduce((sum, score) => sum + score.total, 0);
     const expected = recommendationTotal + result.pace.modifier * 1.5 + result.stamina.modifier * 3
-      + 3 + 4 - Math.max(0, result.usedStamina - result.availableStamina) * 25;
+      + 3 + 4 - Math.max(0, result.usedStamina - result.availableStamina) * 1.5;
     expect(result.totalScore).toBeCloseTo(expected, 2);
   });
 });

@@ -84,6 +84,8 @@ function addAdvisoryPreview(match: ReturnType<typeof createPlannedSegment>): voi
       presentationScore: 78,
       staminaStatus: "PASS",
       staminaModifier: 2,
+      staminaUsed: 42,
+      staminaAvailable: 80,
       actualPace: undefined,
       paceStatus: "IDEAL PACE",
       paceModifier: 2,

@@ -7,7 +7,7 @@ import {
   profileApproachRatingInputs,
   scoreApproachCandidate,
 } from "../matchEngine/model";
-import type { MatchAimId, MatchEngineProfile, MatchWorkerApproachPlan } from "../matchEngine/types";
+import type { MatchAimId, MatchEngineProfile, MatchWorkerApproachPlan, MentalStateDefinition } from "../matchEngine/types";
 import { currentPerformancePreview } from "../matchEngine/previewIntegrity";
 import type { PlannedSegment } from "../planner/types";
 import type { AnticipationLabel, CrowdHeatLabel, LiveAudienceResult, MatchAnticipation, MomentumLabel } from "./types";
@@ -132,7 +132,37 @@ export function calculateMatchAnticipation(input: {
   };
 }
 
-export function calculateLiveMatchAudience(performanceRating: number, anticipation: number, crowdBefore: number): LiveAudienceResult {
+export function calculateMentalNightAdjustment(mentalStates: MentalStateDefinition["name"][]) {
+  const formula = CALCULATION_FORMULAS.crowdMentalNight;
+  const values = mentalStates.map((state) => formula.stateValues[state] ?? 0);
+  const fieldScale = Math.min(formula.fieldScaleMaximum, values.length);
+  const averageValue = values.length ? values.reduce<number>((total, value) => total + value, 0) / values.length : 0;
+  const hotCount = mentalStates.filter((state) => state === "HOT NIGHT").length;
+  const focusedCount = mentalStates.filter((state) => state === "FOCUSED").length;
+  const negativeCount = mentalStates.filter((state) => state === "DISTRACTED" || state === "OFF NIGHT").length;
+  const combinedAdjustment = hotCount >= 2
+    ? formula.twoHotBonus
+    : focusedCount >= 2
+      ? formula.twoFocusedBonus
+      : negativeCount >= 2
+        ? formula.twoNegativePenalty
+        : 0;
+  return createCalculationStage(formula, [
+    createCalculationTerm("field", "Average participant mental-night value", averageValue, fieldScale, mentalStates.length ? mentalStates.join(", ") : "No mental-night states were supplied."),
+    createCalculationTerm("combined", combinedAdjustment > 0 ? "Combined strong-night bonus" : combinedAdjustment < 0 ? "Combined poor-night penalty" : "Combined-night adjustment", combinedAdjustment),
+  ], { notes: [
+    hotCount >= 2 ? "At least two HOT NIGHT performances amplify the crowd surge." :
+      focusedCount >= 2 ? "At least two FOCUSED performances create a combined crowd boost." :
+        negativeCount >= 2 ? "Multiple poor mental nights compound the crowd drop." : "No combined-night bonus or penalty applied.",
+  ] });
+}
+
+export function calculateLiveMatchAudience(
+  performanceRating: number,
+  anticipation: number,
+  crowdBefore: number,
+  mentalStates: MentalStateDefinition["name"][] = [],
+): LiveAudienceResult {
   const expectationFormula = CALCULATION_FORMULAS.expectationAdjustment;
   const responseFormula = CALCULATION_FORMULAS.crowdResponse;
   const finalFormula = CALCULATION_FORMULAS.finalRating;
@@ -144,25 +174,33 @@ export function calculateLiveMatchAudience(performanceRating: number, anticipati
   const deliveryWeight = performanceGap >= 0 ? expectationFormula.overdeliveryWeight : expectationFormula.disappointmentWeight;
   const expectationLedger = createCalculationStage(expectationFormula, [
     createCalculationTerm("performance-gap", performanceGap >= 0 ? "Performance above anticipation" : "Performance below anticipation", performanceGap, deliveryWeight),
-  ], { notes: [performanceGap >= 0 ? "Overdelivery earns 25% of the positive performance gap, capped at +12." : "Disappointment loses 40% of the negative performance gap, capped at -15."] });
+  ], { notes: [performanceGap >= 0
+    ? `Overdelivery earns ${expectationFormula.overdeliveryWeight * 100}% of the positive performance gap, capped at +${expectationFormula.capMaximum}.`
+    : `Disappointment loses ${expectationFormula.disappointmentWeight * 100}% of the negative performance gap, capped at ${expectationFormula.capMinimum}.`,
+  ] });
   const expectationAdjustment = expectationLedger.result;
+  const mentalNightLedger = calculateMentalNightAdjustment(mentalStates);
+  const mentalNightAdjustment = mentalNightLedger.result;
   const responseLedger = createCalculationStage(responseFormula, [
     createCalculationTerm("anticipation", "Anticipation", expected, responseFormula.anticipationWeight),
     createCalculationTerm("incoming", "Incoming crowd heat", incoming, responseFormula.incomingCrowdWeight),
     createCalculationTerm("expectation", "Delivery adjustment", expectationAdjustment),
-  ], { notes: ["Raw in-ring performance affects crowd response only through whether the match exceeded or missed expectations; it is not counted as another direct crowd-response weight."] });
+    createCalculationTerm("mental-night", "Mental-night adjustment", mentalNightAdjustment),
+  ], { notes: ["Raw in-ring performance affects crowd response through expectation delivery, while the participants' combined mental nights directly amplify or suppress the live reaction."] });
   const crowdResponse = responseLedger.result;
   const finalLedger = createCalculationStage(finalFormula, [
     createCalculationTerm("performance", "Raw in-ring performance", performance, finalFormula.performanceWeight),
     createCalculationTerm("crowd-response", "Live crowd response", crowdResponse, finalFormula.crowdResponseWeight),
   ], { notes: ["The official rating keeps raw wrestling quality and live audience response as separate 60% and 40% lanes, and replaces the raw in-ring rating only after the result is locked into the live card."] });
   const finalRating = finalLedger.result;
-  const uncappedMovement = (crowdResponse - incoming) / movementFormula.divisor;
+  const responseGap = crowdResponse - incoming;
+  const movementDivisor = responseGap >= 0 ? movementFormula.positiveDivisor : movementFormula.negativeDivisor;
+  const uncappedMovement = responseGap / movementDivisor;
   const movement = clamp(uncappedMovement, movementFormula.movementMinimum, movementFormula.movementMaximum);
   const crowdAfterLedger = createCalculationStage(movementFormula, [
     createCalculationTerm("incoming", "Incoming crowd heat", incoming),
     createCalculationTerm("movement", "Capped crowd movement", movement),
-  ], { notes: [`Uncapped movement ${(uncappedMovement >= 0 ? "+" : "")}${round(uncappedMovement)} is capped between ${movementFormula.movementMinimum} and +${movementFormula.movementMaximum}.`] });
+  ], { notes: [`The ${responseGap >= 0 ? "positive" : "negative"} response gap uses divisor ${movementDivisor}. Uncapped movement ${(uncappedMovement >= 0 ? "+" : "")}${round(uncappedMovement)} is capped between ${movementFormula.movementMinimum} and +${movementFormula.movementMaximum}.`] });
   const crowdAfter = crowdAfterLedger.result;
   return {
     performanceRating: round(performance),
@@ -172,11 +210,13 @@ export function calculateLiveMatchAudience(performanceRating: number, anticipati
     crowdBeforeLabel: crowdHeatLabel(incoming),
     crowdResponse,
     expectationAdjustment,
+    mentalNightAdjustment,
     finalRating,
     crowdAfter,
     crowdAfterLabel: crowdHeatLabel(crowdAfter),
     calculationLedger: {
       expectationAdjustment: expectationLedger,
+      mentalNightAdjustment: mentalNightLedger,
       crowdResponse: responseLedger,
       finalRating: finalLedger,
       crowdAfter: crowdAfterLedger,
@@ -204,7 +244,7 @@ export function projectedCrowdBeforeForSegment(input: {
       plans: segment.matchApproachSetup.workerPlans,
       aimId: segment.matchApproachSetup.matchAimId,
     });
-    crowd = calculateLiveMatchAudience(preview.matchScore, anticipation.score, crowd).crowdAfter;
+    crowd = calculateLiveMatchAudience(preview.matchScore, anticipation.score, crowd, preview.workerResults.map((result) => result.mentalStateName)).crowdAfter;
   }
   return crowd;
 }

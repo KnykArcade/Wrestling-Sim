@@ -18,7 +18,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Flashiness", weight: 0.2 },
       { skill: "Basics", weight: 0.1 },
     ],
-    pace: 3,
+    pace: 6,
     staminaCost: 3,
     sourceNames: ["Aerial Showstopper", "Aerial Specialist"],
     narrative: {
@@ -39,7 +39,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Charisma", weight: 0.2 },
       { skill: "Stamina", weight: 0.1 },
     ],
-    pace: 2,
+    pace: 4,
     staminaCost: 2,
     sourceNames: ["Big Match Performer"],
     narrative: {
@@ -60,7 +60,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Consistency", weight: 0.2 },
       { skill: "Psychology", weight: 0.2 },
     ],
-    pace: 1,
+    pace: 2,
     staminaCost: 1,
     sourceNames: ["Chain Technician"],
     narrative: {
@@ -81,7 +81,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Consistency", weight: 0.25 },
       { skill: "Technical", weight: 0.15 },
     ],
-    pace: 1,
+    pace: 2,
     staminaCost: 1,
     sourceNames: ["Counter Specialist"],
     narrative: null,
@@ -97,7 +97,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Charisma", weight: 0.2 },
       { skill: "Consistency", weight: 0.15 },
     ],
-    pace: 1,
+    pace: 2,
     staminaCost: 1,
     sourceNames: ["Dirty Rulebreaker"],
     narrative: null,
@@ -113,7 +113,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Resilience", weight: 0.2 },
       { skill: "Safety", weight: 0.15 },
     ],
-    pace: 3,
+    pace: 6,
     staminaCost: 3,
     sourceNames: ["Hardcore Daredevil"],
     narrative: {
@@ -134,7 +134,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Resilience", weight: 0.2 },
       { skill: "Menace", weight: 0.15 },
     ],
-    pace: 2,
+    pace: 4,
     staminaCost: 2,
     sourceNames: ["Heavy Striker / Brawler", "Heavy Striker/Brawler"],
     narrative: {
@@ -155,7 +155,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Consistency", weight: 0.2 },
       { skill: "Basics", weight: 0.15 },
     ],
-    pace: 3,
+    pace: 6,
     staminaCost: 3,
     sourceNames: ["High Tempo Hybrid", "Workrate Machine"],
     narrative: {
@@ -176,7 +176,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Charisma", weight: 0.2 },
       { skill: "Consistency", weight: 0.2 },
     ],
-    pace: 1,
+    pace: 2,
     staminaCost: 1,
     sourceNames: ["Opportunistic Schemer"],
     narrative: {
@@ -199,7 +199,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Crowd Work", weight: 1 / 6 },
       { skill: "Consistency", weight: 1 / 6 },
     ],
-    pace: 1,
+    pace: 2,
     staminaCost: 1,
     sourceNames: ["Pace Controller", "Ring General"],
     narrative: {
@@ -220,7 +220,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Menace", weight: 0.15 },
       { skill: "Stamina", weight: 0.15 },
     ],
-    pace: 2,
+    pace: 4,
     staminaCost: 3,
     sourceNames: ["Power Dominance"],
     narrative: {
@@ -241,7 +241,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Menace", weight: 0.2 },
       { skill: "Brawling", weight: 0.1 },
     ],
-    pace: 1,
+    pace: 2,
     staminaCost: 1,
     sourceNames: ["Psychological Manipulator"],
     narrative: {
@@ -262,7 +262,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Toughness", weight: 0.2 },
       { skill: "Athleticism", weight: 0.1 },
     ],
-    pace: 2,
+    pace: 4,
     staminaCost: 2,
     sourceNames: ["Resilient Underdog"],
     narrative: null,
@@ -278,7 +278,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Basics", weight: 0.15 },
       { skill: "Selling", weight: 0.15 },
     ],
-    pace: 1,
+    pace: 2,
     staminaCost: 2,
     sourceNames: ["Showman"],
     narrative: {
@@ -299,7 +299,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Resilience", weight: 0.2 },
       { skill: "Consistency", weight: 0.1 },
     ],
-    pace: 2,
+    pace: 4,
     staminaCost: 2,
     sourceNames: ["Strong Style Specialist"],
     narrative: null,
@@ -315,7 +315,7 @@ export const MATCH_APPROACHES: MatchApproachDefinition[] = [
       { skill: "Basics", weight: 0.15 },
       { skill: "Toughness", weight: 0.15 },
     ],
-    pace: 1,
+    pace: 2,
     staminaCost: 2,
     sourceNames: ["Submission Specialist"],
     narrative: {
@@ -391,9 +391,9 @@ export const SOURCE_CONFLICTS: SourceConflictRecord[] = [
   {
     id: "pace-controller-pace",
     area: "Approach pace",
-    sourceValues: ["Match Tables: 0", "Data / Match Aims-Approaches: 1"],
-    canonicalValue: "1",
-    resolution: "Use the active Data-table lookup value while retaining the conflicting Match Tables value in diagnostics.",
+    sourceValues: ["Match Tables legacy value: 0", "Data / Match Aims-Approaches legacy value: 1"],
+    canonicalValue: "2 on the shared 1-6 scale",
+    resolution: "Use the active Data-table lookup value, normalized from legacy 1 to visible pace 2, while retaining the conflicting Match Tables value in diagnostics.",
   },
   {
     id: "importance-approach-count",

@@ -331,14 +331,7 @@ export function gimmickStarRating(value: number | null): number {
 }
 
 export function staminaCapacityFromWorkbookRating(value: number): number {
-  if (value >= 75) return 9;
-  if (value >= 70) return 7;
-  if (value >= 65) return 6;
-  if (value >= 60) return 5;
-  if (value >= 50) return 4;
-  if (value >= 30) return 3;
-  if (value >= 20) return 2;
-  return 1;
+  return round(clamp(value), 1);
 }
 
 function popularityRating(worker: StartingUniverseWorker, contract: StartingUniverseContract | null): number {
@@ -377,14 +370,7 @@ export function calculateWorkbookMetrics(
   const crowdWork = Math.round((worker.looks + worker.starQuality + worker.skills.Charisma + popularity) / 4);
   const approachRatings = calculateImportedApproachRatings(worker, crowdWork);
   const overallApproachRating15 = round(WORKBOOK_APPROACH_AVERAGE_15.reduce((total, id) => total + approachRatings[id], 0) / WORKBOOK_APPROACH_AVERAGE_15.length);
-  const staminaRating = round((
-    worker.skills.Selling +
-    worker.skills.Stamina +
-    worker.skills.Resilience +
-    worker.experience +
-    worker.skills.Athleticism +
-    worker.skills.Toughness
-  ) / 6);
+  const staminaRating = round(worker.skills.Stamina, 1);
   const realInRingExperience = round((worker.reputation + worker.respect + worker.experience) / 3);
   const matchHealth = Math.round(bodyHealth * 0.8 + worker.skills.Resilience * 0.1 + worker.skills.Toughness * 0.1);
   const overallRating = round((overallApproachRating15 + bodyHealth + popularity + realInRingExperience + matchHealth) / 5);

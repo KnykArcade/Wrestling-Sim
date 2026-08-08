@@ -1,5 +1,6 @@
 import {
   approachLimitForSetup,
+  calculateMatchLoad,
   calculateApproachPlanScore,
   calculateMentalStateBase,
   calculateMentalStateScore,
@@ -213,6 +214,15 @@ function uniqueApproaches(values: ResolutionApproachId[]): ResolutionApproachId[
   return Array.from(new Set(values)).filter((id) => IMPORTED_APPROACH_FORMULAS.some((formula) => formula.id === id));
 }
 
+function normalizedApproachPace(ids: ResolutionApproachId[]): number {
+  return ids.length ? Math.round(average(ids.map((id) => resolutionApproach(id).pace))) : 0;
+}
+
+function enduranceMatchLoad(ids: ResolutionApproachId[], durationMinutes: number): number {
+  const pace = normalizedApproachPace(ids);
+  return calculateMatchLoad(durationMinutes, ids.map((id) => resolutionApproach(id).staminaCost), pace);
+}
+
 function selectedApproaches(
   worker: MatchResolutionWorkerSettings,
   source: MatchResolutionWorkerSource,
@@ -231,10 +241,10 @@ function selectedApproaches(
   let bestScores: MatchResolutionApproachScore[] = fixed.map((id) => scoreApproach(source, opponents, setup, id));
   for (const ids of candidateSets.length ? candidateSets : [fixed]) {
     const scores = ids.map((id) => scoreApproach(source, opponents, setup, id));
-    const staminaUsed = ids.reduce((total, id) => total + resolutionApproach(id).staminaCost, 0);
-    const staminaAvailable = source.workbookMetrics?.staminaCapacity ?? profileStaminaCapacity(source.profile);
+    const actualPace = normalizedApproachPace(ids);
+    const staminaUsed = enduranceMatchLoad(ids, setup.durationMinutes);
+    const staminaAvailable = profileStaminaCapacity(source.profile);
     const stamina = evaluateStamina(staminaUsed, staminaAvailable);
-    const actualPace = ids.reduce((total, id) => total + resolutionApproach(id).pace, 0);
     const pace = evaluatePace(idealPaceForAim(setup.aimId), actualPace);
     const planScore = calculateApproachPlanScore({
       recommendationTotal: scores.reduce((sum, item) => sum + item.total, 0),
@@ -247,16 +257,16 @@ function selectedApproaches(
       staminaAvailable,
     });
     const total = planScore.total;
-    if (total > bestScore || (total === bestScore && staminaUsed < bestIds.reduce((sum, id) => sum + resolutionApproach(id).staminaCost, 0))) {
+    if (total > bestScore || (total === bestScore && staminaUsed < enduranceMatchLoad(bestIds, setup.durationMinutes))) {
       bestScore = total;
       bestIds = ids;
       bestScores = scores;
     }
   }
-  const staminaUsed = bestIds.reduce((total, id) => total + resolutionApproach(id).staminaCost, 0);
-  const staminaAvailable = source.workbookMetrics?.staminaCapacity ?? profileStaminaCapacity(source.profile);
+  const actualPace = normalizedApproachPace(bestIds);
+  const staminaUsed = enduranceMatchLoad(bestIds, setup.durationMinutes);
+  const staminaAvailable = profileStaminaCapacity(source.profile);
   const stamina = evaluateStamina(staminaUsed, staminaAvailable);
-  const actualPace = bestIds.reduce((total, id) => total + resolutionApproach(id).pace, 0);
   const pace = evaluatePace(idealPaceForAim(setup.aimId), actualPace);
   const planScore = calculateApproachPlanScore({
     recommendationTotal: bestScores.reduce((sum, item) => sum + item.total, 0),
@@ -270,11 +280,11 @@ function selectedApproaches(
   });
   const terms = [
     ...bestScores.map((score) => createCalculationTerm(`recommendation-${score.approachId}`, `${score.approachName} recommendation`, score.total, 1, "Selection-only recommendation score.")),
-    createCalculationTerm("stamina", "Stamina modifier", stamina.modifier, planFormula.staminaModifierWeight, `${staminaUsed}/${staminaAvailable} stamina: ${stamina.status}.`),
+    createCalculationTerm("stamina", "Endurance modifier", stamina.modifier, planFormula.staminaModifierWeight, `Match load ${staminaUsed}/${staminaAvailable} endurance: ${stamina.status}.`),
     createCalculationTerm("pace", "Pace modifier", pace.modifier, planFormula.paceModifierWeight, `Pace ${actualPace} against ideal ${idealPaceForAim(setup.aimId)}: ${pace.status}.`),
     createCalculationTerm("variety", "Pace-variety bonus", planScore.diversityBonus, 1, planScore.diversityBonus ? "Three or more approaches use at least two pace levels." : "No pace-variety bonus applied."),
     createCalculationTerm("long-match", "Big Match Performer long-match bonus", planScore.longMatchBonus, 1, planScore.longMatchBonus ? "Big Match Performer is used in a match lasting at least 16 minutes." : "No long-match bonus applied."),
-    createCalculationTerm("over-budget", "Stamina over-budget penalty", planScore.overBudgetPoints, -planFormula.staminaOverBudgetPenalty, planScore.overBudgetPenalty ? `${planScore.overBudgetPoints} stamina above capacity.` : "The plan stays within stamina capacity."),
+    createCalculationTerm("over-budget", "Endurance over-load penalty", planScore.overBudgetPoints, -planFormula.staminaOverBudgetPenalty, planScore.overBudgetPenalty ? `${planScore.overBudgetPoints} match-load points above endurance.` : "The match load stays within endurance."),
   ];
   return {
     ids: bestIds,
@@ -387,10 +397,10 @@ function workerResult(
   const consistencyRange = ((100 - profile.skills.Consistency) / 100) * setup.volatility * randomness.consistencyRangeWeight;
   const consistencyRoll = random();
   const consistencyVariance = round((consistencyRoll * 2 - 1) * consistencyRange);
-  const staminaUsed = approaches.ids.reduce((total, id) => total + resolutionApproach(id).staminaCost, 0);
-  const staminaAvailable = source.workbookMetrics?.staminaCapacity ?? profileStaminaCapacity(profile);
+  const actualPace = normalizedApproachPace(approaches.ids);
+  const staminaUsed = enduranceMatchLoad(approaches.ids, setup.durationMinutes);
+  const staminaAvailable = profileStaminaCapacity(profile);
   const stamina = evaluateStamina(staminaUsed, staminaAvailable);
-  const actualPace = approaches.ids.reduce((total, id) => total + resolutionApproach(id).pace, 0);
   const pace = evaluatePace(idealPaceForAim(setup.aimId), actualPace);
   const interactionModifier = average(opponentApproaches.map((ids) => pairInteraction(approaches.ids, ids)));
   const risk = botchRisk(profile, source.workbookMetrics);
@@ -401,7 +411,7 @@ function workerResult(
   const executionTerms = [
     createCalculationTerm("approach-rating", "Average raw approach rating", averageApproachRating),
     createCalculationTerm("mental", "Mental-state modifier", mental.state.modifier),
-    createCalculationTerm("stamina", "Stamina modifier", stamina.modifier, 1, `${staminaUsed}/${staminaAvailable}: ${stamina.status}.`),
+    createCalculationTerm("stamina", "Endurance modifier", stamina.modifier, 1, `Match load ${staminaUsed}/${staminaAvailable}: ${stamina.status}.`),
     createCalculationTerm("pace", "Pace modifier", pace.modifier, executionFormula.paceModifierWeight, `Actual ${actualPace}; ideal ${idealPaceForAim(setup.aimId)}: ${pace.status}.`),
     createCalculationTerm("consistency", "Random consistency variance", consistencyVariance, 1, `Roll ${roundCalculation(consistencyRoll, 6)} within the ${roundCalculation(-consistencyRange, 3)} to +${roundCalculation(consistencyRange, 3)} range created by consistency ${profile.skills.Consistency} and volatility ${setup.volatility}.`),
     createCalculationTerm("fit", "Average aim, style, and opponent fit", averageAimFit, executionFormula.fitWeight),
@@ -758,7 +768,7 @@ function matchScore(results: MatchResolutionWorkerResult[], setup: MatchResoluti
     : clamp(100 - meanDeviation * 2);
   const terms = [
     createCalculationTerm("performance", "Average individual performance", performanceAverage, formula.performanceWeight),
-    createCalculationTerm("structure", "Average pace/stamina structure", structure, formula.structureWeight, `Per wrestler: ${formula.structureBaseline} + pace modifier x ${formula.structurePaceWeight} + stamina modifier x ${formula.structureStaminaWeight}, capped 0-100.`),
+    createCalculationTerm("structure", "Average pace/endurance structure", structure, formula.structureWeight, `Per wrestler: ${formula.structureBaseline} + pace modifier x ${formula.structurePaceWeight} + endurance modifier x ${formula.structureStaminaWeight}, capped 0-100.`),
     createCalculationTerm("closeness", setup.aimId === "squash-dominant-showcase" || normalize(setup.matchType).includes("squash") ? "Squash dominance" : "Competitive closeness", closeness, formula.closenessWeight),
     createCalculationTerm("chemistry", "Chemistry bonus", setup.chemistry, formula.chemistryWeight),
   ];
@@ -1153,7 +1163,7 @@ export function finalizeResolutionForLiveCrowd(
   const attempt = activeResolutionAttempt(record);
   if (!attempt?.finalResult || (attempt.status !== "Accepted" && attempt.status !== "Overridden")) throw new Error("Accept or explicitly override the match result before applying the live crowd rating.");
   if (attempt.finalResult.audience) return record;
-  const audience = calculateLiveMatchAudience(attempt.engineResult.matchScore, anticipation.score, crowdBefore);
+  const audience = calculateLiveMatchAudience(attempt.engineResult.matchScore, anticipation.score, crowdBefore, attempt.workerResults.map((result) => result.mentalStateName));
   const finalResult: MatchResolutionFinalResult = {
     ...attempt.finalResult,
     performanceRating: attempt.engineResult.matchScore,

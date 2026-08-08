@@ -55,7 +55,7 @@ export interface MatchApproachDefinition {
   name: string;
   summary: string;
   formula: ApproachSkillWeight[];
-  pace: 0 | 1 | 2 | 3;
+  pace: 0 | 2 | 4 | 6;
   staminaCost: 1 | 2 | 3;
   sourceNames: string[];
   narrative: ApproachNarrativePhrases | null;
@@ -240,6 +240,8 @@ export interface MatchWorkerPerformanceResult {
   presentationScore: number;
   staminaStatus: StaminaStatus;
   staminaModifier: number;
+  staminaUsed: number;
+  staminaAvailable: number;
   actualPace?: number;
   paceStatus: PaceStatus;
   paceModifier: number;

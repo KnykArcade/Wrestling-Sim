@@ -201,12 +201,12 @@ function conditionForWorker(input: {
 }): { record: StandaloneWorkerRecord; change: ConditionChange } {
   const { existing, storedHealthBefore, workerResult, resultCode, finalResult, rawMatchScore, showDate, performanceLeader, upset, expectedPerformance } = input;
   if (!finalResult) throw new Error("A finalized result is required.");
-  const excessPace = Math.max(0, workerResult.actualPace - 3);
+  const excessPace = Math.max(0, workerResult.actualPace - 4);
   const wearFormula = CALCULATION_FORMULAS.ordinaryWear;
   const wearCalculation = createCalculationStage(wearFormula, [
     createCalculationTerm("duration", "Actual duration (minutes)", finalResult.actualDurationMinutes, wearFormula.durationWeight),
-    createCalculationTerm("stamina-cost", "Stamina cost", workerResult.staminaUsed, wearFormula.staminaCostWeight),
-    createCalculationTerm("excess-pace", "Pace above 3", excessPace, wearFormula.excessPaceWeight),
+    createCalculationTerm("stamina-cost", "Match load", workerResult.staminaUsed, wearFormula.staminaCostWeight),
+    createCalculationTerm("excess-pace", "Pace above balanced 4", excessPace, wearFormula.excessPaceWeight),
     createCalculationTerm("stamina-state", `${workerResult.staminaStatus} stamina-state penalty`, wearFormula.staminaPenalties[workerResult.staminaStatus]),
   ], { notes: ["Crowd response, popularity, star rating, and final rating have no physical effect."] });
   const incident = injuryFromIncident(workerResult.incident);
@@ -234,8 +234,8 @@ function conditionForWorker(input: {
   const fatigueFormula = CALCULATION_FORMULAS.fatigueGain;
   const fatigueCalculation = createCalculationStage(fatigueFormula, [
     createCalculationTerm("duration", "Actual duration (minutes)", finalResult.actualDurationMinutes, fatigueFormula.durationWeight),
-    createCalculationTerm("stamina-cost", "Stamina cost", workerResult.staminaUsed, fatigueFormula.staminaCostWeight),
-    createCalculationTerm("excess-pace", "Pace above 3", excessPace, fatigueFormula.excessPaceWeight),
+    createCalculationTerm("stamina-cost", "Match load", workerResult.staminaUsed, fatigueFormula.staminaCostWeight),
+    createCalculationTerm("excess-pace", "Pace above balanced 4", excessPace, fatigueFormula.excessPaceWeight),
     createCalculationTerm("stamina-state", `${workerResult.staminaStatus} stamina-state penalty`, fatigueFormula.staminaPenalties[workerResult.staminaStatus]),
   ]);
   const fatigueGain = fatigueCalculation.result;

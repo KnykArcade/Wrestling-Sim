@@ -102,10 +102,10 @@ export function evaluatePace(idealPace: number, actualPace: number): PaceEvaluat
 }
 
 export function evaluateStamina(used: number, available: number): StaminaEvaluation {
-  const overBudget = Math.round(used - available);
+  const overBudget = Math.round((used - available) * 10) / 10;
   if (overBudget <= 0) return { overBudget, status: "PASS", modifier: 2 };
-  if (overBudget === 1) return { overBudget, status: "WINDED", modifier: -2 };
-  if (overBudget === 2) return { overBudget, status: "GASSED", modifier: -5 };
+  if (overBudget <= 8) return { overBudget, status: "WINDED", modifier: -3 };
+  if (overBudget <= 20) return { overBudget, status: "GASSED", modifier: -8 };
   return { overBudget, status: "DEAD", modifier: -15 };
 }
 
@@ -137,11 +137,22 @@ export function mentalSwingProbability(consistency: number): number {
 }
 
 export function totalApproachPace(approachIds: MatchApproachId[]): number {
-  return approachIds.reduce((sum, id) => sum + (getApproach(id)?.pace ?? 0), 0);
+  if (!approachIds.length) return 0;
+  return Math.round(approachIds.reduce((sum, id) => sum + (getApproach(id)?.pace ?? 0), 0) / approachIds.length);
 }
 
 export function totalApproachStamina(approachIds: MatchApproachId[]): number {
   return approachIds.reduce((sum, id) => sum + (getApproach(id)?.staminaCost ?? 0), 0);
+}
+
+export function calculateMatchLoad(durationMinutes: number, staminaCosts: number[], actualPace: number): number {
+  if (!staminaCosts.length) return 0;
+  const formula = CALCULATION_FORMULAS.enduranceMatchLoad;
+  const averageCost = staminaCosts.reduce((total, value) => total + value, 0) / staminaCosts.length;
+  const load = Math.max(0, durationMinutes) * formula.durationWeight
+    + averageCost * formula.approachCostWeight
+    + Math.max(0, actualPace) * formula.paceWeight;
+  return Math.round(Math.min(formula.capMaximum, load) * 10) / 10;
 }
 
 export function workerProfileKey(worker: { id: string; name: string; source: "tew" | "manual" }): string {
@@ -176,27 +187,11 @@ export function createMatchEngineProfile(worker: { id: string; name: string; sou
 }
 
 export function calculateProfileStaminaRating(profile: MatchEngineProfile): number {
-  const value = (
-    profile.skills.Selling +
-    profile.skills.Stamina +
-    profile.skills.Resilience +
-    profile.experience +
-    profile.skills.Athleticism +
-    profile.skills.Toughness
-  ) / 6;
-  return Math.round(value * 100) / 100;
+  return Math.round(clampRating(profile.skills.Stamina, 60) * 10) / 10;
 }
 
 export function staminaCapacityFromRating(rating: number): number {
-  const value = clampRating(rating, 0);
-  if (value >= 75) return 9;
-  if (value >= 70) return 7;
-  if (value >= 65) return 6;
-  if (value >= 60) return 5;
-  if (value >= 50) return 4;
-  if (value >= 30) return 3;
-  if (value >= 20) return 2;
-  return 1;
+  return Math.round(clampRating(rating, 0) * 10) / 10;
 }
 
 export function profileStaminaCapacity(profile: MatchEngineProfile): number {
@@ -231,7 +226,7 @@ function aimForId(aimId: MatchAimId) {
 
 function paceSelectionBonus(idealPace: number, approachPace: number): number {
   if (idealPace === 0) return 2;
-  const difference = Math.abs(idealPace - approachPace * 2);
+  const difference = Math.abs(idealPace - approachPace);
   if (difference === 0) return 8;
   if (difference === 1) return 5;
   if (difference === 2) return 2;
@@ -324,10 +319,10 @@ export function evaluateApproachPlan(
   const limit = approachLimitForSetup(durationMinutes, configuredLimit);
   const selected = Array.from(new Set(approachIds)).filter((id) => MATCH_APPROACHES.some((approach) => approach.id === id)).slice(0, limit);
   const candidateScores = selected.map((id) => scoreApproachCandidate(profile, aim.id, getApproach(id)!));
-  const usedStamina = totalApproachStamina(selected);
+  const actualPace = totalApproachPace(selected);
+  const usedStamina = calculateMatchLoad(durationMinutes, selected.map((id) => getApproach(id)?.staminaCost ?? 0), actualPace);
   const availableStamina = profileStaminaCapacity(profile);
   const stamina = evaluateStamina(usedStamina, availableStamina);
-  const actualPace = totalApproachPace(selected);
   const pace = evaluatePace(aim.idealPace, actualPace);
   const planScore = calculateApproachPlanScore({
     recommendationTotal: candidateScores.reduce((sum, candidate) => sum + candidate.total, 0),
@@ -350,7 +345,7 @@ export function evaluateApproachPlan(
     pace,
     explanation: [
       `${selected.length} of ${approachLimitForSetup(durationMinutes, configuredLimit)} available approach slots filled.`,
-      `${usedStamina}/${availableStamina} stamina used: ${stamina.status}.`,
+      `Match load ${usedStamina}/${availableStamina} endurance: ${stamina.status}.`,
       aim.idealPace === 0 ? "The selected match aim allows open pacing." : `Estimated pace ${actualPace} against ideal ${aim.idealPace}: ${pace.status}.`,
       "The score uses visible approach ratings, wrestler-style boosts, match-aim hints, pace, and stamina pressure.",
     ],

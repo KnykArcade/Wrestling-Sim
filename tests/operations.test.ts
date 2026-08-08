@@ -121,7 +121,7 @@ describe("Phase 5C unified show operations", () => {
     const report = buildShowPreflight(show, emptyHandoffUniverse(), emptyTransferUniverse(), [], profiles);
     expect(report.issues.some((issue) => issue.id.includes("approach-count"))).toBe(false);
     expect(report.issues.filter((issue) => issue.id.includes("stamina-")).length).toBe(2);
-    expect(report.issues.find((issue) => issue.id.includes("stamina-"))?.detail).toContain("6/1 stamina");
+    expect(report.issues.find((issue) => issue.id.includes("stamina-"))?.detail).toContain("Match load 66/10 endurance");
   });
 
   test("matches planned results to TEW history and applies only confirmed links", () => {

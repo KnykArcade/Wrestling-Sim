@@ -126,7 +126,7 @@ export function generateMatchNarrative(
   const middleParts = workerDetails.map((detail) => {
     const offense = detail.offense || "works through the selected approach plan";
     const structure = detail.evaluation
-      ? ` while managing ${detail.evaluation.usedStamina}/${detail.evaluation.availableStamina} stamina and a ${detail.evaluation.pace.status.toLowerCase()} pace result`
+      ? ` while managing match load ${detail.evaluation.usedStamina}/${detail.evaluation.availableStamina} endurance and a ${detail.evaluation.pace.status.toLowerCase()} pace result`
       : "";
     return `${detail.worker.name} advances the match by ${offense}${structure}`;
   });

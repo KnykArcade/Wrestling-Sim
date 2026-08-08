@@ -171,8 +171,8 @@ describe("Phase 6B2 reactive live card runner", () => {
     expect(() => lockMatchResult(session, unresolved)).toThrow("Accept or explicitly override");
     const record = acceptedResolution(show.id, match.id);
     session = lockMatchResult(session, record);
-    expect(session.progress.find((item) => item.segmentId === match.id)).toMatchObject({ status: "Completed", result: { status: "Accepted", finalResult: { performanceRating: 86, matchScore: 75.2 } }, audience: { performanceRating: 86, anticipation: 50, crowdBefore: 50, crowdResponse: 59, finalRating: 75.2, crowdAfter: 53 } });
-    expect(session.currentCrowd).toBe(53);
+    expect(session.progress.find((item) => item.segmentId === match.id)).toMatchObject({ status: "Completed", result: { status: "Accepted", finalResult: { performanceRating: 86, matchScore: 76.6 } }, audience: { performanceRating: 86, anticipation: 50, crowdBefore: 50, crowdResponse: 62.6, finalRating: 76.6, crowdAfter: 54.2 } });
+    expect(session.currentCrowd).toBe(54.2);
     expect(() => lockMatchResult(session, record)).toThrow("already locked");
   });
 
