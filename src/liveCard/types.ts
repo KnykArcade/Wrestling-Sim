@@ -1,6 +1,7 @@
 import type { MatchResolutionFinalResult } from "../matchResolution/types";
 import type { PlannedSegmentType } from "../planner/types";
 import type { LiveAudienceResult } from "../crowd/types";
+import type { ShowExpectationSnapshot } from "../showEvaluation/types";
 
 export type LiveCardShowStatus = "Planned" | "In Progress" | "Completed";
 export type LiveCardSegmentStatus = "Planned" | "Current" | "Result Pending" | "Completed" | "Skipped" | "Correction";
@@ -76,6 +77,7 @@ export interface LiveCardSession {
   audit: LiveCardAuditEntry[];
   crowdStart: number;
   currentCrowd: number;
+  expectationSnapshot: ShowExpectationSnapshot | null;
   startedAt: string;
   completedAt: string;
   createdAt: string;
