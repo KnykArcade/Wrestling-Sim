@@ -14,7 +14,9 @@ test("builds a World Classic bracket and schedules a fixture onto a planned TEW 
   await expect(page.getByRole("heading", { name: "Tournaments, Cups, Leagues, and Classics" })).toBeVisible();
   await page.getByRole("button", { name: "PWL World Classic" }).click();
   await expect(page.getByRole("heading", { name: "PWL World Classic" })).toBeVisible();
+  await page.getByRole("button", { name: "Overview", exact: true }).click();
   await expect(page.getByLabel("Competition expected participant count")).toHaveValue("8");
+  await page.getByRole("button", { name: "Participants", exact: true }).click();
 
   for (const name of ["Jay White", "PAC", "Eddie Kingston", "Brian Cage"]) {
     await page.getByLabel("Manual competition participant").fill(name);
