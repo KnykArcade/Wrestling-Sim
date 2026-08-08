@@ -7,7 +7,7 @@ import {
 } from "../calculations/foundation";
 import type { CalculationLedgerStage } from "../calculations/foundation";
 import { calculateLiveAngleAudience } from "../crowd/model";
-import { createMatchEngineProfile } from "../matchEngine/model";
+import { createMatchEngineProfile, workerProfileKey } from "../matchEngine/model";
 import type { MatchEngineProfile } from "../matchEngine/types";
 import { createPlannerId } from "../planner/model";
 import type { AnglePerformanceRole, PlannedSegment, PlannedShow, PlannedWorkerReference } from "../planner/types";
@@ -60,7 +60,7 @@ function stableStringify(value: unknown): string {
 }
 
 export function workerKey(worker: PlannedWorkerReference): string {
-  return worker.source === "tew" ? `tew:${worker.id || normalized(worker.name)}` : `manual:${normalized(worker.name)}`;
+  return workerProfileKey(worker);
 }
 
 function profileFor(worker: PlannedWorkerReference, profiles: MatchEngineProfile[]): MatchEngineProfile | null {

@@ -113,6 +113,37 @@ describe("Phase 6B7 angle resolution and show evaluation", () => {
     expect(reopened.promotionPopularity).toBe(evaluated.promotionPopularity);
   });
 
+  test("uses canonical profile keys for multiword manual wrestlers and completes their angle once", () => {
+    const { show, angle } = angleShow();
+    const profiles = angle.workers.map((worker) => createMatchEngineProfile({ id: worker.id, name: worker.name, source: worker.source }));
+    profiles[1].momentum = 63;
+    profiles[1].popularity = 58;
+
+    const calculated = calculateAngleEvaluation(show, angle, profiles);
+    expect(calculated.participants.map((participant) => participant.workerKey)).toEqual(profiles.map((profile) => profile.workerKey));
+
+    const finalized = finalizeAngleEvaluation(calculated, undefined, "", { show, segment: angle, profiles });
+    const applied = applyAngleEvaluation(emptyShowEvaluationUniverse(), finalized, profiles);
+    const appliedAgain = applyAngleEvaluation(applied.universe, finalized, applied.profiles);
+    expect(applied.profiles).toHaveLength(profiles.length);
+    expect(new Set(applied.profiles.map((profile) => profile.workerKey)).size).toBe(profiles.length);
+    expect(appliedAgain.profiles).toEqual(applied.profiles);
+    expect(appliedAgain.universe.workerImpacts).toEqual(applied.universe.workerImpacts);
+
+    const session = completeAngleSegment(
+      startLiveCardSession(createLiveCardSession(show, { records: [], settings: { defaultImportance: "Television", defaultChemistry: 0, defaultVolatility: 8, requireOverrideReason: true, selectedShowId: "", selectedSegmentId: "" } })),
+      angle.id,
+      angle.segmentOutput,
+      "",
+      "",
+      finalized.rawPerformance,
+      finalized.anticipation,
+      finalized.finalScore,
+      finalized.calculationLedger?.finalRating,
+    );
+    expect(session.progress.find((item) => item.segmentId === angle.id)?.status).toBe("Completed");
+  });
+
   test("loads older storage safely with neutral defaults", () => {
     expect(parseShowEvaluationUniverse({ angleEvaluations: [] })).toEqual({ angleEvaluations: [], workerImpacts: [], showReports: [], promotionPopularity: 50, promotionPopularitySeeded: false });
     const legacy = parseShowEvaluationUniverse({

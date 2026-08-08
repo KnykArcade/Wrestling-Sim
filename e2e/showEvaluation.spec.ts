@@ -22,8 +22,9 @@ test("calculates and accepts an angle before producing one permanent post-show r
   await expect(page.getByLabel("Angle result review")).toContainText("Live crowd response");
   await expect(page.getByLabel("Angle result review")).toContainText("Official rating");
   await page.getByText(/Open exact angle calculation/).click();
-  await expect(page.getByText("Raw angle performance", { exact: true })).toBeVisible();
-  await expect(page.getByText("Angle anticipation", { exact: true })).toBeVisible();
+  const exactAngleCalculation = page.getByLabel("Official angle rating exact");
+  await expect(exactAngleCalculation.getByText("Raw angle performance", { exact: true })).toBeVisible();
+  await expect(exactAngleCalculation.getByText("Angle anticipation", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Accept Angle Result" }).click();
   await expect(page.getByText("Participant momentum and popularity effects were recorded exactly once.")).toBeVisible();
   await page.getByRole("button", { name: "Complete Live Show" }).click();
