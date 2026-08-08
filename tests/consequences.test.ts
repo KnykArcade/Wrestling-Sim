@@ -76,11 +76,11 @@ function resolution(showId: string, segmentId: string, winnerName = "PAC", accep
           luck: 1,
           swing: 0,
           consistencyVariance: 0,
-          actualPace: 3,
+          actualPace: 2,
           paceStatus: "IDEAL PACE",
           paceModifier: 10,
-          staminaUsed: 5,
-          staminaAvailable: 9,
+          staminaUsed: 40,
+          staminaAvailable: 60,
           staminaStatus: "PASS",
           staminaModifier: 2,
           interactionModifier: 4,
@@ -116,8 +116,8 @@ function resolution(showId: string, segmentId: string, winnerName = "PAC", accep
           actualPace: 2,
           paceStatus: "OPEN PACE",
           paceModifier: 5,
-          staminaUsed: 4,
-          staminaAvailable: 8,
+          staminaUsed: 40,
+          staminaAvailable: 60,
           staminaStatus: "PASS",
           staminaModifier: 2,
           interactionModifier: 1,
@@ -212,15 +212,15 @@ describe("Phase 6B3 standalone result consequences", () => {
     const white = result.universe.workerRecords.find((record) => record.workerName === "Jay White")!;
     expect(pac).toMatchObject({ wins: 1, losses: 0, rankingPosition: 1, currentStreakType: "W", currentStreakCount: 1, momentum: 56, momentumScale: "0-100-v1" });
     expect(white).toMatchObject({ wins: 0, losses: 1, currentStreakType: "L", currentStreakCount: 1, momentum: 49, momentumScale: "0-100-v1" });
-    expect(pac).toMatchObject({ fatigue: 7.68, health: 93.75, popularity: 51.9, rankingPoints: 4.8 });
-    expect(white).toMatchObject({ fatigue: 7.07, health: 92.87, popularity: 51.46, rankingPoints: -0.48 });
+    expect(pac).toMatchObject({ fatigue: 6.68, health: 93.75, popularity: 51.9, rankingPoints: 4.8 });
+    expect(white).toMatchObject({ fatigue: 6.68, health: 92.75, popularity: 51.46, rankingPoints: -0.48 });
     expect(result.profiles.find((profile) => profile.workerName === "PAC")?.momentum).toBe(pac.momentum);
     expect(result.profiles.find((profile) => profile.workerName === "PAC")?.popularity).toBe(pac.popularity);
-    expect(result.universe.applications[0]).toMatchObject({ calculationVersion: "wrestling-sim-consequences-6b20d-v1", idempotencyKey: expect.stringContaining("match-consequences") });
+    expect(result.universe.applications[0]).toMatchObject({ calculationVersion: "wrestling-sim-consequences-6b21-v1", idempotencyKey: expect.stringContaining("match-consequences") });
     const pacChange = result.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")!;
-    expect(pacChange).toMatchObject({ healthRecovery: 0, ordinaryWear: 1.25, incidentDamage: 0, fatigueRecovery: 0, fatigueGain: 7.68, fullRestDays: 0, rankingPositionBefore: 0, rankingPositionAfter: 1 });
+    expect(pacChange).toMatchObject({ healthRecovery: 0, ordinaryWear: 1.25, incidentDamage: 0, fatigueRecovery: 0, fatigueGain: 6.68, fullRestDays: 0, rankingPositionBefore: 0, rankingPositionAfter: 1 });
     expect(pacChange.calculationLedger?.ordinaryWear.terms.map((term) => term.contribution)).toEqual([0.6545, 0.6, 0, 0]);
-    expect(pacChange.calculationLedger?.fatigueGain.terms.map((term) => term.contribution)).toEqual([4.675, 3, 0, 0]);
+    expect(pacChange.calculationLedger?.fatigueGain.terms.map((term) => term.contribution)).toEqual([4.675, 2, 0, 0]);
     expect(pacChange.calculationLedger?.ranking.terms.map((term) => term.contribution)).toEqual([3, 1.3, 0, 0.5]);
     expect(pac.matchHistory[0].result).toBe("W");
     expect(result.shows[0].segments[0]).toMatchObject({ workflowStatus: "Reconciled", reconciliation: { actualMatch: { winner: "PAC", rating: 86 }, finalNarrative: "PAC forced Jay White to submit." } });
@@ -265,8 +265,8 @@ describe("Phase 6B3 standalone result consequences", () => {
     const exhausting = resolution(show.id, segment.id);
     exhausting.attempts[0].finalResult!.actualDurationMinutes = 60;
     const [pacResult, whiteResult] = exhausting.attempts[0].workerResults;
-    Object.assign(pacResult, { staminaStatus: "DEAD", staminaUsed: 10, actualPace: 5, incident: "Visible botch on the landing." });
-    Object.assign(whiteResult, { staminaStatus: "DEAD", staminaUsed: 10, actualPace: 5, incident: "Major execution mistake caused a hard landing." });
+    Object.assign(pacResult, { staminaStatus: "DEAD", staminaUsed: 103, actualPace: 6, incident: "Visible botch on the landing." });
+    Object.assign(whiteResult, { staminaStatus: "DEAD", staminaUsed: 103, actualPace: 6, incident: "Major execution mistake caused a hard landing." });
     const applied = applyCoreResultConsequences({ universe: emptyResultConsequenceUniverse(), resolution: exhausting, shows: [show], profiles: profiles(), championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
     const pac = applied.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")!;
     const white = applied.universe.applications[0].conditionChanges.find((change) => change.workerName === "Jay White")!;
@@ -286,7 +286,7 @@ describe("Phase 6B3 standalone result consequences", () => {
     sameNight.show.segments = [sameNight.segment];
     const sameNightApplied = applyCoreResultConsequences({ universe: first.universe, resolution: resolution(sameNight.show.id, sameNight.segment.id), shows: [...first.shows, sameNight.show], profiles: first.profiles, championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
     const sameNightPac = sameNightApplied.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")!;
-    expect(sameNightPac).toMatchObject({ fullRestDays: 0, fatigueStoredBefore: 7.68, fatigueRecovery: 0, fatigueBefore: 7.68, fatigueAfter: 15.36 });
+    expect(sameNightPac).toMatchObject({ fullRestDays: 0, fatigueStoredBefore: 6.68, fatigueRecovery: 0, fatigueBefore: 6.68, fatigueAfter: 13.36 });
 
     const weekly = showWithMatch();
     weekly.show.id = "show-weekly";
@@ -298,7 +298,7 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(synchronizedUniverse.workerRecords.find((record) => record.workerName === "PAC")).toMatchObject({ health: 95, lastMatchHealth: 93.75 });
     const weeklyApplied = applyCoreResultConsequences({ universe: synchronizedUniverse, resolution: resolution(weekly.show.id, weekly.segment.id), shows: [...first.shows, weekly.show], profiles: recoveredProfiles, championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
     const weeklyPac = weeklyApplied.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")!;
-    expect(weeklyPac).toMatchObject({ fullRestDays: 6, fatigueStoredBefore: 7.68, fatigueRecovery: 7.68, fatigueBefore: 0, fatigueAfter: 7.68, healthStoredBefore: 93.75, healthRecovery: 1.25, healthBefore: 95, healthAfter: 93.75 });
+    expect(weeklyPac).toMatchObject({ fullRestDays: 6, fatigueStoredBefore: 6.68, fatigueRecovery: 6.68, fatigueBefore: 0, fatigueAfter: 6.68, healthStoredBefore: 93.75, healthRecovery: 1.25, healthBefore: 95, healthAfter: 93.75 });
     expect(weeklyPac.calculationLedger?.fatigueRecovery.capApplied).toBe(true);
 
     const longRest = showWithMatch();
@@ -308,7 +308,7 @@ describe("Phase 6B3 standalone result consequences", () => {
     longRest.show.segments = [longRest.segment];
     const longRestApplied = applyCoreResultConsequences({ universe: first.universe, resolution: resolution(longRest.show.id, longRest.segment.id), shows: [...first.shows, longRest.show], profiles: first.profiles, championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
     const longRestPac = longRestApplied.universe.applications[0].conditionChanges.find((change) => change.workerName === "PAC")!;
-    expect(longRestPac).toMatchObject({ fullRestDays: 21, fatigueRecovery: 7.68, fatigueBefore: 0, fatigueAfter: 7.68 });
+    expect(longRestPac).toMatchObject({ fullRestDays: 21, fatigueRecovery: 6.68, fatigueBefore: 0, fatigueAfter: 6.68 });
   });
 
   test("uses the official multi-person upset flag instead of treating every sub-50% winner as an upset", () => {
@@ -639,7 +639,7 @@ describe("Phase 6B3 standalone result consequences", () => {
     const parsed = parseResultConsequenceUniverse(JSON.parse(JSON.stringify(applied.universe)) as unknown);
     expect(parsed.workerRecords[0].matchHistory[0].resolutionAttemptId).toBe(`attempt-${segment.id}`);
     expect(parsed.applications[0].conditionChanges).toHaveLength(2);
-    expect(parsed.applications[0].conditionChanges[0].calculationLedger?.version).toBe("wrestling-sim-consequences-6b20d-v1");
+    expect(parsed.applications[0].conditionChanges[0].calculationLedger?.version).toBe("wrestling-sim-consequences-6b21-v1");
     expect(parsed.prompts.length).toBeGreaterThanOrEqual(3);
 
     const legacy = JSON.parse(JSON.stringify(applied.universe)) as any;

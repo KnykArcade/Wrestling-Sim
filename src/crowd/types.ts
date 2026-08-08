@@ -28,11 +28,13 @@ export interface LiveAudienceResult {
   crowdBeforeLabel: CrowdHeatLabel;
   crowdResponse: number;
   expectationAdjustment: number;
+  mentalNightAdjustment?: number;
   finalRating: number;
   crowdAfter: number;
   crowdAfterLabel: CrowdHeatLabel;
   calculationLedger?: {
     expectationAdjustment: CalculationLedgerStage;
+    mentalNightAdjustment?: CalculationLedgerStage;
     crowdResponse: CalculationLedgerStage;
     finalRating: CalculationLedgerStage;
     crowdAfter: CalculationLedgerStage;

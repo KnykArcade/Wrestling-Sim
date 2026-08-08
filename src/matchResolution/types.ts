@@ -22,7 +22,7 @@ export interface ResolutionApproachDefinition {
   id: ResolutionApproachId;
   name: string;
   workbookName: string;
-  pace: 1 | 2 | 3;
+  pace: 2 | 4 | 6;
   staminaCost: 1 | 2 | 3;
   paceSource: "Workbook" | "Wrestling Sim Extension";
   summary: string;

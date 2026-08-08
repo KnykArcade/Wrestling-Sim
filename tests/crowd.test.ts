@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { calculateLiveMatchAudience, calculateMatchAnticipation, crowdHeatLabel, momentumLabel, projectedCrowdBeforeForSegment } from "../src/crowd/model";
+import { calculateLiveMatchAudience, calculateMatchAnticipation, calculateMentalNightAdjustment, crowdHeatLabel, momentumLabel, projectedCrowdBeforeForSegment } from "../src/crowd/model";
 import { createMatchEngineProfile } from "../src/matchEngine/model";
 import { generateMatchPerformancePreview } from "../src/matchEngine/performance";
 import { createPlannedSegment } from "../src/planner/model";
@@ -48,30 +48,31 @@ describe("Phase 6B20C momentum, anticipation, and live crowd dynamics", () => {
       anticipationLabel: "Hot",
       crowdBefore: 60,
       crowdBeforeLabel: "Hot",
-      crowdResponse: 67.5,
-      expectationAdjustment: 2,
-      finalRating: 73.8,
-      crowdAfter: 62.5,
+      crowdResponse: 68.3,
+      expectationAdjustment: 2.8,
+      mentalNightAdjustment: 0,
+      finalRating: 74.1,
+      crowdAfter: 62.8,
       crowdAfterLabel: "Hot",
     });
     expect(result.calculationLedger?.crowdResponse).toMatchObject({
       formulaId: "crowd.match-response",
-      rawSubtotal: 67.5,
-      result: 67.5,
+      rawSubtotal: 68.3,
+      result: 68.3,
       capApplied: false,
       roundingPlaces: 1,
     });
-    expect(result.calculationLedger?.crowdResponse.terms.map((term) => term.id)).toEqual(["anticipation", "incoming", "expectation"]);
-    expect(result.calculationLedger?.finalRating.terms.map((term) => term.contribution)).toEqual([46.8, 27]);
+    expect(result.calculationLedger?.crowdResponse.terms.map((term) => term.id)).toEqual(["anticipation", "incoming", "expectation", "mental-night"]);
+    expect(result.calculationLedger?.finalRating.terms.map((term) => term.contribution)).toEqual([46.8, 27.32]);
   });
 
   test.each([
-    ["average match", 65, 55, 50, 61.1],
-    ["strong match with a warm crowd", 78, 70, 60, 73.8],
-    ["elite match with a hot crowd", 90, 85, 80, 87.6],
-    ["excellent match with a cold crowd", 90, 40, 35, 73.9],
-    ["hyped match that disappoints", 55, 85, 80, 61.3],
-    ["weak match with a dead crowd", 45, 30, 25, 39.6],
+    ["average match", 65, 55, 50, 61.5],
+    ["strong match with a warm crowd", 78, 70, 60, 74.1],
+    ["elite match with a hot crowd", 90, 85, 80, 87.8],
+    ["excellent match with a cold crowd", 90, 40, 35, 75.1],
+    ["hyped match that disappoints", 55, 85, 80, 59.5],
+    ["weak match with a dead crowd", 45, 30, 25, 40.2],
   ])("calibrates the %s scenario", (_label, performance, anticipation, crowdBefore, expectedFinal) => {
     expect(calculateLiveMatchAudience(performance, anticipation, crowdBefore).finalRating).toBe(expectedFinal);
   });
@@ -81,20 +82,31 @@ describe("Phase 6B20C momentum, anticipation, and live crowd dynamics", () => {
     const disappointment = calculateLiveMatchAudience(50, 70, 50);
     const cappedOverdelivery = calculateLiveMatchAudience(100, 0, 50);
     const cappedDisappointment = calculateLiveMatchAudience(0, 100, 50);
-    expect(overdelivery.expectationAdjustment).toBe(5);
-    expect(disappointment.expectationAdjustment).toBe(-8);
-    expect(cappedOverdelivery.expectationAdjustment).toBe(12);
-    expect(cappedDisappointment.expectationAdjustment).toBe(-15);
+    expect(overdelivery.expectationAdjustment).toBe(7);
+    expect(disappointment.expectationAdjustment).toBe(-11);
+    expect(cappedOverdelivery.expectationAdjustment).toBe(15);
+    expect(cappedDisappointment.expectationAdjustment).toBe(-20);
     expect(cappedOverdelivery.calculationLedger?.expectationAdjustment.capApplied).toBe(true);
     expect(cappedDisappointment.calculationLedger?.expectationAdjustment.capApplied).toBe(true);
   });
 
   test("caps crowd movement and exposes the approved momentum and heat labels", () => {
-    expect(calculateLiveMatchAudience(100, 100, 0).crowdAfter).toBe(12);
+    expect(calculateLiveMatchAudience(100, 100, 0).crowdAfter).toBe(15);
     expect(momentumLabel(50)).toBe("Even");
     expect(momentumLabel(82)).toBe("White Hot");
     expect(crowdHeatLabel(19)).toBe("Dead");
     expect(crowdHeatLabel(65)).toBe("Hot");
+  });
+
+  test("makes two strong mental nights surge and multiple poor nights compound", () => {
+    expect(calculateMentalNightAdjustment(["HOT NIGHT", "HOT NIGHT"]).result).toBe(12);
+    expect(calculateMentalNightAdjustment(["FOCUSED", "FOCUSED"]).result).toBe(6);
+    expect(calculateMentalNightAdjustment(["OFF NIGHT", "NEUTRAL"]).result).toBe(-5);
+    expect(calculateMentalNightAdjustment(["OFF NIGHT", "OFF NIGHT"]).result).toBe(-14);
+    expect(calculateLiveMatchAudience(80, 70, 50, ["HOT NIGHT", "HOT NIGHT"]).crowdAfter).toBe(58.8);
+    expect(calculateLiveMatchAudience(80, 70, 50, ["FOCUSED", "FOCUSED"]).crowdAfter).toBe(56.8);
+    expect(calculateLiveMatchAudience(40, 70, 50, ["OFF NIGHT", "NEUTRAL"]).crowdAfter).toBe(43);
+    expect(calculateLiveMatchAudience(40, 70, 50, ["OFF NIGHT", "OFF NIGHT"]).crowdAfter).toBe(37);
   });
 
   test("projects incoming heat from earlier rolled matches and responds to card order", () => {

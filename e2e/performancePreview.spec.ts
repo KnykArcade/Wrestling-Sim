@@ -34,9 +34,11 @@ test("generates and persists a TEW-authoritative match performance preview", asy
   await expect(match.getByText("Projected final rating", { exact: true })).toBeVisible();
   await expect(match.getByText("60% performance · 40% crowd reaction", { exact: true })).toBeVisible();
   await expect(match.getByLabel("Projected crowd result")).toContainText(/Crowd Reaction \d+\.\d+ · Final Rating \d+\.\d+/);
+  await expect(match.getByLabel("Projected crowd result")).toContainText(/Mental nights [+-]\d+\.\d+/);
   await expect(match.locator(".match-performance-worker")).toHaveCount(2);
   await expect(match.getByText(/Mental base/)).toHaveCount(2);
   await expect(match.locator(".match-performance-worker-metrics").first().getByText(/^Pace \d+ · /)).toBeVisible();
+  await expect(match.locator(".match-performance-worker-metrics").first().getByText(/^Load \d+\.\d+\/\d+\.\d+ · /)).toBeVisible();
   await expect(match.locator(".match-performance-scorecard strong").first()).not.toHaveText("0.0");
   const savedScore = await match.locator(".match-performance-scorecard strong").first().textContent();
   const savedSeed = await match.locator(".match-performance-seed span").first().textContent();

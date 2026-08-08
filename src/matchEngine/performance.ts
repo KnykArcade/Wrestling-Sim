@@ -139,6 +139,8 @@ export function generateMatchPerformancePreview(input: GenerateMatchPerformanceI
       presentationScore: result.presentationScore,
       staminaStatus: result.staminaStatus,
       staminaModifier: result.staminaModifier,
+      staminaUsed: result.staminaUsed,
+      staminaAvailable: result.staminaAvailable,
       actualPace: plan?.actualPace ?? result.actualPace,
       paceStatus: plan?.pace.status ?? result.paceStatus,
       paceModifier: plan?.pace.modifier ?? result.paceModifier,

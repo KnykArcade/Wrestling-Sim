@@ -20,7 +20,7 @@ type FoundationView = "approaches" | "aims" | "states" | "sources";
 
 const durationExamples = [5, 6, 15, 16, 24, 25, 35];
 const paceExamples = [0, 1, 2, 3, 4, 5, 6];
-const staminaExamples = [0, 1, 2, 3];
+const staminaExamples = [0, 8, 15, 21];
 
 export default function MatchEngineFoundation() {
   const [view, setView] = useState<FoundationView>("approaches");
@@ -41,7 +41,7 @@ export default function MatchEngineFoundation() {
       <div>
         <p className="eyebrow">NATIVE MATCH ENGINE · PHASE 4C1</p>
         <h2>Match Data Foundation</h2>
-        <p>Canonical approaches, weighted skill formulas, match aims, pace, stamina, mental states, duration slots, and explicit source reconciliation.</p>
+        <p>Canonical approaches, weighted skill formulas, match aims, normalized pace, endurance load, mental states, duration slots, and explicit source reconciliation.</p>
       </div>
       <div className="match-engine-metrics" aria-label="Match engine catalog summary">
         <div><span>Canonical approaches</span><strong>{MATCH_APPROACHES.length}</strong></div>
@@ -54,7 +54,7 @@ export default function MatchEngineFoundation() {
     <nav className="match-engine-tabs" aria-label="Match engine foundation sections">
       <button type="button" className={view === "approaches" ? "active" : ""} onClick={() => setView("approaches")}>Approaches</button>
       <button type="button" className={view === "aims" ? "active" : ""} onClick={() => setView("aims")}>Match Aims</button>
-      <button type="button" className={view === "states" ? "active" : ""} onClick={() => setView("states")}>Pace, Stamina & Mental State</button>
+      <button type="button" className={view === "states" ? "active" : ""} onClick={() => setView("states")}>Pace, Endurance & Mental State</button>
       <button type="button" className={view === "sources" ? "active" : ""} onClick={() => setView("sources")}>Source Reconciliation</button>
     </nav>
 
@@ -62,7 +62,7 @@ export default function MatchEngineFoundation() {
       <aside className="match-engine-approach-list" aria-label="Canonical match approaches">
         {MATCH_APPROACHES.map((approach) => <button key={approach.id} type="button" className={approach.id === selected.id ? "selected" : ""} onClick={() => setSelectedId(approach.id)}>
           <strong>{approach.name}</strong>
-          <span>Pace {approach.pace} · Stamina {approach.staminaCost}</span>
+          <span>Pace {approach.pace} · Effort {approach.staminaCost}</span>
         </button>)}
       </aside>
 
@@ -74,7 +74,7 @@ export default function MatchEngineFoundation() {
           </header>
           <div className="approach-facts">
             <div><span>Approach pace</span><strong>{selected.pace}</strong></div>
-            <div><span>Stamina cost</span><strong>{selected.staminaCost}</strong></div>
+            <div><span>Approach effort</span><strong>{selected.staminaCost}</strong></div>
             <div><span>Source names</span><strong>{selected.sourceNames.join(" / ")}</strong></div>
           </div>
           <p className="formula-line">{approachFormulaLabel(selected)}</p>
@@ -145,11 +145,11 @@ export default function MatchEngineFoundation() {
         </div>
       </section>
       <section className="match-engine-panel">
-        <header><div><p className="eyebrow">STAMINA RESULT</p><h3>Cost beyond available stamina</h3></div></header>
+        <header><div><p className="eyebrow">ENDURANCE RESULT</p><h3>Match load against actual Stamina</h3></div></header>
         <div className="state-list">
           {staminaExamples.map((over) => {
-            const result = evaluateStamina(6 + over, 6);
-            return <div key={over}><strong>{result.status}</strong><span>{over === 0 ? "At or under budget" : `${over} stamina over budget`}</span><b>{result.modifier > 0 ? "+" : ""}{result.modifier}</b></div>;
+            const result = evaluateStamina(60 + over, 60);
+            return <div key={over}><strong>{result.status}</strong><span>{over === 0 ? "Load at or under endurance" : `${over} load points over endurance`}</span><b>{result.modifier > 0 ? "+" : ""}{result.modifier}</b></div>;
           })}
         </div>
       </section>

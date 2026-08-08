@@ -1,5 +1,5 @@
-export const CALCULATION_SYSTEM_VERSION = "wrestling-sim-calculations-6b20c-v3";
-export const CONSEQUENCE_CALCULATION_SYSTEM_VERSION = "wrestling-sim-consequences-6b20d-v1";
+export const CALCULATION_SYSTEM_VERSION = "wrestling-sim-calculations-6b21-v1";
+export const CONSEQUENCE_CALCULATION_SYSTEM_VERSION = "wrestling-sim-consequences-6b21-v1";
 export const ANGLE_CALCULATION_SYSTEM_VERSION = "wrestling-sim-angles-6b20e-v1";
 export const SHOW_CALCULATION_SYSTEM_VERSION = "wrestling-sim-shows-6b20e-v1";
 export const COMPETITIVE_CALCULATION_SYSTEM_VERSION = "wrestling-sim-competitive-6b20f-v1";
@@ -58,15 +58,26 @@ export const CALCULATION_FORMULAS = {
   approachPlan: {
     id: "approach.plan",
     label: "Approach-plan score",
-    formula: "Recommendation totals + (pace modifier x 1.5) + (stamina modifier x 3) + variety + long-match bonus - over-budget penalty",
+    formula: "Recommendation totals + (pace modifier x 1.5) + (endurance modifier x 3) + variety + long-match bonus - over-load penalty",
     paceModifierWeight: 1.5,
     staminaModifierWeight: 3,
     diversityBonus: 3,
     longMatchBonus: 4,
-    staminaOverBudgetPenalty: 25,
+    staminaOverBudgetPenalty: 1.5,
     capMinimum: null,
     capMaximum: null,
     roundingPlaces: 2,
+  },
+  enduranceMatchLoad: {
+    id: "endurance.match-load",
+    label: "Match endurance load",
+    formula: "Duration x 1.5 + average approach cost x 7 + normalized pace x 3",
+    durationWeight: 1.5,
+    approachCostWeight: 7,
+    paceWeight: 3,
+    capMinimum: 0,
+    capMaximum: 140,
+    roundingPlaces: 1,
   },
   mentalBase: {
     id: "performance.mental-base",
@@ -168,7 +179,7 @@ export const CALCULATION_FORMULAS = {
   matchQuality: {
     id: "match.raw-quality",
     label: "Raw in-ring match score",
-    formula: "Average performance 80% + structure 12% + closeness 8% + chemistry bonus",
+    formula: "Average performance 80% + pace/endurance structure 12% + closeness 8% + chemistry bonus",
     performanceWeight: 0.8,
     structureWeight: 0.12,
     closenessWeight: 0.08,
@@ -223,17 +234,30 @@ export const CALCULATION_FORMULAS = {
   expectationAdjustment: {
     id: "crowd.expectation-adjustment",
     label: "Expectation adjustment",
-    formula: "Overdelivery x 25% or disappointment x 40%",
-    overdeliveryWeight: 0.25,
-    disappointmentWeight: 0.4,
-    capMinimum: -15,
+    formula: "Overdelivery x 35% or disappointment x 55%",
+    overdeliveryWeight: 0.35,
+    disappointmentWeight: 0.55,
+    capMinimum: -20,
+    capMaximum: 15,
+    roundingPlaces: 1,
+  },
+  crowdMentalNight: {
+    id: "crowd.mental-night",
+    label: "Mental-night crowd adjustment",
+    formula: "Average participant mental-night value x two-wrestler field scale + combined-night bonus",
+    stateValues: { "HOT NIGHT": 4, FOCUSED: 2, NEUTRAL: 0, DISTRACTED: -2.5, "OFF NIGHT": -5 },
+    fieldScaleMaximum: 2,
+    twoHotBonus: 4,
+    twoFocusedBonus: 2,
+    twoNegativePenalty: -4,
+    capMinimum: -14,
     capMaximum: 12,
     roundingPlaces: 1,
   },
   crowdResponse: {
     id: "crowd.match-response",
     label: "Live crowd response",
-    formula: "Anticipation 55% + incoming crowd 45% + delivery adjustment",
+    formula: "Anticipation 55% + incoming crowd 45% + delivery adjustment + mental-night adjustment",
     anticipationWeight: 0.55,
     incomingCrowdWeight: 0.45,
     capMinimum: 0,
@@ -291,10 +315,11 @@ export const CALCULATION_FORMULAS = {
   crowdMovement: {
     id: "crowd.heat-movement",
     label: "Crowd heat after match",
-    formula: "Incoming crowd + ((crowd response - incoming crowd) / 3), with movement capped at +/-12",
-    divisor: 3,
-    movementMinimum: -12,
-    movementMaximum: 12,
+    formula: "Incoming crowd + responsive movement: positive response gap / 3 or negative response gap / 1.5, capped at +/-15",
+    positiveDivisor: 3,
+    negativeDivisor: 1.5,
+    movementMinimum: -15,
+    movementMaximum: 15,
     capMinimum: 0,
     capMaximum: 100,
     roundingPlaces: 1,
@@ -321,9 +346,9 @@ export const CALCULATION_FORMULAS = {
   ordinaryWear: {
     id: "consequence.ordinary-wear",
     label: "Ordinary match wear",
-    formula: "Duration x 0.035 + stamina cost x 0.12 + excess pace x 0.15 + stamina-state penalty",
+    formula: "Duration x 0.035 + match load x 0.015 + excess pace x 0.15 + stamina-state penalty",
     durationWeight: 0.035,
-    staminaCostWeight: 0.12,
+    staminaCostWeight: 0.015,
     excessPaceWeight: 0.15,
     staminaPenalties: { PASS: 0, WINDED: 0.75, GASSED: 2, DEAD: 4 },
     capMinimum: 0.4,
@@ -352,9 +377,9 @@ export const CALCULATION_FORMULAS = {
   fatigueGain: {
     id: "consequence.fatigue-gain",
     label: "Match fatigue gained",
-    formula: "Duration x 0.25 + stamina cost x 0.60 + excess pace x 0.50 + stamina-state penalty",
+    formula: "Duration x 0.25 + match load x 0.05 + excess pace x 0.50 + stamina-state penalty",
     durationWeight: 0.25,
-    staminaCostWeight: 0.6,
+    staminaCostWeight: 0.05,
     excessPaceWeight: 0.5,
     staminaPenalties: { PASS: 0, WINDED: 2, GASSED: 5, DEAD: 9 },
     capMinimum: 2,

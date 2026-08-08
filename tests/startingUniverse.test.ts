@@ -90,6 +90,8 @@ describe("Phase 6B9 quick universe loading", () => {
     expect(universe.companies.find((company) => company.id === "1")?.profile).toContain("promotional biography");
     expect(universe.review.roster).toHaveLength(2);
     expect(universe.review.roster.every((worker) => worker.included && worker.rosterClass === "Wrestler")).toBe(true);
+    expect(universe.review.roster.map((worker) => worker.workbookMetrics.staminaRating)).toEqual([70, 65]);
+    expect(universe.review.roster.map((worker) => worker.workbookMetrics.staminaCapacity)).toEqual([70, 65]);
     expect(universe.review.tagTeams[0]).toMatchObject({ selectedVariantId: "company", gameName: "PWL Team", acknowledged: true });
     expect(universe.review).toMatchObject({ rosterAcknowledged: true, titlesAcknowledged: true, teamsAcknowledged: true });
     expect(confirmStartingUniverse(universe).status).toBe("Confirmed");
@@ -132,7 +134,7 @@ describe("Phase 6B12 complete Starting Universe activation", () => {
     expect(result.activation).toMatchObject({ activeUniverseId: record.id, activeCompanyId: "1", activeCompanyName: "Pro Wrestling League", gameDate: "2019-01-02" });
     expect(result.vault.promotion).toMatchObject({ status: "Completed", promotionName: "Pro Wrestling League", abbreviation: "PWL", defaultWeeklyShow: "PWL Power Hour", calendarStartDate: "2019-01-02" });
     expect(result.matchEngine.profiles).toHaveLength(2);
-    expect(result.matchEngine.profiles.find((profile) => profile.workerId === "w2")).toMatchObject({ workerName: "Ricochet", momentum: 50, momentumScale: "0-100-v1" });
+    expect(result.matchEngine.profiles.find((profile) => profile.workerId === "w2")).toMatchObject({ workerName: "Ricochet", momentum: 50, momentumScale: "0-100-v1", skills: { Stamina: 65 } });
     expect(result.workers.profiles).toHaveLength(3);
     expect(result.workers.profiles.find((profile) => profile.linkedTewWorkerId === "w2")).toMatchObject({ displayName: "Ricochet", alignment: "Face", brand: "Power Hour", gimmickSummary: "One and only" });
     expect(result.profiles.records).toHaveLength(2);

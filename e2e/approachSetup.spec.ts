@@ -15,9 +15,13 @@ test("selects and persists wrestler approaches inside a planned TEW match", asyn
   await expect(match.getByLabel("Approach limit per wrestler")).toHaveValue("3");
   await expect(match.getByLabel("Approach limit per wrestler")).toHaveAttribute("max", "4");
   await expect(match.getByText("Recommended: 3", { exact: true })).toBeVisible();
+  const typeWidth = (await match.locator(".match-setting-type").boundingBox())?.width ?? 0;
   const aimWidth = (await match.locator(".match-setting-aim").boundingBox())?.width ?? 0;
   const approachesWidth = (await match.locator(".match-setting-limit").boundingBox())?.width ?? 0;
-  expect(aimWidth).toBeLessThan(approachesWidth);
+  expect(typeWidth).toBeLessThanOrEqual(200);
+  expect(aimWidth).toBeGreaterThan(typeWidth);
+  expect(approachesWidth).toBeLessThan(typeWidth);
+  expect(await match.locator(".match-approach-controls").evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   await match.getByLabel("Approach limit per wrestler").fill("8");
   await expect(match.getByLabel("Approach limit per wrestler")).toHaveValue("4");
   await match.getByLabel("Approach limit per wrestler").fill("2");
@@ -38,6 +42,7 @@ test("selects and persists wrestler approaches inside a planned TEW match", asyn
   await expect(jay.getByRole("button", { name: "Jay White approach 1" })).toContainText(/Cost \d+ · Pace \d+/);
   await expect(pac.getByRole("button", { name: "PAC approach 1" })).toContainText(/Cost \d+ · Pace \d+/);
   await expect(jay.locator(".tew-strategy-result")).toContainText(/Pace \d+ ·/);
+  await expect(jay.locator(".tew-strategy-result")).toContainText(/Load \d+(\.\d+)?\/\d+(\.\d+)? ·/);
 
   const lockedName = await jay.getByRole("button", { name: "Jay White approach 1" }).locator("span").textContent() ?? "";
   await jay.getByRole("button", { name: `Lock ${lockedName} for Jay White` }).click();

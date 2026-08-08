@@ -12,6 +12,7 @@ import {
   activeResolutionAttempt,
   appendResolutionAttempt,
   createMatchResolutionRecord,
+  finalizeResolutionForLiveCrowd,
   matchResolutionSetupFingerprint,
   overrideEngineResult,
   resolutionApproachRating,
@@ -120,7 +121,7 @@ describe("Phase 6B1 official singles match resolution", () => {
   test("retains all sixteen workbook-derived approaches with Counter Specialist separate from Pace Controller", () => {
     expect(RESOLUTION_APPROACHES).toHaveLength(16);
     expect(new Set(RESOLUTION_APPROACHES.map((approach) => approach.id)).size).toBe(16);
-    expect(resolutionApproach("counter-specialist")).toMatchObject({ name: "Counter Specialist", pace: 1, staminaCost: 1, paceSource: "Wrestling Sim Extension" });
+    expect(resolutionApproach("counter-specialist")).toMatchObject({ name: "Counter Specialist", pace: 2, staminaCost: 1, paceSource: "Wrestling Sim Extension" });
     expect(resolutionApproach("ring-general-pace-controller")).toMatchObject({ name: "Pace Controller", workbookName: "Ring General", paceSource: "Workbook" });
     expect(resolutionApproach("counter-specialist").id).not.toBe(resolutionApproach("ring-general-pace-controller").id);
   });
@@ -148,6 +149,8 @@ describe("Phase 6B1 official singles match resolution", () => {
     expect(first.engineResult.finishDescription).toContain(first.engineResult.winnerName);
     expect(first.engineResult.matchScore).toBeGreaterThan(0);
     expect(first.engineResult.starRating).toBeGreaterThanOrEqual(0);
+    expect(first.workerResults.map((worker) => worker.staminaAvailable)).toEqual([84, 88]);
+    expect(first.workerResults.every((worker) => worker.staminaUsed > 9)).toBe(true);
   });
 
   test("preserves a complete Phase 6B20C ledger without combining score lanes", () => {
@@ -290,6 +293,36 @@ describe("Phase 6B1 official singles match resolution", () => {
     });
     expect(active.engineResult).toEqual(attempt.engineResult);
     expect(() => acceptEngineResult(accepted)).toThrow("already been finalized");
+  });
+
+  test("does not recalculate an audience result already locked by an older calculation version", () => {
+    const attempt = resolveSinglesMatch({ setup: setup(), workers: sources(), seed: "locked-audience-result" });
+    const accepted = acceptEngineResult(createMatchResolutionRecord(setup(), attempt));
+    const active = activeResolutionAttempt(accepted)!;
+    active.finalResult!.audience = {
+      performanceRating: 73,
+      anticipation: 61,
+      anticipationLabel: "Interested",
+      crowdBefore: 52,
+      crowdBeforeLabel: "Engaged",
+      crowdResponse: 55,
+      expectationAdjustment: -2,
+      finalRating: 64,
+      crowdAfter: 53,
+      crowdAfterLabel: "Engaged",
+    };
+
+    const finalized = finalizeResolutionForLiveCrowd(accepted, {
+      score: 90,
+      label: "Must-See",
+      popularity: 90,
+      momentum: 90,
+      skills: 90,
+      styleAppeal: 90,
+    }, 90);
+
+    expect(finalized).toBe(accepted);
+    expect(activeResolutionAttempt(finalized)?.finalResult?.audience).toEqual(active.finalResult!.audience);
   });
 
   test("requires an explicit reason for a booker override and preserves the engine winner", () => {

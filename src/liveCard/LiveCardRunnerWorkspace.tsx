@@ -81,6 +81,9 @@ function resultFacts(record: MatchResolutionRecord | null): string[] {
     attempt.finalResult.audience
       ? `Final rating: ${attempt.finalResult.matchScore.toFixed(1)} · ${attempt.finalResult.starRating} stars.`
       : `In-ring performance: ${attempt.finalResult.matchScore.toFixed(1)} · official crowd-adjusted rating is finalized live.`,
+    ...(attempt.finalResult.audience
+      ? [`Mental-night crowd adjustment: ${(attempt.finalResult.audience.mentalNightAdjustment ?? 0) >= 0 ? "+" : ""}${(attempt.finalResult.audience.mentalNightAdjustment ?? 0).toFixed(1)} · crowd heat ${attempt.finalResult.audience.crowdBefore.toFixed(1)} → ${attempt.finalResult.audience.crowdAfter.toFixed(1)}.`]
+      : []),
     attempt.status === "Overridden" ? `Booker override: ${attempt.finalResult.overrideReason}` : "Engine result accepted.",
   ];
 }

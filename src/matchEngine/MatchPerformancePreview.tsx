@@ -98,7 +98,7 @@ export default function MatchPerformancePreviewEditor({
     plans: previewWorkers.map((worker) => worker.plan),
     aimId: segment.matchApproachSetup.matchAimId,
   });
-  const projectedAudience = preview ? calculateLiveMatchAudience(preview.matchScore, anticipation.score, projectedCrowdBefore) : null;
+  const projectedAudience = preview ? calculateLiveMatchAudience(preview.matchScore, anticipation.score, projectedCrowdBefore, preview.workerResults.map((result) => result.mentalStateName)) : null;
 
   function updateSettings(patch: Partial<MatchPerformanceSettings>): void {
     onChange({
@@ -165,13 +165,13 @@ export default function MatchPerformancePreviewEditor({
       <section className="match-performance-scorecard">
         <div><span>Projected in-ring performance</span><strong>{preview.matchScore.toFixed(1)}</strong><small>Wrestler execution before the crowd</small></div>
         <div><span>Crowd anticipation</span><strong>{anticipation.score.toFixed(1)}</strong><small>{anticipation.label} before the bell</small></div>
-        <div><span>Projected crowd reaction</span><strong>{projectedAudience.crowdResponse.toFixed(1)}</strong><small>Expectation adjustment {projectedAudience.expectationAdjustment >= 0 ? "+" : ""}{projectedAudience.expectationAdjustment.toFixed(1)}</small></div>
+        <div><span>Projected crowd reaction</span><strong>{projectedAudience.crowdResponse.toFixed(1)}</strong><small>Expectation {projectedAudience.expectationAdjustment >= 0 ? "+" : ""}{projectedAudience.expectationAdjustment.toFixed(1)} · Mental nights {(projectedAudience.mentalNightAdjustment ?? 0) >= 0 ? "+" : ""}{(projectedAudience.mentalNightAdjustment ?? 0).toFixed(1)}</small></div>
         <div><span>Projected final rating</span><strong>{projectedAudience.finalRating.toFixed(1)} · {formatStarRating(advisoryStarRating(projectedAudience.finalRating))}</strong><small>60% performance · 40% crowd reaction</small></div>
         <div><span>Performance leader</span><strong>{preview.performanceLeaderName}</strong><small>Best projected individual night</small></div>
         <div><span>{preview.authority === "tew-authoritative" ? "Winner" : "Projected winner"}</span><strong>{preview.authority === "tew-authoritative" ? "Determined in TEW" : preview.projectedWinnerName || "Not available"}</strong><small>{preview.authority === "competitive-preview" && preview.confidence ? `${preview.confidence.toFixed(1)}% advisory confidence` : authorityLabel(preview.authority)}</small></div>
       </section>
 
-      <div className="match-performance-crowd-path" aria-label="Projected crowd result"><strong>Projected Crowd Heat {projectedAudience.crowdBefore.toFixed(1)} {projectedAudience.crowdBeforeLabel} → {projectedAudience.crowdAfter.toFixed(1)} {projectedAudience.crowdAfterLabel}</strong><span>Performance {preview.matchScore.toFixed(1)} · Crowd Reaction {projectedAudience.crowdResponse.toFixed(1)} · Final Rating {projectedAudience.finalRating.toFixed(1)}</span></div>
+      <div className="match-performance-crowd-path" aria-label="Projected crowd result"><strong>Projected Crowd Heat {projectedAudience.crowdBefore.toFixed(1)} {projectedAudience.crowdBeforeLabel} → {projectedAudience.crowdAfter.toFixed(1)} {projectedAudience.crowdAfterLabel}</strong><span>Mental nights {(projectedAudience.mentalNightAdjustment ?? 0) >= 0 ? "+" : ""}{(projectedAudience.mentalNightAdjustment ?? 0).toFixed(1)} · Performance {preview.matchScore.toFixed(1)} · Crowd Reaction {projectedAudience.crowdResponse.toFixed(1)} · Final Rating {projectedAudience.finalRating.toFixed(1)}</span></div>
 
       <p className="match-performance-summary">{preview.summary}</p>
 
@@ -184,7 +184,7 @@ export default function MatchPerformancePreviewEditor({
             <div><span>Presentation</span><b>{result.presentationScore.toFixed(1)}</b></div>
             <div><span>Mental score</span><b>{result.mentalStateScore.toFixed(1)}</b></div>
             <div><span>Pace</span><b>{result.actualPace === undefined ? result.paceStatus : `Pace ${result.actualPace} · ${result.paceStatus}`}</b></div>
-            <div><span>Stamina</span><b>{result.staminaStatus}</b></div>
+            <div><span>Endurance</span><b>Load {result.staminaUsed.toFixed(1)}/{result.staminaAvailable.toFixed(1)} · {result.staminaStatus}</b></div>
           </div>
           <div className="match-performance-variance"><span>Mental base {result.mentalBase.toFixed(1)}</span><span>Luck {result.luck >= 0 ? "+" : ""}{result.luck.toFixed(1)}</span><span>Rare swing {result.swing >= 0 ? "+" : ""}{result.swing}</span><span>Consistency variance {result.consistencyVariance >= 0 ? "+" : ""}{result.consistencyVariance.toFixed(1)}</span>{preview.authority === "competitive-preview" && <span>Win chance {(result.winProbability * 100).toFixed(1)}%</span>}</div>
         </article>)}
