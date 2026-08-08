@@ -12,6 +12,7 @@ import {
   fixtureDisplayName,
   generateCompetitionStructure,
   recordCompetitionResult,
+  recordCompetitionCommitteeDecision,
   resetCompetitionResult,
   syncCompetitionFromPlannedShows,
   touchCompetition,
@@ -141,12 +142,17 @@ export default function CompetitionHub({
 
   function recordWinner(fixture: CompetitionFixture, winnerId: string): void {
     if (!selected || !winnerId) return;
-    updateCompetition(selected.id, (competition) => recordCompetitionResult(competition, fixture.id, "Decision", winnerId, fixture.scoreText));
+    updateCompetition(selected.id, (competition) => recordCompetitionResult(competition, fixture.id, "Decision", winnerId, fixture.scoreText, { winnerSubmissions: fixture.submissionWinnerCount, loserSubmissions: fixture.submissionLoserCount }));
   }
 
   function recordDraw(fixture: CompetitionFixture): void {
     if (!selected || selected.format === "Single Elimination") return;
-    updateCompetition(selected.id, (competition) => recordCompetitionResult(competition, fixture.id, "Draw", "", fixture.scoreText));
+    updateCompetition(selected.id, (competition) => recordCompetitionResult(competition, fixture.id, "Draw", "", fixture.scoreText, { winnerSubmissions: fixture.submissionWinnerCount, loserSubmissions: fixture.submissionLoserCount }));
+  }
+
+  function recordNeutral(fixture: CompetitionFixture, resultType: "No Contest" | "Cancelled"): void {
+    if (!selected) return;
+    updateCompetition(selected.id, (competition) => recordCompetitionResult(competition, fixture.id, resultType, "", fixture.scoreText));
   }
 
   function addToShow(fixture: CompetitionFixture): void {
@@ -223,9 +229,10 @@ export default function CompetitionHub({
           <div className="competition-form-grid">
             <label className="field field--wide"><span>Competition name</span><input aria-label="Competition name" value={selected.name} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, name: event.target.value }))} /></label>
             <label className="field"><span>Type</span><select aria-label="Competition type" value={selected.kind} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, kind: event.target.value as CompetitionKind }))}><option>Tournament</option><option>Cup</option><option>League</option><option>Classic</option><option>Custom</option></select></label>
-            <label className="field"><span>Format</span><select aria-label="Competition format" value={selected.format} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, format: event.target.value as CompetitionFormat }))}><option>Single Elimination</option><option>Round Robin</option><option>Double Round Robin</option></select></label>
+            <label className="field"><span>Format</span><select aria-label="Competition format" value={selected.format} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, format: event.target.value as CompetitionFormat }))}><option>Single Elimination</option><option>Round Robin</option><option>Double Round Robin</option><option>Round Robin + Final</option></select></label>
             <label className="field"><span>Division</span><select aria-label="Competition participant type" value={selected.participantType} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, participantType: event.target.value as CompetitionParticipantType }))}><option>Singles</option><option>Tag Team</option><option>Trios</option><option>Custom</option></select></label>
             <label className="field"><span>Status</span><select aria-label="Competition status" value={selected.status} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, status: event.target.value as CompetitionStatus }))}><option>Planning</option><option>Active</option><option>Completed</option><option>Archived</option></select></label>
+            <label className="field"><span>Approved field size</span><input aria-label="Competition expected participant count" type="number" min="0" value={selected.expectedParticipantCount} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, expectedParticipantCount: Math.max(0, Number(event.target.value) || 0) }))} /></label>
             <label className="field"><span>Company</span><input value={selected.company} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, company: event.target.value }))} /></label>
             <label className="field"><span>Brand</span><input value={selected.brand} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, brand: event.target.value }))} /></label>
             <label className="field"><span>Start date</span><input type="date" value={selected.startDate} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, startDate: event.target.value }))} /></label>
@@ -239,6 +246,8 @@ export default function CompetitionHub({
             <label className="field"><span>Draw points</span><input type="number" value={selected.pointsRules.draw} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, pointsRules: { ...competition.pointsRules, draw: Number(event.target.value) || 0 } }))} /></label>
             <label className="field"><span>Loss points</span><input type="number" value={selected.pointsRules.loss} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, pointsRules: { ...competition.pointsRules, loss: Number(event.target.value) || 0 } }))} /></label>
             <label className="field"><span>No-contest points</span><input type="number" value={selected.pointsRules.noContest} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, pointsRules: { ...competition.pointsRules, noContest: Number(event.target.value) || 0 } }))} /></label>
+            <label className="field"><span>Submission tiebreak</span><select aria-label="Competition submission tiebreak" value={selected.submissionTiebreak} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, submissionTiebreak: event.target.value as typeof competition.submissionTiebreak }))}><option>Unresolved</option><option>Submission Differential</option><option>Disabled</option></select></label>
+            <label className="field"><span>Committee tie decision</span><select aria-label="Competition committee tie decision" value={selected.committeeDecisionParticipantId} onChange={(event) => updateCompetition(selected.id, (competition) => recordCompetitionCommitteeDecision(competition, event.target.value))}><option value="">No decision recorded</option>{selected.participants.map((participant) => <option key={participant.id} value={participant.id}>{participant.name}</option>)}</select></label>
             <label className="field field--full"><span>Private competition notes</span><textarea rows={4} value={selected.notes} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, notes: event.target.value }))} /></label>
           </div>
         </section>}
@@ -272,11 +281,15 @@ export default function CompetitionHub({
               const fixtures = selected.fixtures.filter((fixture) => fixture.roundNumber === roundNumber);
               return <section className="competition-round" key={roundNumber}><header><h5>{fixtures[0]?.roundLabel}</h5><span>{fixtures.length} match{fixtures.length === 1 ? "" : "es"}</span></header><div>
                 {fixtures.map((fixture) => <article className={`competition-fixture competition-fixture--${fixture.status.toLowerCase()}`} key={fixture.id} data-fixture-id={fixture.id}>
-                  <div className="competition-fixture__identity"><span>#{fixture.bracketPosition}</span><strong>{fixtureDisplayName(selected, fixture)}</strong><small>{fixture.status}{fixture.resultType ? ` · ${fixture.resultType}` : ""}</small></div>
+                  <div className="competition-fixture__identity"><span>#{fixture.bracketPosition}</span><strong>{fixtureDisplayName(selected, fixture)}</strong><small>{fixture.status}{fixture.resultType ? ` · ${fixture.resultType}` : ""}</small>{fixture.resultType ? <details><summary>Structured result ledger</summary><small>Winner ID: {fixture.winnerId || "None"}</small><small>Loser ID: {fixture.loserId || "None"}</small><small>Submissions: {fixture.submissionWinnerCount}-{fixture.submissionLoserCount}</small><small>Source result: {fixture.sourceResultId || "Manual competition entry"}</small></details> : null}</div>
                   <div className="competition-fixture__result">
                     <label className="field"><span>Result note / time</span><input aria-label={`${fixture.roundLabel} ${fixture.bracketPosition} result note`} value={fixture.scoreText} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, fixtures: competition.fixtures.map((item) => item.id === fixture.id ? { ...item, scoreText: event.target.value } : item) }))} /></label>
+                    <label className="field"><span>Winner submissions</span><input aria-label={`${fixture.roundLabel} ${fixture.bracketPosition} winner submissions`} type="number" min="0" value={fixture.submissionWinnerCount} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, fixtures: competition.fixtures.map((item) => item.id === fixture.id ? { ...item, submissionWinnerCount: Math.max(0, Number(event.target.value) || 0) } : item) }))} /></label>
+                    <label className="field"><span>Loser submissions</span><input aria-label={`${fixture.roundLabel} ${fixture.bracketPosition} loser submissions`} type="number" min="0" value={fixture.submissionLoserCount} onChange={(event) => updateCompetition(selected.id, (competition) => ({ ...competition, fixtures: competition.fixtures.map((item) => item.id === fixture.id ? { ...item, submissionLoserCount: Math.max(0, Number(event.target.value) || 0) } : item) }))} /></label>
                     <select aria-label={`${fixture.roundLabel} ${fixture.bracketPosition} winner`} value={fixture.winnerId} disabled={!fixture.participantAId || !fixture.participantBId || fixture.status === "Bye"} onChange={(event) => recordWinner(fixture, event.target.value)}><option value="">Select winner</option>{[fixture.participantAId, fixture.participantBId].filter(Boolean).map((participantId) => <option key={participantId} value={participantId}>{participantName(selected, participantId)}</option>)}</select>
                     {selected.format !== "Single Elimination" && <button className="secondary-button compact-button" type="button" disabled={!fixture.participantAId || !fixture.participantBId} onClick={() => recordDraw(fixture)}>Record Draw</button>}
+                    <button className="secondary-button compact-button" type="button" disabled={!fixture.participantAId || !fixture.participantBId} onClick={() => recordNeutral(fixture, "No Contest")}>Record No Contest</button>
+                    <button className="secondary-button compact-button" type="button" disabled={!fixture.participantAId || !fixture.participantBId} onClick={() => recordNeutral(fixture, "Cancelled")}>Cancel Fixture</button>
                     <button className="secondary-button compact-button" type="button" disabled={!fixture.resultType} onClick={() => updateCompetition(selected.id, (competition) => resetCompetitionResult(competition, fixture.id))}>Reset Result</button>
                   </div>
                   <div className="competition-fixture__schedule">
@@ -290,10 +303,11 @@ export default function CompetitionHub({
         </section>}
 
         {tab === "Standings" && <section className="competition-panel">
-          <header><div><h4>Competition standings</h4><p>Points are recalculated from recorded decisions, draws, and no contests. Ties are ordered by points, wins, fewer losses, then name.</p></div></header>
+          <header><div><h4>Competition standings</h4><p>Points are recalculated from structured results. Head-to-head is the first tiebreak; unresolved ties require a Committee decision or playoff and are never decided alphabetically.</p></div></header>
+          {selected.unresolvedTieParticipantIds.length > 0 && <div className="status-banner" role="status"><span>Advancement or the competition winner is blocked by an unresolved mathematical tie.</span></div>}
           {standings.length === 0 ? <div className="empty-state">Add participants to create the standings table.</div> : <div className="competition-standings">
             <div className="competition-standing competition-standing--header"><span>Rank</span><span>Participant</span><span>P</span><span>W</span><span>D</span><span>L</span><span>NC</span><span>Pts</span></div>
-            {standings.map((standing) => <div className="competition-standing" key={standing.participantId}><strong>{standing.rank}</strong><strong>{standing.participantName}</strong><span>{standing.played}</span><span>{standing.wins}</span><span>{standing.draws}</span><span>{standing.losses}</span><span>{standing.noContests}</span><strong>{standing.points}</strong></div>)}
+            {standings.map((standing) => <div className="competition-standing" key={standing.participantId}><strong>{standing.tied ? `T${standing.rank}` : standing.rank}</strong><strong>{standing.participantName}<details><summary>Points and tiebreak ledger</summary>{standing.tiebreakExplanation.map((line) => <small key={line}>{line}</small>)}</details></strong><span>{standing.played}</span><span>{standing.wins}</span><span>{standing.draws}</span><span>{standing.losses}</span><span>{standing.noContests}</span><strong>{standing.points}</strong></div>)}
           </div>}
           {selected.championParticipantId && <div className="competition-presentation"><span>Competition winner</span><strong>{champion}</strong><p>{selected.championPresentation || selected.prize || "Winner presentation has not been defined."}</p></div>}
         </section>}

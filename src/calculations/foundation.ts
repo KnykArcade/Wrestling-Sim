@@ -2,6 +2,7 @@ export const CALCULATION_SYSTEM_VERSION = "wrestling-sim-calculations-6b20c-v3";
 export const CONSEQUENCE_CALCULATION_SYSTEM_VERSION = "wrestling-sim-consequences-6b20d-v1";
 export const ANGLE_CALCULATION_SYSTEM_VERSION = "wrestling-sim-angles-6b20e-v1";
 export const SHOW_CALCULATION_SYSTEM_VERSION = "wrestling-sim-shows-6b20e-v1";
+export const COMPETITIVE_CALCULATION_SYSTEM_VERSION = "wrestling-sim-competitive-6b20f-v1";
 
 export interface CalculationFormulaDefinition {
   id: string;

@@ -3,9 +3,12 @@ import { createPlannerId } from "../planner/model";
 import type { PlannedSegment, PlannedShow } from "../planner/types";
 import type { TrackerStoryline } from "../storylines/types";
 import type { WorkerUniverse } from "../workers/types";
+import type { StandaloneTeamRecord, StandaloneWorkerRecord } from "../consequences/types";
 import type {
   Championship,
+  ChampionshipActivityBaseline,
   ChampionshipCompetitor,
+  ChampionshipResultEvent,
   ChampionshipReign,
   ChampionshipTimelineEntry,
   ChampionshipUniverse,
@@ -92,6 +95,8 @@ export function createChampionship(sequence: number): Championship {
     reigns: [],
     rankings: [],
     legacyNames: [],
+    resultEvents: [],
+    lastTitleActivityDate: "",
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -167,7 +172,8 @@ function resultCodeForWorker(workerName: string, segment: PlannedSegment): "W" |
   if (!winner) return "?";
   if (normalizedWinner.includes("draw")) return "D";
   if (normalizedWinner.includes("no contest") || normalizedWinner === "nc") return "NC";
-  return normalizedWinner.includes(normalize(workerName)) ? "W" : "L";
+  const winnerNames = winner.split(/\s*(?:&|,|\/| and )\s*/i).map(normalize).filter(Boolean);
+  return winnerNames.includes(normalize(workerName)) ? "W" : "L";
 }
 
 export function buildCompetitiveRecord(workerName: string, shows: PlannedShow[], championships: ChampionshipUniverse): CompetitiveRecord {
@@ -236,34 +242,48 @@ export function suggestRankings(
   shows: PlannedShow[],
   workers: WorkerUniverse,
   universe: ChampionshipUniverse,
+  competitiveRecords?: { workerRecords: StandaloneWorkerRecord[]; teamRecords: StandaloneTeamRecord[] },
 ): ContenderRanking[] {
   const championKeys = new Set(championship.currentChampions.map((champion) => normalize(champion.name)));
-  const candidates = workers.profiles
-    .filter((worker) => !championKeys.has(normalize(worker.displayName)))
-    .map((worker) => ({ worker, record: buildCompetitiveRecord(worker.displayName, shows, universe) }))
-    .sort((a, b) => {
-      const scoreA = a.record.wins * 3 - a.record.losses + a.record.championshipMatches;
-      const scoreB = b.record.wins * 3 - b.record.losses + b.record.championshipMatches;
-      return scoreB - scoreA || b.record.matchCount - a.record.matchCount || a.worker.displayName.localeCompare(b.worker.displayName);
-    })
-    .slice(0, 10);
-
-  const locked = championship.rankings.filter((ranking) => ranking.locked);
-  const lockedNames = new Set(locked.flatMap((ranking) => ranking.competitors.map((competitor) => normalize(competitor.name))));
-  const generated = candidates
-    .filter(({ worker }) => !lockedNames.has(normalize(worker.displayName)))
-    .map(({ worker, record }, index) => ({
-      ...createRanking(index + 1),
-      competitors: [{ id: worker.id, name: worker.displayName }],
-      record: `${record.wins}-${record.losses}-${record.draws}`,
-      recentForm: record.lastFive.join(" ") || "No recorded form",
-      reason: `Transparent suggestion: ${record.wins} wins, ${record.losses} losses, ${record.matchCount} recorded matches.`,
-      movement: 0,
-    }));
-
-  return [...locked, ...generated]
-    .sort((a, b) => a.rank - b.rank)
-    .map((ranking, index) => ({ ...ranking, rank: index + 1, updatedAt: now() }));
+  if (competitiveRecords) {
+    const source = championship.division === "Tag Team" || championship.division === "Trios"
+      ? competitiveRecords.teamRecords.map((record) => ({ id: record.teamKey, name: record.teamName, members: record.memberNames, wins: record.wins, losses: record.losses, draws: record.draws, noContests: record.noContests, points: record.rankingPoints, position: record.rankingPosition, tied: Boolean(record.rankingTied), form: record.matchHistory.slice(0, 5).map((entry) => entry.result) }))
+      : competitiveRecords.workerRecords.map((record) => ({ id: record.workerId || record.workerKey, name: record.workerName, members: [record.workerName], wins: record.wins, losses: record.losses, draws: record.draws, noContests: record.noContests, points: record.rankingPoints, position: record.rankingPosition, tied: Boolean(record.rankingTied), form: record.lastFive }));
+    const limit = championship.division === "Singles" ? 8 : 6;
+    const calculated = source.filter((record) => !championKeys.has(normalize(record.name))).sort((left, right) => left.position - right.position || left.id.localeCompare(right.id));
+    const calculatedByName = new Map(calculated.map((record) => [normalize(record.name), record]));
+    const locked = championship.rankings.filter((ranking) => ranking.locked).map((ranking) => {
+      const record = calculatedByName.get(normalize(ranking.competitors[0]?.name ?? ""));
+      return {
+        ...ranking,
+        calculatedRank: record?.position,
+        calculatedPoints: record?.points,
+        tied: record?.tied,
+        overrideReason: ranking.overrideReason || ranking.reason,
+        updatedAt: now(),
+      };
+    });
+    const lockedNames = new Set(locked.flatMap((ranking) => ranking.competitors.map((competitor) => normalize(competitor.name))));
+    const usedPublishedRanks = new Set(locked.map((ranking) => ranking.rank));
+    let nextPublishedRank = 1;
+    const generated = calculated.filter((record) => !lockedNames.has(normalize(record.name))).slice(0, limit).map((record) => {
+      while (usedPublishedRanks.has(nextPublishedRank)) nextPublishedRank += 1;
+      const publishedRank = nextPublishedRank;
+      nextPublishedRank += 1;
+      return {
+        ...createRanking(publishedRank),
+        competitors: [{ id: record.id, name: record.name }],
+        record: `${record.wins}-${record.losses}-${record.draws}${record.noContests ? ` (${record.noContests} NC)` : ""}`,
+        recentForm: record.form.join(" ") || "No recorded form",
+        reason: `Official Phase 6B20 ranking ledger: ${record.points.toFixed(2)} points from raw in-ring performance and official results.`,
+        calculatedRank: record.position,
+        calculatedPoints: record.points,
+        tied: record.tied,
+      };
+    });
+    return [...locked, ...generated].sort((left, right) => left.rank - right.rank || (left.calculatedRank ?? 999) - (right.calculatedRank ?? 999)).slice(0, limit).map((ranking, index) => ({ ...ranking, rank: index + 1 }));
+  }
+  return championship.rankings.filter((ranking) => ranking.locked).sort((left, right) => left.rank - right.rank).map((ranking, index) => ({ ...ranking, rank: index + 1, updatedAt: now() }));
 }
 
 export function buildTitleResultSuggestions(championship: Championship, shows: PlannedShow[]): TitleResultSuggestion[] {
@@ -277,10 +297,13 @@ export function buildTitleResultSuggestions(championship: Championship, shows: P
       const challenger = segment.challenger || segment.workers.map((worker) => worker.name).find((name) => !normalize(champion).includes(normalize(name))) || "";
       let suggestedDecision: TitleResultDecision = "Unresolved";
       let reason = "The stored result does not identify a clear title outcome.";
-      if (winner && champion && normalize(winner).includes(normalize(champion))) {
+      if (normalize(winner) === "no contest" || normalize(winner) === "nc") {
+        suggestedDecision = "No Contest";
+        reason = "The official result records title activity without a defense or title change.";
+      } else if (winner && champion && normalize(winner) === normalize(champion)) {
         suggestedDecision = "Retained";
         reason = `${winner} matches the champion entering the match.`;
-      } else if (winner && challenger && normalize(winner).includes(normalize(challenger))) {
+      } else if (winner && challenger && normalize(winner) === normalize(challenger)) {
         suggestedDecision = "Changed Hands";
         reason = `${winner} matches the recorded challenger.`;
       }
@@ -308,68 +331,126 @@ export function applyTitleResult(
   segment: PlannedSegment,
   decision: TitleResultDecision,
   knownWorkers: Array<{ id: string; name: string }> = [],
+  eventDetails: { sourceResultId?: string; runningOrderPosition?: number; confirmedAt?: string } = {},
 ): { championship: Championship; show: PlannedShow } {
-  if (!decision) throw new Error("Choose a title-result decision.");
+  if (!decision || decision === "Unresolved") throw new Error("Choose a resolved title-result decision.");
   const resultDate = show.reconciliation?.actualShow.date || show.date || today();
   const winner = actualWinner(segment);
-  let nextChampionship = { ...championship, reigns: championship.reigns.map((reign) => ({ ...reign })) };
+  if (decision === "Changed Hands" && !winner) throw new Error("The reconciled match does not contain a winner to begin the new reign.");
+  const sourceResultId = eventDetails.sourceResultId || `${show.id}:${segment.id}`;
+  if (championship.resultEvents.some((event) => event.sourceResultId === sourceResultId)) throw new Error("This official result has already updated the championship.");
+  const baseline: ChampionshipActivityBaseline = championship.activityBaseline ?? {
+    status: championship.status,
+    currentChampions: structuredClone(championship.currentChampions),
+    previousChampions: structuredClone(championship.previousChampions),
+    dateWon: championship.dateWon,
+    defenses: championship.defenses,
+    reigns: structuredClone(championship.reigns),
+  };
+  const winners = decision === "Changed Hands"
+    ? competitorsFromNames(winner, knownWorkers)
+    : decision === "Retained" || decision === "No Contest"
+      ? structuredClone(championship.currentChampions)
+      : [];
+  const event: ChampionshipResultEvent = {
+    id: `title-event:${championship.id}:${sourceResultId}`,
+    sourceResultId,
+    showId: show.id,
+    segmentId: segment.id,
+    showDate: resultDate,
+    runningOrderPosition: Math.max(0, eventDetails.runningOrderPosition ?? show.segments.findIndex((item) => item.id === segment.id)),
+    decision: decision as Exclude<TitleResultDecision, "" | "Unresolved">,
+    winners,
+    previousChampions: structuredClone(championship.currentChampions),
+    activityOnly: decision === "No Contest",
+    confirmedAt: eventDetails.confirmedAt ?? now(),
+  };
+  const nextChampionship = rebuildChampionshipFromEvents({ ...championship, activityBaseline: baseline, resultEvents: [...championship.resultEvents, event] });
 
-  if (decision === "Retained") {
-    nextChampionship.defenses += 1;
-    const active = nextChampionship.reigns.find((reign) => reign.status === "Active");
-    if (active) {
-      active.successfulDefenses += 1;
-      active.updatedAt = now();
-    }
-  } else if (decision === "Changed Hands") {
-    if (!winner) throw new Error("The reconciled match does not contain a winner to begin the new reign.");
-    const prior = nextChampionship.currentChampions;
-    nextChampionship.reigns = nextChampionship.reigns.map((reign) => reign.status === "Active" ? {
-      ...reign,
-      status: "Ended",
-      endDate: resultDate,
-      endShowId: show.id,
-      endSegmentId: segment.id,
-      updatedAt: now(),
-    } : reign);
-    const newChampions = competitorsFromNames(winner, knownWorkers);
-    nextChampionship.previousChampions = prior;
-    nextChampionship.currentChampions = newChampions;
-    nextChampionship.dateWon = resultDate;
-    nextChampionship.defenses = 0;
-    nextChampionship.status = "Active";
-    nextChampionship.reigns = [
-      ...nextChampionship.reigns,
-      createChampionshipReign(newChampions, prior, resultDate, show.id, segment.id),
-    ];
-  } else if (decision === "Vacated") {
-    nextChampionship.reigns = nextChampionship.reigns.map((reign) => reign.status === "Active" ? {
-      ...reign,
-      status: "Vacated",
-      endDate: resultDate,
-      endShowId: show.id,
-      endSegmentId: segment.id,
-      vacancyReason: segment.reconciliation.changes || "Vacated after the recorded title match.",
-      updatedAt: now(),
-    } : reign);
-    nextChampionship.previousChampions = nextChampionship.currentChampions;
-    nextChampionship.currentChampions = [];
-    nextChampionship.dateWon = "";
-    nextChampionship.defenses = 0;
-    nextChampionship.status = "Vacant";
-  }
-
-  nextChampionship = touchChampionship(nextChampionship);
   const nextShow = {
     ...show,
     updatedAt: now(),
     segments: show.segments.map((item) => item.id === segment.id ? {
       ...item,
       titleResultDecision: decision,
-      titleResultConfirmedAt: now(),
+      titleResultConfirmedAt: event.confirmedAt,
     } : item),
   };
   return { championship: nextChampionship, show: nextShow };
+}
+
+export function rebuildChampionshipFromEvents(championship: Championship): Championship {
+  const baseline = championship.activityBaseline ?? {
+    status: championship.status,
+    currentChampions: championship.currentChampions,
+    previousChampions: championship.previousChampions,
+    dateWon: championship.dateWon,
+    defenses: championship.defenses,
+    reigns: championship.reigns,
+  };
+  let nextChampionship: Championship = {
+    ...championship,
+    status: baseline.status,
+    currentChampions: structuredClone(baseline.currentChampions),
+    previousChampions: structuredClone(baseline.previousChampions),
+    dateWon: baseline.dateWon,
+    defenses: baseline.defenses,
+    reigns: structuredClone(baseline.reigns),
+    lastTitleActivityDate: "",
+  };
+  const events = [...championship.resultEvents].sort((left, right) => left.showDate.localeCompare(right.showDate) || left.runningOrderPosition - right.runningOrderPosition || left.confirmedAt.localeCompare(right.confirmedAt) || left.id.localeCompare(right.id));
+  for (const event of events) {
+    nextChampionship.lastTitleActivityDate = event.showDate;
+    if (event.decision === "No Contest") continue;
+    if (event.decision === "Retained") {
+      nextChampionship.defenses += 1;
+      const active = nextChampionship.reigns.find((reign) => reign.status === "Active");
+      if (active) {
+        active.successfulDefenses += 1;
+        active.updatedAt = event.confirmedAt;
+      }
+    } else if (event.decision === "Changed Hands") {
+    const prior = nextChampionship.currentChampions;
+    nextChampionship.reigns = nextChampionship.reigns.map((reign) => reign.status === "Active" ? {
+      ...reign,
+      status: "Ended",
+      endDate: event.showDate,
+      endShowId: event.showId,
+      endSegmentId: event.segmentId,
+      updatedAt: event.confirmedAt,
+    } : reign);
+    nextChampionship.previousChampions = structuredClone(prior);
+    nextChampionship.currentChampions = structuredClone(event.winners);
+    nextChampionship.dateWon = event.showDate;
+    nextChampionship.defenses = 0;
+    nextChampionship.status = "Active";
+    nextChampionship.reigns = [
+      ...nextChampionship.reigns,
+      {
+        ...createChampionshipReign(event.winners, prior, event.showDate, event.showId, event.segmentId),
+        id: `reign:${championship.id}:${event.id}`,
+        createdAt: event.confirmedAt,
+        updatedAt: event.confirmedAt,
+      },
+    ];
+    } else if (event.decision === "Vacated") {
+    nextChampionship.reigns = nextChampionship.reigns.map((reign) => reign.status === "Active" ? {
+      ...reign,
+      status: "Vacated",
+      endDate: event.showDate,
+      endShowId: event.showId,
+      endSegmentId: event.segmentId,
+      vacancyReason: "Vacated after the recorded title result.",
+      updatedAt: event.confirmedAt,
+    } : reign);
+    nextChampionship.previousChampions = nextChampionship.currentChampions;
+    nextChampionship.currentChampions = [];
+    nextChampionship.dateWon = "";
+    nextChampionship.defenses = 0;
+    nextChampionship.status = "Vacant";
+    }
+  }
+  return touchChampionship({ ...nextChampionship, resultEvents: events });
 }
 
 export function buildChampionshipWarnings(
@@ -384,8 +465,9 @@ export function buildChampionshipWarnings(
     if (championship.status === "Active" && championship.currentChampions.length === 0) warnings.push({ id: `missing-champion-${championship.id}`, category: "Champion", message: `${championship.name} is active but has no current champion.`, championshipId: championship.id, showId: "", segmentId: "" });
     if (championship.status === "Vacant" && !shows.some((show) => show.segments.some((segment) => titleMatchesSegment(championship, segment) && ["Vacant Title", "Tournament Final"].includes(segment.championshipMatchPurpose)))) warnings.push({ id: `vacancy-${championship.id}`, category: "Vacancy", message: `${championship.name} is vacant with no resolution planned.`, championshipId: championship.id, showId: "", segmentId: "" });
     const lastReign = championship.reigns.slice().sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
-    const inactiveDays = lastReign?.startDate ? daysBetween(lastReign.startDate, today()) : null;
-    if (championship.status === "Active" && inactiveDays !== null && inactiveDays > championship.inactivityWarningDays && championship.defenses === 0) warnings.push({ id: `inactive-${championship.id}`, category: "Activity", message: `${championship.name} has no recorded defense during a ${inactiveDays}-day reign.`, championshipId: championship.id, showId: "", segmentId: "" });
+    const lastActivityDate = championship.lastTitleActivityDate || lastReign?.startDate || championship.dateWon;
+    const inactiveDays = lastActivityDate ? daysBetween(lastActivityDate, today()) : null;
+    if (championship.status === "Active" && inactiveDays !== null && inactiveDays > championship.inactivityWarningDays) warnings.push({ id: `inactive-${championship.id}`, category: "Activity", message: `${championship.name} has no official title activity for ${inactiveDays} days.`, championshipId: championship.id, showId: "", segmentId: "" });
     const leading = championship.rankings.find((ranking) => ranking.rank === 1);
     if (leading && !shows.some((show) => show.segments.some((segment) => segment.workers.some((worker) => leading.competitors.some((competitor) => normalize(competitor.name) === normalize(worker.name)))))) warnings.push({ id: `contender-${championship.id}`, category: "Contender", message: `${competitorNames(leading.competitors)} is ranked #1 for ${championship.name} but has no planned booking.`, championshipId: championship.id, showId: "", segmentId: "" });
     buildTitleResultSuggestions(championship, shows).forEach((suggestion) => warnings.push({ id: suggestion.id, category: "Match", message: `${suggestion.showName}: ${suggestion.segmentTitle} has an unconfirmed championship result.`, championshipId: championship.id, showId: suggestion.showId, segmentId: suggestion.segmentId }));

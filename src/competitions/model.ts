@@ -57,6 +57,11 @@ export function createCompetition(sequence = 1): Competition {
     championParticipantId: "",
     runnerUpParticipantId: "",
     pointsRules: { win: 2, draw: 1, loss: 0, noContest: 0 },
+    submissionTiebreak: "Unresolved",
+    committeeDecisionParticipantId: "",
+    unresolvedTieParticipantIds: [],
+    topAdvanceCount: 1,
+    expectedParticipantCount: 0,
     participants: [],
     fixtures: [],
     notes: "",
@@ -74,10 +79,11 @@ export function createCompetitionTemplate(template: "world-classic" | "world-tag
       kind: "Classic",
       format: "Single Elimination",
       participantType: "Singles",
-      prize: "World Classic winner recognition and future championship positioning",
+      prize: "Cash prize, PWL World Classic Trophy, and ceremonial Champion's Jacket. No automatic title shot.",
       trophyName: "PWL World Classic Trophy",
       traditions: "The reigning winner passes the ceremonial jacket to the new winner after the final. The presentation may remain respectful or launch the next rivalry if the former winner attacks after the handoff.",
       championPresentation: "Trophy presentation followed by the ceremonial World Classic jacket handoff from the previous winner.",
+      expectedParticipantCount: 8,
     };
   }
   if (template === "world-tag-classic") {
@@ -85,12 +91,16 @@ export function createCompetitionTemplate(template: "world-classic" | "world-tag
       ...competition,
       name: "PWL World Tag Classic",
       kind: "Classic",
-      format: "Single Elimination",
+      format: "Round Robin + Final",
       participantType: "Tag Team",
-      prize: "World Tag Classic winner recognition and future tag-title positioning",
+      prize: "Cash prize, PWL World Tag Classic Trophy, and ceremonial Champion's Jackets. No automatic title shot.",
       trophyName: "PWL World Tag Classic Trophy",
       traditions: "The previous winning team presents the trophy and ceremonial jackets to the new winners. The presentation can establish respect, tension, or the next tag-team program.",
       championPresentation: "Trophy presentation and ceremonial jacket handoff by the previous winning team.",
+      pointsRules: { win: 2, draw: 1, loss: 0, noContest: 0 },
+      submissionTiebreak: "Unresolved",
+      topAdvanceCount: 2,
+      expectedParticipantCount: 6,
     };
   }
   return {
@@ -162,6 +172,9 @@ function emptyFixture(roundNumber: number, roundLabel: string, bracketPosition: 
     plannedSegmentId: "",
     completedAt: "",
     notes: "",
+    sourceResultId: "",
+    submissionWinnerCount: 0,
+    submissionLoserCount: 0,
   };
 }
 
@@ -202,7 +215,7 @@ function rebuildParticipantStatuses(competition: Competition): Competition {
 }
 
 function sourceResolved(fixture: CompetitionFixture | undefined): boolean {
-  return Boolean(fixture && ["Completed", "Bye", "Cancelled"].includes(fixture.status));
+  return Boolean(fixture && (fixture.status === "Completed" || fixture.status === "Bye") && fixture.winnerId);
 }
 
 export function advanceEliminationBracket(input: Competition): Competition {
@@ -212,13 +225,16 @@ export function advanceEliminationBracket(input: Competition): Competition {
   while (changed) {
     changed = false;
     fixtures = fixtures.map((fixture) => {
-      if (fixture.roundNumber === 1 || fixture.status === "Completed" || fixture.status === "Bye" || fixture.status === "Cancelled") return fixture;
+      if (fixture.roundNumber === 1) return fixture;
       const sourceA = fixtures.find((item) => item.id === fixture.sourceFixtureAId);
       const sourceB = fixtures.find((item) => item.id === fixture.sourceFixtureBId);
-      const participantAId = fixture.participantAId || (sourceResolved(sourceA) ? sourceA?.winnerId ?? "" : "");
-      const participantBId = fixture.participantBId || (sourceResolved(sourceB) ? sourceB?.winnerId ?? "" : "");
+      const participantAId = sourceResolved(sourceA) ? sourceA?.winnerId ?? "" : "";
+      const participantBId = sourceResolved(sourceB) ? sourceB?.winnerId ?? "" : "";
       const bothSourcesResolved = sourceResolved(sourceA) && sourceResolved(sourceB);
-      let next = { ...fixture, participantAId, participantBId };
+      const sourcesChanged = participantAId !== fixture.participantAId || participantBId !== fixture.participantBId;
+      let next = sourcesChanged && (fixture.status === "Completed" || fixture.status === "Bye")
+        ? { ...fixture, participantAId, participantBId, status: fixture.scheduledShowId ? "Scheduled" : "Unscheduled", resultType: "", winnerId: "", loserId: "", scoreText: "", completedAt: "", sourceResultId: "", submissionWinnerCount: 0, submissionLoserCount: 0 }
+        : { ...fixture, participantAId, participantBId };
       if (bothSourcesResolved && Boolean(participantAId) !== Boolean(participantBId)) {
         const winnerId = participantAId || participantBId;
         next = { ...next, status: "Bye", resultType: "Bye", winnerId, loserId: "", completedAt: new Date().toISOString() };
@@ -333,7 +349,22 @@ export function generateRoundRobin(competition: Competition, doubleRound = compe
   });
 }
 
+export function generateRoundRobinWithFinal(competition: Competition): Competition {
+  const league = generateRoundRobin({ ...competition, format: "Round Robin" }, false);
+  const final = emptyFixture(league.fixtures.reduce((maximum, fixture) => Math.max(maximum, fixture.roundNumber), 0) + 1, "Final", 1);
+  return touchCompetition({
+    ...league,
+    format: "Round Robin + Final",
+    fixtures: [...league.fixtures, final],
+    topAdvanceCount: 2,
+    championParticipantId: "",
+    runnerUpParticipantId: "",
+    unresolvedTieParticipantIds: [],
+  });
+}
+
 export function generateCompetitionStructure(competition: Competition): Competition {
+  if (competition.format === "Round Robin + Final") return generateRoundRobinWithFinal(competition);
   return competition.format === "Single Elimination"
     ? generateSingleElimination(competition)
     : generateRoundRobin(competition, competition.format === "Double Round Robin");
@@ -345,6 +376,7 @@ export function recordCompetitionResult(
   resultType: CompetitionResultType,
   winnerId = "",
   scoreText = "",
+  details: { sourceResultId?: string; winnerSubmissions?: number; loserSubmissions?: number } = {},
 ): Competition {
   const fixture = competition.fixtures.find((item) => item.id === fixtureId);
   if (!fixture) return competition;
@@ -361,23 +393,68 @@ export function recordCompetitionResult(
     loserId,
     scoreText,
     completedAt: status === "Completed" || status === "Bye" ? new Date().toISOString() : "",
+    sourceResultId: details.sourceResultId ?? item.sourceResultId,
+    submissionWinnerCount: Math.max(0, details.winnerSubmissions ?? 0),
+    submissionLoserCount: Math.max(0, details.loserSubmissions ?? 0),
   } : item);
   const next = touchCompetition({ ...competition, fixtures });
   if (competition.format === "Single Elimination") return advanceEliminationBracket(next);
   const standings = buildCompetitionStandings(next);
+  if (competition.format === "Round Robin + Final") {
+    const final = next.fixtures.find((item) => item.roundLabel === "Final");
+    if (!final) return next;
+    if (fixture.id === final.id && resultType === "Decision") {
+      return rebuildParticipantStatuses({ ...next, status: "Completed", championParticipantId: winnerId, runnerUpParticipantId: loserId, unresolvedTieParticipantIds: [] });
+    }
+    const leagueFixtures = next.fixtures.filter((item) => item.id !== final.id);
+    const activeCount = next.participants.filter((participant) => participant.status !== "Withdrawn").length;
+    const expectedLeagueFixtures = activeCount * (activeCount - 1) / 2;
+    const leagueResolved = leagueFixtures.length === expectedLeagueFixtures && leagueFixtures.every((item) => ["Completed", "Cancelled"].includes(item.status));
+    const advanceCount = Math.max(1, next.topAdvanceCount);
+    const cutoff = standings[advanceCount - 1];
+    const aboveCutoff = cutoff ? standings.filter((standing) => standing.rank < cutoff.rank) : [];
+    const boundary = cutoff ? standings.filter((standing) => standing.rank === cutoff.rank) : [];
+    const openSlots = Math.max(0, advanceCount - aboveCutoff.length);
+    const committeeChoice = boundary.find((standing) => standing.participantId === next.committeeDecisionParticipantId);
+    const unresolved = leagueResolved && boundary.length > openSlots && !committeeChoice ? boundary.map((standing) => standing.participantId) : [];
+    if (!leagueResolved || unresolved.length > 0) {
+      return { ...next, unresolvedTieParticipantIds: unresolved, status: "Active", championParticipantId: "", runnerUpParticipantId: "", fixtures: next.fixtures.map((item) => item.id === final.id ? { ...item, participantAId: "", participantBId: "", status: item.scheduledShowId ? "Scheduled" : "Unscheduled", resultType: "", winnerId: "", loserId: "", sourceResultId: "" } : item) };
+    }
+    const finalists = [...aboveCutoff, ...(boundary.length <= openSlots ? boundary : committeeChoice ? [committeeChoice] : [])].slice(0, advanceCount);
+    return {
+      ...next,
+      unresolvedTieParticipantIds: [],
+      fixtures: next.fixtures.map((item) => item.id === final.id ? { ...item, participantAId: finalists[0]?.participantId ?? "", participantBId: finalists[1]?.participantId ?? "" } : item),
+    };
+  }
   const allResolved = next.fixtures.length > 0 && next.fixtures.every((item) => ["Completed", "Cancelled", "Bye"].includes(item.status));
-  const championId = allResolved ? standings[0]?.participantId ?? "" : "";
-  const runnerUpId = allResolved ? standings[1]?.participantId ?? "" : "";
+  const top = standings[0];
+  const unresolved = allResolved && top ? standings.filter((standing) => standing.rank === top.rank).map((standing) => standing.participantId) : [];
+  const committeeWinner = unresolved.includes(next.committeeDecisionParticipantId) ? next.committeeDecisionParticipantId : "";
+  const championId = allResolved ? unresolved.length === 1 ? top?.participantId ?? "" : committeeWinner : "";
+  const runnerUpId = championId ? standings.find((standing) => standing.participantId !== championId)?.participantId ?? "" : "";
   return {
     ...next,
-    status: allResolved ? "Completed" : "Active",
+    status: allResolved && championId ? "Completed" : "Active",
     championParticipantId: championId,
     runnerUpParticipantId: runnerUpId,
+    unresolvedTieParticipantIds: allResolved && !championId ? unresolved : [],
     participants: next.participants.map((participant) => ({
       ...participant,
       status: participant.status === "Withdrawn" ? "Withdrawn" : participant.id === championId ? "Champion" : "Active",
     })),
   };
+}
+
+export function recordCompetitionCommitteeDecision(competition: Competition, participantId: string): Competition {
+  const next = { ...competition, committeeDecisionParticipantId: participantId };
+  const fixture = [...next.fixtures].reverse().find((item) => item.status === "Completed" || item.status === "Cancelled");
+  if (!fixture) return touchCompetition(next);
+  return recordCompetitionResult(next, fixture.id, fixture.resultType as CompetitionResultType, fixture.winnerId, fixture.scoreText, {
+    sourceResultId: fixture.sourceResultId,
+    winnerSubmissions: fixture.submissionWinnerCount,
+    loserSubmissions: fixture.submissionLoserCount,
+  });
 }
 
 export function resetCompetitionResult(competition: Competition, fixtureId: string): Competition {
@@ -395,7 +472,7 @@ export function resetCompetitionResult(competition: Competition, fixtureId: stri
     }
   }
   const fixtures = competition.fixtures.map((fixture) => {
-    if (fixture.id === fixtureId) return { ...fixture, status: fixture.scheduledShowId ? "Scheduled" : "Unscheduled", resultType: "", winnerId: "", loserId: "", scoreText: "", completedAt: "" };
+    if (fixture.id === fixtureId) return { ...fixture, status: fixture.scheduledShowId ? "Scheduled" : "Unscheduled", resultType: "", winnerId: "", loserId: "", scoreText: "", completedAt: "", sourceResultId: "", submissionWinnerCount: 0, submissionLoserCount: 0 };
     if (!dependentIds.has(fixture.id)) return fixture;
     return {
       ...fixture,
@@ -407,11 +484,19 @@ export function resetCompetitionResult(competition: Competition, fixtureId: stri
       loserId: "",
       scoreText: "",
       completedAt: "",
+      sourceResultId: "",
+      submissionWinnerCount: 0,
+      submissionLoserCount: 0,
     };
   });
+  if (competition.format === "Round Robin + Final") {
+    const final = fixtures.find((fixture) => fixture.roundLabel === "Final");
+    const resetFixtures = fixtures.map((fixture) => fixture.id === final?.id || target.roundLabel !== "Final" && fixture.roundLabel === "Final" ? { ...fixture, participantAId: "", participantBId: "", status: fixture.scheduledShowId ? "Scheduled" : "Unscheduled", resultType: "", winnerId: "", loserId: "", scoreText: "", completedAt: "", sourceResultId: "", submissionWinnerCount: 0, submissionLoserCount: 0 } : fixture);
+    return touchCompetition({ ...competition, fixtures: resetFixtures, status: "Active", championParticipantId: "", runnerUpParticipantId: "", unresolvedTieParticipantIds: [], participants: competition.participants.map((participant) => ({ ...participant, status: participant.status === "Withdrawn" ? "Withdrawn" : "Active" })) });
+  }
   return competition.format === "Single Elimination"
-    ? advanceEliminationBracket(touchCompetition({ ...competition, fixtures, status: "Active", championParticipantId: "", runnerUpParticipantId: "" }))
-    : touchCompetition({ ...competition, fixtures, status: "Active", championParticipantId: "", runnerUpParticipantId: "" });
+    ? advanceEliminationBracket(touchCompetition({ ...competition, fixtures, status: "Active", championParticipantId: "", runnerUpParticipantId: "", unresolvedTieParticipantIds: [] }))
+    : touchCompetition({ ...competition, fixtures, status: "Active", championParticipantId: "", runnerUpParticipantId: "", unresolvedTieParticipantIds: [], participants: competition.participants.map((participant) => ({ ...participant, status: participant.status === "Withdrawn" ? "Withdrawn" : "Active" })) });
 }
 
 export function buildCompetitionStandings(competition: Competition): CompetitionStanding[] {
@@ -427,9 +512,14 @@ export function buildCompetitionStandings(competition: Competition): Competition
       noContests: 0,
       points: 0,
       rank: 0,
+      headToHeadPoints: 0,
+      submissionDifferential: 0,
+      tied: false,
+      tiebreakExplanation: [],
     });
   }
-  for (const fixture of competition.fixtures) {
+  const countedFixtures = competition.fixtures.filter((fixture) => competition.format !== "Round Robin + Final" || fixture.roundLabel !== "Final");
+  for (const fixture of countedFixtures) {
     if (fixture.status !== "Completed") continue;
     const left = rows.get(fixture.participantAId);
     const right = rows.get(fixture.participantBId);
@@ -439,8 +529,8 @@ export function buildCompetitionStandings(competition: Competition): Competition
     if (fixture.resultType === "Decision") {
       const winner = rows.get(fixture.winnerId);
       const loser = rows.get(fixture.loserId);
-      if (winner) { winner.wins += 1; winner.points += competition.pointsRules.win; }
-      if (loser) { loser.losses += 1; loser.points += competition.pointsRules.loss; }
+      if (winner) { winner.wins += 1; winner.points += competition.pointsRules.win; winner.submissionDifferential += fixture.submissionWinnerCount - fixture.submissionLoserCount; }
+      if (loser) { loser.losses += 1; loser.points += competition.pointsRules.loss; loser.submissionDifferential += fixture.submissionLoserCount - fixture.submissionWinnerCount; }
     } else if (fixture.resultType === "Draw") {
       left.draws += 1;
       right.draws += 1;
@@ -453,9 +543,44 @@ export function buildCompetitionStandings(competition: Competition): Competition
       right.points += competition.pointsRules.noContest;
     }
   }
-  return [...rows.values()]
-    .sort((left, right) => right.points - left.points || right.wins - left.wins || left.losses - right.losses || left.participantName.localeCompare(right.participantName))
-    .map((standing, index) => ({ ...standing, rank: index + 1 }));
+  const pointGroups = new Map<number, CompetitionStanding[]>();
+  for (const row of rows.values()) pointGroups.set(row.points, [...(pointGroups.get(row.points) ?? []), row]);
+  for (const group of pointGroups.values()) {
+    if (group.length < 2) continue;
+    const ids = new Set(group.map((row) => row.participantId));
+    for (const fixture of countedFixtures.filter((item) => item.status === "Completed" && ids.has(item.participantAId) && ids.has(item.participantBId))) {
+      if (fixture.resultType === "Decision") {
+        const winner = rows.get(fixture.winnerId);
+        const loser = rows.get(fixture.loserId);
+        if (winner) winner.headToHeadPoints += competition.pointsRules.win;
+        if (loser) loser.headToHeadPoints += competition.pointsRules.loss;
+      } else if (fixture.resultType === "Draw") {
+        const left = rows.get(fixture.participantAId);
+        const right = rows.get(fixture.participantBId);
+        if (left) left.headToHeadPoints += competition.pointsRules.draw;
+        if (right) right.headToHeadPoints += competition.pointsRules.draw;
+      }
+    }
+  }
+  const useSubmissions = competition.submissionTiebreak === "Submission Differential";
+  const ordered = [...rows.values()].sort((left, right) => {
+    return right.points - left.points || right.headToHeadPoints - left.headToHeadPoints || (useSubmissions ? right.submissionDifferential - left.submissionDifferential : 0);
+  });
+  const samePosition = (left: CompetitionStanding, right: CompetitionStanding) => left.points === right.points
+    && left.headToHeadPoints === right.headToHeadPoints
+    && (!useSubmissions || left.submissionDifferential === right.submissionDifferential);
+  return ordered.map((standing, index) => {
+    const rank = index > 0 && samePosition(standing, ordered[index - 1]) ? ordered[index - 1].rank : index + 1;
+    const tied = ordered.some((candidate) => candidate.participantId !== standing.participantId && samePosition(standing, candidate));
+    const explanation = [
+      `${standing.points} league points (${standing.wins} wins, ${standing.draws} draws, ${standing.losses} losses).`,
+      `${standing.headToHeadPoints} head-to-head points inside the tied points group.`,
+      useSubmissions ? `${standing.submissionDifferential >= 0 ? "+" : ""}${standing.submissionDifferential} submission differential.` : "Submission tiebreak is not active.",
+      competition.committeeDecisionParticipantId === standing.participantId ? "Committee decision recorded for this unresolved tie." : tied ? "Still tied; Committee decision or playoff required." : "Position resolved mathematically.",
+    ];
+    standing.rank = rank;
+    return { ...standing, rank, tied, tiebreakExplanation: explanation };
+  });
 }
 
 function participantName(competition: Competition, participantId: string): string {
@@ -552,6 +677,7 @@ export function competitionWarnings(competition: Competition, shows: PlannedShow
     if (key && count > 1) warnings.push({ id: `duplicate-${key}`, severity: "Warning", message: `Duplicate participant name: ${key}.`, fixtureId: "", participantId: "" });
   }
   if (activeParticipants.length < 2) warnings.push({ id: "not-enough-participants", severity: "Warning", message: "At least two active participants are required to generate a competition structure.", fixtureId: "", participantId: "" });
+  if (competition.expectedParticipantCount > 0 && activeParticipants.length !== competition.expectedParticipantCount) warnings.push({ id: "unexpected-field-size", severity: "Warning", message: `${competition.name} is configured for ${competition.expectedParticipantCount} participants; ${activeParticipants.length} are currently active.`, fixtureId: "", participantId: "" });
   if (competition.fixtures.length === 0 && activeParticipants.length >= 2) warnings.push({ id: "structure-not-generated", severity: "Info", message: "Participants are ready, but the bracket or league schedule has not been generated.", fixtureId: "", participantId: "" });
   for (const fixture of competition.fixtures) {
     if (fixture.status === "Scheduled" && !fixture.scheduledShowId) warnings.push({ id: `scheduled-no-show-${fixture.id}`, severity: "Warning", message: `${fixture.roundLabel} is marked scheduled without a planned show.`, fixtureId: fixture.id, participantId: "" });

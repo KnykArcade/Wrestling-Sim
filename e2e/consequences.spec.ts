@@ -126,7 +126,7 @@ test("applies one official result to records and forces a future booking review"
     const showsRaw = window.localStorage.getItem("tew-story-tracker:planned-shows:v1");
     return {
       consequences: consequencesRaw ? JSON.parse(consequencesRaw) as {
-        applications?: Array<{ status?: string; calculationVersion?: string }>;
+        applications?: Array<{ status?: string; calculationVersion?: string; competitiveCalculationVersion?: string; officialShowDate?: string; runningOrderPosition?: number; replayStatus?: string }>;
         workerRecords?: Array<{ workerName?: string; wins?: number; losses?: number }>;
         futureConflicts?: Array<{ resolved?: boolean; resolutionNote?: string }>;
       } : {},
@@ -136,6 +136,7 @@ test("applies one official result to records and forces a future booking review"
   expect(stored.consequences.applications).toHaveLength(1);
   expect(stored.consequences.applications?.[0]?.status).toBe("Applied");
   expect(stored.consequences.applications?.[0]?.calculationVersion).toBe("wrestling-sim-consequences-6b20d-v1");
+  expect(stored.consequences.applications?.[0]).toMatchObject({ competitiveCalculationVersion: "wrestling-sim-competitive-6b20f-v1", officialShowDate: "2019-01-08", runningOrderPosition: 0, replayStatus: "Original" });
   expect(stored.consequences.workerRecords).toHaveLength(2);
   expect(stored.consequences.futureConflicts?.[0]).toMatchObject({ resolved: true, resolutionNote: "Keep the rematch tentative and review rankings after the next show." });
   const currentShow = stored.shows.find((show) => show.name === "PWL Consequence Test");

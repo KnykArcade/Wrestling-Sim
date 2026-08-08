@@ -8,6 +8,7 @@ import type {
   Championship,
   ChampionshipCompetitor,
   ChampionshipReign,
+  ChampionshipResultEvent,
   ChampionshipUniverse,
   ContenderRanking,
 } from "./types";
@@ -81,7 +82,31 @@ function normalizeRanking(value: unknown, index: number): ContenderRanking | nul
     reason: text(value.reason),
     movement: number(value.movement, 0),
     locked: bool(value.locked),
+    calculatedRank: number(value.calculatedRank, 0) || undefined,
+    calculatedPoints: typeof value.calculatedPoints === "number" && Number.isFinite(value.calculatedPoints) ? value.calculatedPoints : undefined,
+    tied: bool(value.tied),
+    overrideReason: text(value.overrideReason),
     updatedAt: text(value.updatedAt, defaults.updatedAt),
+  };
+}
+
+function normalizeResultEvent(value: unknown): ChampionshipResultEvent | null {
+  if (!isRecord(value) || !text(value.id) || !text(value.sourceResultId)) return null;
+  const decisions = ["Retained", "Changed Hands", "Vacated", "No Contest"] as const;
+  const decision = decisions.find((item) => item === value.decision);
+  if (!decision) return null;
+  return {
+    id: text(value.id),
+    sourceResultId: text(value.sourceResultId),
+    showId: text(value.showId),
+    segmentId: text(value.segmentId),
+    showDate: text(value.showDate),
+    runningOrderPosition: Math.max(0, number(value.runningOrderPosition, 0)),
+    decision,
+    winners: normalizeCompetitors(value.winners),
+    previousChampions: normalizeCompetitors(value.previousChampions),
+    activityOnly: bool(value.activityOnly, decision === "No Contest"),
+    confirmedAt: text(value.confirmedAt),
   };
 }
 
@@ -124,6 +149,16 @@ function normalizeChampionship(value: unknown, index: number): Championship | nu
     reigns: Array.isArray(value.reigns) ? value.reigns.map(normalizeReign).filter((item): item is ChampionshipReign => item !== null) : [],
     rankings: Array.isArray(value.rankings) ? value.rankings.map(normalizeRanking).filter((item): item is ContenderRanking => item !== null).sort((a, b) => a.rank - b.rank) : [],
     legacyNames: Array.isArray(value.legacyNames) ? value.legacyNames.filter((item): item is string => typeof item === "string") : [],
+    resultEvents: Array.isArray(value.resultEvents) ? value.resultEvents.map(normalizeResultEvent).filter((item): item is ChampionshipResultEvent => item !== null) : [],
+    activityBaseline: isRecord(value.activityBaseline) ? {
+      status: statuses.includes(text(value.activityBaseline.status)) ? value.activityBaseline.status as Championship["status"] : defaults.status,
+      currentChampions: normalizeCompetitors(value.activityBaseline.currentChampions),
+      previousChampions: normalizeCompetitors(value.activityBaseline.previousChampions),
+      dateWon: text(value.activityBaseline.dateWon),
+      defenses: Math.max(0, number(value.activityBaseline.defenses, 0)),
+      reigns: Array.isArray(value.activityBaseline.reigns) ? value.activityBaseline.reigns.map(normalizeReign).filter((item): item is ChampionshipReign => item !== null) : [],
+    } : undefined,
+    lastTitleActivityDate: text(value.lastTitleActivityDate),
     createdAt: text(value.createdAt, defaults.createdAt),
     updatedAt: text(value.updatedAt, defaults.updatedAt),
   };

@@ -50,6 +50,7 @@ export interface StandaloneWorkerRecord {
   rankingPoints: number;
   rankingPosition: number;
   previousRankingPosition: number;
+  rankingTied?: boolean;
   momentum: number;
   momentumScale: "0-100-v1";
   popularity: number;
@@ -78,6 +79,8 @@ export interface StandaloneTeamHistoryEntry {
   rawMatchScore?: number;
   rankingChange?: number;
   rankingCalculation?: CalculationLedgerStage;
+  momentumChange?: number;
+  momentumCalculation?: CalculationLedgerStage;
   occurredAt: string;
 }
 
@@ -93,7 +96,9 @@ export interface StandaloneTeamRecord {
   rankingPoints: number;
   rankingPosition: number;
   previousRankingPosition: number;
+  rankingTied?: boolean;
   momentum: number;
+  momentumScale: "0-100-v1";
   matchHistory: StandaloneTeamHistoryEntry[];
   updatedAt: string;
 }
@@ -179,6 +184,7 @@ export interface ChampionshipConsequenceProposal {
   challenger: string;
   finalWinner: string;
   finalWinnerMemberNames: string[];
+  finalWinnerMemberKeys: string[];
   suggestedDecision: TitleResultDecision;
   selectedDecision: TitleResultDecision;
   status: ConsequenceDecisionStatus;
@@ -200,6 +206,9 @@ export interface CompetitionConsequenceProposal {
   proposedWinnerParticipantId: string;
   proposedWinnerParticipantName: string;
   resultType: CompetitionResultType;
+  finishType: string;
+  winnerSubmissions: number;
+  loserSubmissions: number;
   status: ConsequenceDecisionStatus;
   reason: string;
   preview: string[];
@@ -220,6 +229,7 @@ export interface ResultConsequenceApplication {
   resolutionRecordId: string;
   resolutionAttemptId: string;
   calculationVersion: string;
+  competitiveCalculationVersion?: string;
   idempotencyKey: string;
   showId: string;
   showName: string;
@@ -227,6 +237,13 @@ export interface ResultConsequenceApplication {
   segmentTitle: string;
   finalResult: MatchResolutionFinalResult;
   engineAttempt: MatchResolutionAttempt;
+  sourceSetup?: import("../matchResolution/types").MatchResolutionSetup;
+  officialShowDate: string;
+  runningOrderPosition: number;
+  officialOrderKey: string;
+  replayStatus: "Original" | "Replayed" | "Superseded";
+  replayedAt: string;
+  supersededByApplicationId: string;
   status: ConsequenceApplicationStatus;
   conditionChanges: ConditionChange[];
   futureConflictIds: string[];
@@ -242,9 +259,22 @@ export interface ResultConsequenceApplication {
 export interface ConsequenceAuditEntry {
   id: string;
   applicationId: string;
-  action: "Core Consequences Applied" | "Core Consequences Rolled Back" | "Championship Confirmed" | "Championship Deferred" | "Competition Confirmed" | "Competition Deferred" | "Conflict Resolved" | "Prompt Used" | "Prompt Dismissed";
+  action: "Core Consequences Applied" | "Core Consequences Rolled Back" | "Angle Consequence Recorded" | "Competitive Ledger Replayed" | "Championship Confirmed" | "Championship Deferred" | "Competition Confirmed" | "Competition Deferred" | "Conflict Resolved" | "Prompt Used" | "Prompt Dismissed";
   detail: string;
   createdAt: string;
+}
+
+export interface CompetitiveProfileAdjustmentEvent {
+  id: string;
+  source: "Angle";
+  sourceEvaluationId: string;
+  showId: string;
+  segmentId: string;
+  officialShowDate: string;
+  runningOrderPosition: number;
+  officialOrderKey: string;
+  participantChanges: Array<{ workerKey: string; workerName: string; momentumDelta: number; popularityDelta: number }>;
+  appliedAt: string;
 }
 
 export interface ResultConsequenceSettings {
@@ -262,5 +292,8 @@ export interface ResultConsequenceUniverse {
   futureConflicts: FutureBookingConflict[];
   prompts: GroundedBookingPrompt[];
   audit: ConsequenceAuditEntry[];
+  competitiveProfileAdjustments: CompetitiveProfileAdjustmentEvent[];
+  competitiveCalculationVersion: string;
+  competitiveBaseline?: ConsequenceSnapshot;
   settings: ResultConsequenceSettings;
 }
