@@ -2,6 +2,8 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import MatchApproachSetupEditor, { MatchSettingsEditor } from "../matchEngine/MatchApproachSetup";
 import { loadMatchEngineUniverse, saveMatchEngineUniverse } from "../matchEngine/storage";
 import type { MatchEngineUniverse } from "../matchEngine/types";
+import { fixtureDisplayName, touchCompetition } from "../competitions/model";
+import { loadCompetitionUniverse, saveCompetitionUniverse } from "../competitions/storage";
 import NarrativeGenerator from "../narratives/NarrativeGenerator";
 import { startingCrowdForShow } from "../showEvaluation/model";
 import { loadShowEvaluationUniverse } from "../showEvaluation/storage";
@@ -198,6 +200,40 @@ function BasicMatchBooking({ segment, snapshot, company, startingUniverse, onCha
   </section>;
 }
 
+function CompetitionFixturePicker({ segment, showId, onChange }: { segment: PlannedSegment; showId: string; onChange: (segment: PlannedSegment) => void }) {
+  const universe = loadCompetitionUniverse(window.localStorage);
+  const choices = universe.competitions.flatMap((competition) => competition.fixtures
+    .filter((fixture) => fixture.participantAId && fixture.participantBId && !["Completed", "Bye", "Cancelled"].includes(fixture.status) && (!fixture.plannedSegmentId || fixture.plannedSegmentId === segment.id))
+    .map((fixture) => ({ competition, fixture })));
+
+  function selectFixture(value: string): void {
+    const [competitionId, fixtureId] = value.split("::");
+    const selected = choices.find((item) => item.competition.id === competitionId && item.fixture.id === fixtureId);
+    const competitions = universe.competitions.map((competition) => touchCompetition({
+      ...competition,
+      fixtures: competition.fixtures.map((fixture) => {
+        if (fixture.plannedSegmentId === segment.id && (!selected || fixture.id !== selected.fixture.id)) return { ...fixture, plannedSegmentId: "", scheduledShowId: "", status: fixture.status === "Scheduled" ? "Unscheduled" as const : fixture.status };
+        if (selected && competition.id === selected.competition.id && fixture.id === selected.fixture.id) return { ...fixture, plannedSegmentId: segment.id, scheduledShowId: showId, status: fixture.status === "Unscheduled" ? "Scheduled" as const : fixture.status };
+        return fixture;
+      }),
+    }));
+    saveCompetitionUniverse(window.localStorage, { ...universe, competitions });
+    if (!selected) { onChange({ ...segment, competitionId: "", competitionFixtureId: "", competitionRoundLabel: "" }); return; }
+    const participantA = selected.competition.participants.find((participant) => participant.id === selected.fixture.participantAId);
+    const participantB = selected.competition.participants.find((participant) => participant.id === selected.fixture.participantBId);
+    const references = [participantA, participantB].flatMap((participant, sideIndex) => (participant?.memberNames.length ? participant.memberNames : participant ? [participant.name] : []).map((name, memberIndex) => ({ id: participant?.sourceWorkerIds[memberIndex] || createPlannerId(), name, role: "Competitor", side: participant?.name || `Side ${sideIndex + 1}`, source: participant?.source === "tew" ? "tew" as const : "manual" as const })));
+    const matchType = selected.competition.participantType === "Tag Team" ? "2 vs. 2" : selected.competition.participantType === "Trios" ? "3 vs. 3" : "1 vs. 1";
+    onChange({ ...segment, title: `${fixtureDisplayName(selected.competition, selected.fixture)} — ${selected.fixture.roundLabel}`, matchType, workers: references, competitionId: selected.competition.id, competitionFixtureId: selected.fixture.id, competitionRoundLabel: selected.fixture.roundLabel });
+  }
+
+  return <section className="competition-fixture-picker" aria-label="Tournament fixture booking"><label className="field"><span>Tournament fixture</span><select aria-label="Tournament fixture" value={segment.competitionId && segment.competitionFixtureId ? `${segment.competitionId}::${segment.competitionFixtureId}` : ""} onChange={(event) => selectFixture(event.target.value)}><option value="">Not a tournament fixture</option>{choices.map(({ competition, fixture }) => <option key={`${competition.id}:${fixture.id}`} value={`${competition.id}::${fixture.id}`}>{competition.name}{competition.editionLabel ? ` · ${competition.editionLabel}` : ""} · {fixture.roundLabel} · {fixtureDisplayName(competition, fixture)}</option>)}</select><small>Choosing a fixture links this match, fills its participants, and marks it scheduled.</small></label></section>;
+}
+
+function unlinkCompetitionSegment(segmentId: string): void {
+  const universe = loadCompetitionUniverse(window.localStorage);
+  saveCompetitionUniverse(window.localStorage, { ...universe, competitions: universe.competitions.map((competition) => ({ ...competition, fixtures: competition.fixtures.map((fixture) => fixture.plannedSegmentId === segmentId ? { ...fixture, plannedSegmentId: "", scheduledShowId: "", status: fixture.status === "Scheduled" ? "Unscheduled" as const : fixture.status } : fixture), updatedAt: new Date().toISOString() })) });
+}
+
 function SegmentEditor({
   segment,
   cardSegments,
@@ -207,6 +243,7 @@ function SegmentEditor({
   snapshot,
   company = "",
   startingUniverse,
+  showId,
   matchEngine,
   onMatchEngineChange,
   onChange,
@@ -222,6 +259,7 @@ function SegmentEditor({
   snapshot: TewSnapshot | null;
   company?: string;
   startingUniverse: StartingUniverseRecord | null;
+  showId: string;
   matchEngine: MatchEngineUniverse;
   onMatchEngineChange: (universe: MatchEngineUniverse) => void;
   onChange: (segment: PlannedSegment) => void;
@@ -262,6 +300,7 @@ function SegmentEditor({
       </div>
 
       {segment.type === "match" && <MatchSettingsEditor segment={segment} onChange={onChange} />}
+      {segment.type === "match" && <CompetitionFixturePicker segment={segment} showId={showId} onChange={onChange} />}
       {segment.type === "match" && <BasicMatchBooking segment={segment} snapshot={snapshot} company={company} startingUniverse={startingUniverse} onChange={onChange} />}
       {segment.type === "match" && <MatchApproachSetupEditor segment={segment} cardSegments={cardSegments} crowdStart={crowdStart} universe={matchEngine} onUniverseChange={onMatchEngineChange} onChange={onChange} />}
       <NarrativeEditor segment={segment} availableWorkers={snapshot?.workers ?? []} availableStorylines={snapshot?.storylines ?? []} onChange={onChange} />
@@ -472,7 +511,7 @@ export default function PlannedShowWorkspace({
             <section className="planned-card-editor"><header className="card-editor-header"><div><p className="eyebrow">{activeSegment ? "SEGMENT BOOKING" : "CARD / BOOKING"}</p><h3>{activeSegment ? activeSegment.title : `${selectedShow.segments.length} planned segment${selectedShow.segments.length === 1 ? "" : "s"}`}</h3><p>{activeSegment ? "Complete this segment, save it, then return to the running order." : `${totalPlannedMinutes(selectedShow)} of ${selectedShow.expectedMinutes} expected minutes planned · ${completeNarratives} narratives complete`}</p></div>{!activeSegment && <div className="card-editor-actions"><button className="primary-button" type="button" onClick={() => addSegment("match")}>Add Match</button><button className="secondary-button" type="button" onClick={() => addSegment("angle")}>Add Angle</button></div>}</header>
               {!activeSegment && selectedShow.segments.length > 0 && <div className="tew-card-list" aria-label="Current card summary">{selectedShow.segments.map((segment, index) => <button type="button" key={segment.id} className={`tew-card-row tew-card-row--${segment.type}`} onClick={() => setActiveSegmentId(segment.id)}><b>{index + 1}</b><span>{segment.title || (segment.type === "match" ? "Untitled Match" : "Untitled Angle")}</span><small>{segment.type === "match" ? "MATCH" : "ANGLE"}</small></button>)}</div>}
               {!activeSegment && selectedShow.segments.length === 0 && <div className="empty-state card-empty">Add a match or angle to begin building the show in running order.</div>}
-              {activeSegment && <div className="planned-segment-list"><SegmentEditor key={activeSegment.id} segment={activeSegment} cardSegments={selectedShow.segments} crowdStart={projectedCrowdStart} index={selectedShow.segments.findIndex((segment) => segment.id === activeSegment.id)} count={selectedShow.segments.length} snapshot={snapshot} company={selectedShow.company} startingUniverse={startingUniverse} matchEngine={matchEngine} onMatchEngineChange={setMatchEngine} onChange={(updated) => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.map((item) => item.id === updated.id ? updated : item) }))} onMove={(direction) => updateShow(selectedShow.id, (show) => ({ ...show, segments: movePlannedSegment(show.segments, activeSegment.id, direction) }))} onDelete={() => { updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.filter((item) => item.id !== activeSegment.id) })); setActiveSegmentId(""); setNotice("Segment removed from the card."); }} onClose={(saved) => { setActiveSegmentId(""); if (saved) setNotice("Segment saved. Returned to the card."); }} /></div>}
+              {activeSegment && <div className="planned-segment-list"><SegmentEditor key={activeSegment.id} segment={activeSegment} cardSegments={selectedShow.segments} crowdStart={projectedCrowdStart} index={selectedShow.segments.findIndex((segment) => segment.id === activeSegment.id)} count={selectedShow.segments.length} snapshot={snapshot} company={selectedShow.company} startingUniverse={startingUniverse} showId={selectedShow.id} matchEngine={matchEngine} onMatchEngineChange={setMatchEngine} onChange={(updated) => updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.map((item) => item.id === updated.id ? updated : item) }))} onMove={(direction) => updateShow(selectedShow.id, (show) => ({ ...show, segments: movePlannedSegment(show.segments, activeSegment.id, direction) }))} onDelete={() => { unlinkCompetitionSegment(activeSegment.id); updateShow(selectedShow.id, (show) => ({ ...show, segments: show.segments.filter((item) => item.id !== activeSegment.id) })); setActiveSegmentId(""); setNotice("Segment removed from the card; its tournament fixture is unscheduled."); }} onClose={(saved) => { setActiveSegmentId(""); if (saved) setNotice("Segment saved. Returned to the card."); }} /></div>}
             </section>
           </>}
         </div>}

@@ -618,7 +618,7 @@ export function previewCompetitionDecision(input: {
   if (resultType === "Decision" && !input.decision.proposedWinnerParticipantId) {
     return { blocked: true, message: "Choose the competition participant that matches the actual TEW winner.", competition: input.competition };
   }
-  if (input.competition.format === "Single Elimination" && resultType === "Draw") {
+  if (fixture.stageType === "Knockout" && resultType === "Draw") {
     return { blocked: true, message: "A single-elimination fixture cannot advance from a draw. Resolve or defer the result.", competition: input.competition };
   }
   const beforeStandings = buildCompetitionStandings(input.competition);

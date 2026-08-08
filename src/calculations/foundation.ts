@@ -1,5 +1,5 @@
-export const CALCULATION_SYSTEM_VERSION = "wrestling-sim-calculations-6b21-v1";
-export const CONSEQUENCE_CALCULATION_SYSTEM_VERSION = "wrestling-sim-consequences-6b21-v1";
+export const CALCULATION_SYSTEM_VERSION = "wrestling-sim-calculations-6b22-v1";
+export const CONSEQUENCE_CALCULATION_SYSTEM_VERSION = "wrestling-sim-consequences-6b22-v1";
 export const ANGLE_CALCULATION_SYSTEM_VERSION = "wrestling-sim-angles-6b20e-v1";
 export const SHOW_CALCULATION_SYSTEM_VERSION = "wrestling-sim-shows-6b20e-v1";
 export const COMPETITIVE_CALCULATION_SYSTEM_VERSION = "wrestling-sim-competitive-6b20f-v1";

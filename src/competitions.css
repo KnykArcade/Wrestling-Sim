@@ -91,3 +91,24 @@
   .competition-form-grid .field--full { grid-column: auto; }
   .competition-panel > header, .competition-boundary { flex-direction: column; }
 }
+
+.competition-rounds--bracket { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); align-items: start; gap: 14px; }
+.competition-rounds--bracket .competition-round--knockout { min-width: 280px; position: relative; }
+.competition-rounds--bracket .competition-round--knockout + .competition-round--knockout::before { content: ""; position: absolute; left: -8px; top: 52px; width: 8px; border-top: 2px solid rgba(107, 157, 255, .5); }
+.competition-group-standings { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; }
+.competition-group-standings > section { border: 1px solid #31506f; background: #081628; }
+.competition-group-standings > section > header { display: flex; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid #31506f; }
+.competition-group-standings h5 { margin: 0; }
+.competition-standing--qualified { box-shadow: inset 4px 0 #41c77a; background: rgba(65, 199, 122, .08) !important; }
+.competition-history-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.competition-history-grid > section { display: grid; gap: 10px; align-content: start; }
+.competition-history-grid h5 { margin: 0 0 4px; }
+.competition-history-grid button, .competition-history-grid article, .competition-audit article { display: grid; gap: 5px; padding: 12px; border: 1px solid #31506f; color: #e9f0f9; text-align: left; background: #0d2036; }
+.competition-history-grid button.selected { border-color: #6b9dff; box-shadow: inset 3px 0 #6b9dff; }
+.competition-history-grid p { margin: 0; color: #b5c5d8; }
+.competition-audit { margin-top: 18px; }
+.competition-audit article { margin-top: 8px; }
+.competition-company-history { display: grid; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #31506f; }
+.competition-company-history h5 { margin: 0; }
+.competition-company-history button { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #31506f; color: #e9f0f9; background: #0d2036; text-align: left; }
+@media (max-width: 760px) { .competition-history-grid, .competition-group-standings { grid-template-columns: 1fr; } }

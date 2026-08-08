@@ -210,6 +210,7 @@ export interface MatchWorkerApproachPlan {
   workerName: string;
   selectedApproachIds: MatchApproachId[];
   lockedApproachIds: MatchApproachId[];
+  requiredApproachId?: MatchApproachId | "";
   mode: ApproachPlanMode;
   generatedAt: string;
 }

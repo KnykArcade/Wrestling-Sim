@@ -215,6 +215,7 @@ function normalizeSegment(value: unknown): PlannedSegment | null {
     followUp: text(value.followUp),
     privateNotes: text(value.privateNotes),
     matchType: text(value.matchType, defaults.matchType),
+    matchStipulation: text(value.matchStipulation, defaults.matchStipulation),
     championship: text(value.championship),
     championshipId: text(value.championshipId),
     championshipMatchPurpose: titlePurposes.includes(text(value.championshipMatchPurpose)) ? value.championshipMatchPurpose as PlannedSegment["championshipMatchPurpose"] : "",

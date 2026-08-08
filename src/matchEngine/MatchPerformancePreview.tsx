@@ -3,9 +3,10 @@ import { CALCULATION_SYSTEM_VERSION } from "../calculations/foundation";
 import { calculateLiveMatchAudience, calculateMatchAnticipation } from "../crowd/model";
 import type { PlannedSegment, PlannedWorkerReference } from "../planner/types";
 import { advisoryStarRating, generateMatchPerformancePreview, formatStarRating, performancePreviewInputFingerprint, resolveMatchFormat, resolveMatchImportance } from "./performance";
+import { enforceRequiredApproachPlan, requiredApproachForMatch } from "./requiredApproaches";
 import { loadActiveStartingUniverse, loadStartingUniverseState } from "../startingUniverse/storage";
 import type { StartingUniverseRecord } from "../startingUniverse/types";
-import { normalizeApproachName, workerProfileKey } from "./model";
+import { approachLimitForSetup, normalizeApproachName, workerProfileKey } from "./model";
 import type {
   MatchEngineProfile,
   MatchEngineUniverse,
@@ -64,9 +65,10 @@ export default function MatchPerformancePreviewEditor({
   const incompleteWorkers = readyWorkers.filter((item) => !item.profile || !item.plan || item.plan.selectedApproachIds.length === 0);
   const canGenerate = sourceReady && readyWorkers.length > 0 && incompleteWorkers.length === 0;
   const settings = segment.matchApproachSetup.performanceSettings;
+  const required = requiredApproachForMatch(segment.matchStipulation, segment.matchApproachSetup.matchAimId);
   const previewWorkers = readyWorkers.filter((item): item is typeof item & { profile: MatchEngineProfile; plan: MatchWorkerApproachPlan } => Boolean(item.profile && item.plan)).map((item) => ({
     profile: item.profile,
-    plan: item.plan,
+    plan: enforceRequiredApproachPlan(item.plan, required?.approachId ?? "", approachLimitForSetup(segment.durationMinutes, segment.matchApproachSetup.approachLimit)),
     workbookMetrics: startingUniverse?.review.roster.find((decision) => decision.workerId === item.worker.id)?.workbookMetrics ?? null,
     teamId: normalizeApproachName(item.worker.side) || item.profile.workerKey,
     teamName: (normalizeApproachName(item.worker.side)

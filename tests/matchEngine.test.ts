@@ -49,6 +49,7 @@ import {
 } from "../src/matchEngine/storage";
 import { CALCULATION_SYSTEM_VERSION, calculationQualityLabel, normalizeRating } from "../src/calculations/foundation";
 import type { MatchEngineProfile, MatchWorkerApproachPlan } from "../src/matchEngine/types";
+import { enforceRequiredApproachPlan, requiredApproachForMatch } from "../src/matchEngine/requiredApproaches";
 
 class MemoryStorage {
   private values = new Map<string, string>();
@@ -136,7 +137,7 @@ describe("native match engine data foundation", () => {
     expect(normalizeRating(-4)).toBe(0);
     expect(calculationQualityLabel(85)).toBe("Elite");
     expect(calculationQualityLabel(49.99)).toBe("Weak");
-    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b21-v1");
+    expect(CALCULATION_SYSTEM_VERSION).toBe("wrestling-sim-calculations-6b22-v1");
   });
 
   test("migrates saved resolver IDs without losing selected or locked approaches", () => {
@@ -186,6 +187,16 @@ describe("native match engine data foundation", () => {
     expect(approachSlotsForDuration(24.99)).toBe(3);
     expect(approachSlotsForDuration(25)).toBe(4);
     expect(approachSlotsForDuration(60)).toBe(4);
+  });
+
+  test("requires one approach with stipulation priority and preserves free slots", () => {
+    expect(requiredApproachForMatch("Hardcore", "technical-showcase")).toMatchObject({ approachId: "hardcore-daredevil", source: "Stipulation" });
+    expect(requiredApproachForMatch("Standard", "technical-showcase")).toMatchObject({ approachId: "chain-technician", source: "Match Aim" });
+    const enforced = enforceRequiredApproachPlan({ ...testPlan(testProfile(), ["showman", "pace-controller", "chain-technician"]), lockedApproachIds: ["showman"] }, "hardcore-daredevil", 3);
+    expect(enforced.selectedApproachIds).toEqual(["hardcore-daredevil", "showman", "pace-controller"]);
+    expect(enforced.lockedApproachIds).toEqual(["showman"]);
+    expect(enforced.requiredApproachId).toBe("hardcore-daredevil");
+    expect(enforceRequiredApproachPlan(enforced, "", 3).requiredApproachId).toBe("");
   });
 
   test("matches the workbook pace-status and penalty table", () => {

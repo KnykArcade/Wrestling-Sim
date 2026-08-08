@@ -4,6 +4,7 @@ import { MATCH_AIMS } from "../matchEngine/catalog";
 import { approachLimitForSetup, normalizeApproachName, workerProfileKey } from "../matchEngine/model";
 import { loadMatchEngineUniverse } from "../matchEngine/storage";
 import type { MatchEngineProfile } from "../matchEngine/types";
+import { requiredApproachForMatch } from "../matchEngine/requiredApproaches";
 import { resolveMatchFormat, resolveMatchImportance } from "../matchEngine/performance";
 import { calculateMatchAnticipation, momentumLabel } from "../crowd/model";
 import { loadPlannedShows } from "../planner/storage";
@@ -79,12 +80,15 @@ function createWorkerSettings(worker: PlannedWorkerReference, segment: PlannedSe
   const bookedApproaches = bookedPlan?.selectedApproachIds
     .map((id) => importedApproachIdForMatchEngineId(id))
     .filter((id): id is ResolutionApproachId => id !== null) ?? [];
+  const required = requiredApproachForMatch(segment.matchStipulation, segment.matchApproachSetup.matchAimId);
+  const requiredApproachId = required ? importedApproachIdForMatchEngineId(required.approachId) ?? "" : "";
   return {
     workerKey: workerProfileKey({ id: worker.id, name: worker.name, source: worker.source }),
     workerId: worker.id,
     workerName: worker.name,
     approachMode: bookedApproaches.length ? "Manual" : "AI",
     lockedApproachIds: [],
+    requiredApproachId,
     manualApproachIds: bookedApproaches,
     storyNeed: 0,
     momentum: profile?.momentum ?? 50,
@@ -110,6 +114,7 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, profiles: MatchE
       showDate: show.date,
       segmentTitle: segment.title,
       matchType: segment.matchType,
+      stipulation: segment.matchStipulation,
       durationMinutes: segment.durationMinutes,
       approachLimit: segment.matchApproachSetup.approachLimit,
       aimId: segment.matchApproachSetup.matchAimId,
@@ -129,6 +134,7 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, profiles: MatchE
           ...saved,
           approachMode: derived.manualApproachIds.length ? "Manual" : saved.approachMode,
           manualApproachIds: derived.manualApproachIds.length ? derived.manualApproachIds : saved.manualApproachIds,
+          requiredApproachId: derived.requiredApproachId,
           momentum: derived.momentum,
           teamId: saved.teamId || derived.teamId,
           teamName: saved.teamName || derived.teamName,
@@ -143,6 +149,7 @@ function buildSetup(show: PlannedShow, segment: PlannedSegment, profiles: MatchE
     segmentId: segment.id,
     segmentTitle: segment.title,
     matchType: segment.matchType,
+    stipulation: segment.matchStipulation,
     durationMinutes: segment.durationMinutes,
     approachLimit: segment.matchApproachSetup.approachLimit,
     aimId: segment.matchApproachSetup.matchAimId,
@@ -256,6 +263,7 @@ export default function MatchResolutionWorkspace({ onReturnToShow }: { onReturnT
   function toggleApproach(index: number, approachId: ResolutionApproachId, mode: "locked" | "manual"): void {
     if (!setup) return;
     const worker = setup.workers[index];
+    if (worker.requiredApproachId === approachId) return;
     const source = mode === "locked" ? worker.lockedApproachIds : worker.manualApproachIds;
     const next = source.includes(approachId) ? source.filter((id) => id !== approachId) : [...source, approachId].slice(0, slots);
     updateWorker(index, mode === "locked" ? { lockedApproachIds: next } : { manualApproachIds: next });
@@ -341,7 +349,7 @@ export default function MatchResolutionWorkspace({ onReturnToShow }: { onReturnT
       <section className="match-resolution-context">
         <header><div><p className="eyebrow">MATCH CONTEXT</p><h3>{selectedSegment.title}</h3><p>{selectedShow.name} · {selectedSegment.matchType} · {selectedSegment.durationMinutes} minutes</p></div><span className={`resolution-status resolution-status--${statusClass(displayedRecord?.status ?? "Unresolved")}`}>{displayedRecord?.status ?? "Unresolved"}</span></header>
           <div className="match-resolution-context-grid">
-          <label className="field"><span>Match aim</span><select aria-label="Resolution match aim" value={setup.aimId} onChange={(event) => { const aimId = event.target.value as MatchResolutionSetup["aimId"]; setSetup({ ...setup, aimId, anticipation: calculateMatchAnticipation({ profiles: sources.map((source) => source.profile), plans: selectedSegment.matchApproachSetup.workerPlans, aimId }) }); }}>{MATCH_AIMS.map((aim) => <option key={aim.id} value={aim.id}>{aim.name}</option>)}</select></label>
+          <label className="field"><span>Match aim</span><select aria-label="Resolution match aim" value={setup.aimId} onChange={(event) => { const aimId = event.target.value as MatchResolutionSetup["aimId"]; const required = requiredApproachForMatch(setup.stipulation || selectedSegment.matchStipulation, aimId); const requiredApproachId = required ? importedApproachIdForMatchEngineId(required.approachId) ?? "" : ""; setSetup({ ...setup, aimId, workers: setup.workers.map((worker) => ({ ...worker, requiredApproachId })), anticipation: calculateMatchAnticipation({ profiles: sources.map((source) => source.profile), plans: selectedSegment.matchApproachSetup.workerPlans, aimId }) }); }}>{MATCH_AIMS.map((aim) => <option key={aim.id} value={aim.id}>{aim.name}</option>)}</select></label>
           <div><span>Importance</span><strong>{setup.importance}</strong><small>Set once in the booking preview</small></div>
           <div><span>Chemistry</span><strong>{setup.chemistry >= 0 ? "+" : ""}{setup.chemistry}</strong><small>Set once in the booking preview</small></div>
           <div><span>Volatility</span><strong>{setup.volatility}</strong><small>Shared with the booking preview</small></div>
@@ -359,9 +367,10 @@ export default function MatchResolutionWorkspace({ onReturnToShow }: { onReturnT
           <header><div><p className="eyebrow">WRESTLER {index + 1}</p><h3>{plannedWorker?.name ?? workerSettings.workerName}</h3><span>{profile ? `${profile.styleId} · ${source?.workbookMetrics ? "Exact Starting Universe workbook metrics" : "Match Engine profile formulas"}` : "Profile missing"}</span></div><strong>{slots} approach slot{slots === 1 ? "" : "s"}</strong></header>
           <div className="match-resolution-worker-factors"><label className="field"><span>Approach control</span><select aria-label={`${workerSettings.workerName} approach mode`} value={workerSettings.approachMode} onChange={(event) => updateWorker(index, { approachMode: event.target.value as MatchResolutionWorkerSettings["approachMode"] })}><option>AI</option><option>Manual</option></select></label><label className="field"><span>Story need</span><input aria-label={`${workerSettings.workerName} story need`} type="number" min={-20} max={20} value={workerSettings.storyNeed} onChange={(event) => updateWorker(index, { storyNeed: clamp(Number(event.target.value) || 0, -20, 20) })} /></label><label className="field"><span>Momentum</span><input aria-label={`${workerSettings.workerName} momentum`} title={momentumLabel(workerSettings.momentum)} type="number" min={0} max={100} value={workerSettings.momentum} onChange={(event) => updateWorker(index, { momentum: clamp(Number(event.target.value) || 0, 0, 100) })} /></label><label className="field"><span>Booker influence</span><input aria-label={`${workerSettings.workerName} booking influence`} type="number" min={-20} max={20} value={workerSettings.bookingBias} onChange={(event) => updateWorker(index, { bookingBias: clamp(Number(event.target.value) || 0, -20, 20) })} /></label></div>
           <div className="match-resolution-approach-grid">{RESOLUTION_APPROACHES.map((approach) => {
-            const checked = workerSettings.approachMode === "Manual" ? workerSettings.manualApproachIds.includes(approach.id) : workerSettings.lockedApproachIds.includes(approach.id);
+            const isRequired = workerSettings.requiredApproachId === approach.id;
+            const checked = isRequired || (workerSettings.approachMode === "Manual" ? workerSettings.manualApproachIds.includes(approach.id) : workerSettings.lockedApproachIds.includes(approach.id));
             const rating = profile ? resolutionApproachRating(profile, source?.workbookMetrics ?? null, approach.id) : 0;
-            return <label key={approach.id} className={checked ? "selected" : ""}><input type="checkbox" checked={checked} disabled={!profile} onChange={() => toggleApproach(index, approach.id, workerSettings.approachMode === "Manual" ? "manual" : "locked")} /><span><strong>{approach.name}</strong><small>{rating.toFixed(1)} rating · Pace {approach.pace} · Cost {approach.staminaCost}</small></span><b>{approach.paceSource === "Workbook" ? "Workbook" : "Extension"}</b></label>;
+            return <label key={approach.id} className={checked ? "selected" : ""}><input type="checkbox" checked={checked} disabled={!profile || isRequired} onChange={() => toggleApproach(index, approach.id, workerSettings.approachMode === "Manual" ? "manual" : "locked")} /><span><strong>{approach.name}{isRequired ? " · REQUIRED" : ""}</strong><small>{rating.toFixed(1)} rating · Pace {approach.pace} · Cost {approach.staminaCost}</small></span><b>{isRequired ? "AUTO" : approach.paceSource === "Workbook" ? "Workbook" : "Extension"}</b></label>;
           })}</div>
           <p className="match-resolution-worker-note">{workerSettings.approachMode === "AI" ? `Lock up to ${slots} approaches. The wrestler AI chooses every remaining slot.` : `Select up to ${slots} approaches. Any unfilled slots are completed by the wrestler AI.`}</p>
         </article>;

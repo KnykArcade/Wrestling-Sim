@@ -147,6 +147,7 @@ export function createPlannedSegment(type: PlannedSegmentType): PlannedSegment {
     privateNotes: "",
 
     matchType: type === "match" ? "Singles" : "",
+    matchStipulation: type === "match" ? "Standard" : "",
     championship: "",
     championshipId: "",
     championshipMatchPurpose: "",
