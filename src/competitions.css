@@ -94,6 +94,9 @@
 
 .competition-rounds--bracket { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); align-items: start; gap: 14px; }
 .competition-rounds--bracket .competition-round--knockout { min-width: 280px; position: relative; }
+.competition-rounds--bracket .competition-fixture,
+.competition-rounds--bracket .competition-fixture__result,
+.competition-rounds--bracket .competition-fixture__schedule { grid-template-columns: minmax(0, 1fr); }
 .competition-rounds--bracket .competition-round--knockout + .competition-round--knockout::before { content: ""; position: absolute; left: -8px; top: 52px; width: 8px; border-top: 2px solid rgba(107, 157, 255, .5); }
 .competition-group-standings { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; }
 .competition-group-standings > section { border: 1px solid #31506f; background: #081628; }

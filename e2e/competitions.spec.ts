@@ -29,6 +29,16 @@ test("builds a World Classic bracket and schedules a fixture onto a planned TEW 
 
   const firstSemifinal = page.locator(".competition-fixture").first();
   await firstSemifinal.getByLabel(/target show/).selectOption({ index: 1 });
+  const overlappingControls = await firstSemifinal.locator("button, select, input").evaluateAll((controls) => controls.flatMap((control, index) => {
+    const first = control.getBoundingClientRect();
+    if (first.width === 0 || first.height === 0) return [];
+    return controls.slice(index + 1).flatMap((candidate) => {
+      const second = candidate.getBoundingClientRect();
+      const overlaps = first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
+      return overlaps ? [`${control.getAttribute("aria-label") || control.textContent?.trim()} overlaps ${candidate.getAttribute("aria-label") || candidate.textContent?.trim()}`] : [];
+    });
+  }));
+  expect(overlappingControls).toEqual([]);
   await firstSemifinal.getByRole("button", { name: "Add to Planned Show" }).click();
   await expect(firstSemifinal.getByRole("button", { name: "Open Planned Match" })).toBeVisible();
   await firstSemifinal.getByRole("button", { name: "Open Planned Match" }).click();
