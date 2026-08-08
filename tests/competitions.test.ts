@@ -39,10 +39,21 @@ describe("Phase 4D competition management", () => {
     const tags = createCompetitionTemplate("world-tag-classic");
     expect(singles.name).toBe("PWL World Classic");
     expect(singles.kind).toBe("Classic");
+    expect(singles.expectedParticipantCount).toBe(8);
     expect(singles.traditions).toContain("ceremonial jacket");
     expect(tags.name).toBe("PWL World Tag Classic");
     expect(tags.participantType).toBe("Tag Team");
+    expect(tags.format).toBe("Round Robin + Final");
+    expect(tags.topAdvanceCount).toBe(2);
+    expect(tags.expectedParticipantCount).toBe(6);
+    expect(tags.prize).toContain("No automatic title shot");
     expect(tags.championPresentation).toContain("jacket handoff");
+  });
+
+  test("creates the six-team World Tag Classic as 15 league matches plus a Final", () => {
+    const generated = generateCompetitionStructure(withParticipants(6, "world-tag-classic"));
+    expect(generated.fixtures.filter((fixture) => fixture.roundLabel !== "Final")).toHaveLength(15);
+    expect(generated.fixtures.filter((fixture) => fixture.roundLabel === "Final")).toHaveLength(1);
   });
 
   test("generates a seeded elimination bracket with byes", () => {
@@ -79,6 +90,15 @@ describe("Phase 4D competition management", () => {
     expect(competition.fixtures.find((fixture) => fixture.id === semifinal.id)?.winnerId).toBe("");
   });
 
+  test("blocks elimination advancement after a No Contest or cancellation", () => {
+    let competition = generateCompetitionStructure(withParticipants(4));
+    const semifinal = competition.fixtures.find((fixture) => fixture.roundLabel === "Semifinal")!;
+    competition = recordCompetitionResult(competition, semifinal.id, "No Contest");
+    expect(competition.fixtures.find((fixture) => fixture.roundLabel === "Final")?.participantAId).toBe("");
+    competition = recordCompetitionResult(competition, semifinal.id, "Cancelled");
+    expect(competition.fixtures.find((fixture) => fixture.roundLabel === "Final")?.participantAId).toBe("");
+  });
+
   test("generates round-robin and double-round-robin schedules", () => {
     const league = withParticipants(4, "league");
     const single = generateCompetitionStructure(league);
@@ -100,6 +120,17 @@ describe("Phase 4D competition management", () => {
     expect(standings[0].points).toBeGreaterThanOrEqual(standings[1].points);
     expect(standings.reduce((sum, row) => sum + row.played, 0)).toBe(6);
     expect(standings.reduce((sum, row) => sum + row.draws, 0)).toBe(2);
+  });
+
+  test("keeps unresolved league ties tied instead of using participant names", () => {
+    const league = generateCompetitionStructure(withParticipants(2, "league"));
+    const fixture = league.fixtures[0];
+    const tied = recordCompetitionResult(league, fixture.id, "Draw");
+    const standings = buildCompetitionStandings(tied);
+    expect(standings.map((standing) => standing.rank)).toEqual([1, 1]);
+    expect(standings.every((standing) => standing.tied)).toBe(true);
+    expect(tied.championParticipantId).toBe("");
+    expect(tied.unresolvedTieParticipantIds).toHaveLength(2);
   });
 
   test("creates one planned match per fixture and prevents duplicate scheduling", () => {

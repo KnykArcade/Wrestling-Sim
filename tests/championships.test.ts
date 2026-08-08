@@ -119,6 +119,29 @@ describe("championship universe", () => {
     expect(result.championship.reigns[1].status).toBe("Active");
   });
 
+  test("reconstructs title activity chronologically and prevents duplicate source results", () => {
+    const championship = createChampionship(1);
+    championship.id = "world-title";
+    championship.name = "PWL Championship";
+    championship.status = "Active";
+    championship.currentChampions = [{ id: "bret", name: "Bret Hart" }];
+    championship.dateWon = "2026-07-01";
+    championship.reigns = [createChampionshipReign(championship.currentChampions, [], championship.dateWon)];
+    const later = reconciledTitleShow("Shawn Michaels");
+    later.show.date = "2026-08-15";
+    const changed = applyTitleResult(championship, later.show, later.segment, "Changed Hands", [{ id: "shawn", name: "Shawn Michaels" }], { sourceResultId: "later" });
+    const earlier = reconciledTitleShow("Bret Hart");
+    earlier.show.id = "show-earlier-title";
+    earlier.show.date = "2026-08-01";
+    earlier.segment.id = "segment-earlier-title";
+    earlier.show.segments = [earlier.segment];
+    const replayed = applyTitleResult(changed.championship, earlier.show, earlier.segment, "Retained", [], { sourceResultId: "earlier" });
+    expect(competitorNames(replayed.championship.currentChampions)).toBe("Shawn Michaels");
+    expect(replayed.championship.reigns.find((reign) => reign.champions[0]?.name === "Bret Hart")?.successfulDefenses).toBe(1);
+    expect(replayed.championship.lastTitleActivityDate).toBe("2026-08-15");
+    expect(() => applyTitleResult(replayed.championship, earlier.show, earlier.segment, "Retained", [], { sourceResultId: "earlier" })).toThrow("already updated");
+  });
+
   test("calculates grounded worker records from reconciled results", () => {
     const first = reconciledTitleShow("Bret Hart").show;
     const second = reconciledTitleShow("Shawn Michaels").show;
@@ -159,10 +182,26 @@ describe("championship universe", () => {
       relationships: [],
     };
     const { show } = reconciledTitleShow("Shawn Michaels");
-    const rankings = suggestRankings(championship, [show], workers, { championships: [championship] });
+    const rankings = suggestRankings(championship, [show], workers, { championships: [championship] }, { workerRecords: [{ workerKey: "manual:shawn-michaels", workerId: "shawn", workerName: "Shawn Michaels", wins: 1, losses: 0, draws: 0, noContests: 0, currentStreakType: "W", currentStreakCount: 1, lastFive: ["W"], rankingPoints: 4.5, rankingPosition: 1, previousRankingPosition: 0, momentum: 55, momentumScale: "0-100-v1", popularity: 50, health: 100, fatigue: 0, injuryStatus: "Healthy", injuryNote: "", matchHistory: [], updatedAt: "" } as any], teamRecords: [] });
     expect(rankings[0].id).toBe("locked");
     expect(rankings.some((ranking) => ranking.competitors[0]?.name === "Shawn Michaels")).toBe(true);
-    expect(rankings.find((ranking) => ranking.competitors[0]?.name === "Shawn Michaels")?.reason).toContain("Transparent suggestion");
+    expect(rankings.find((ranking) => ranking.competitors[0]?.name === "Shawn Michaels")?.reason).toContain("Official Phase 6B20 ranking ledger");
+  });
+
+  test("uses the official consequence ranking points for Championship Hub suggestions", () => {
+    const championship = createChampionship(1);
+    const workers: WorkerUniverse = { profiles: [], relationships: [] };
+    const records = {
+      workerRecords: [
+        { workerKey: "tew:a", workerId: "a", workerName: "Alpha", wins: 1, losses: 0, draws: 0, noContests: 0, currentStreakType: "W", currentStreakCount: 1, lastFive: ["W"], rankingPoints: 9, rankingPosition: 1, previousRankingPosition: 0, momentum: 50, momentumScale: "0-100-v1", popularity: 50, health: 100, fatigue: 0, injuryStatus: "Healthy", injuryNote: "", matchHistory: [], updatedAt: "" },
+        { workerKey: "tew:b", workerId: "b", workerName: "Beta", wins: 4, losses: 0, draws: 0, noContests: 0, currentStreakType: "W", currentStreakCount: 4, lastFive: ["W"], rankingPoints: 7, rankingPosition: 2, previousRankingPosition: 0, momentum: 50, momentumScale: "0-100-v1", popularity: 50, health: 100, fatigue: 0, injuryStatus: "Healthy", injuryNote: "", matchHistory: [], updatedAt: "" },
+      ],
+      teamRecords: [],
+    } as any;
+    const rankings = suggestRankings(championship, [], workers, { championships: [championship] }, records);
+    expect(rankings.map((ranking) => ranking.competitors[0].name)).toEqual(["Alpha", "Beta"]);
+    expect(rankings[0]).toMatchObject({ calculatedPoints: 9, calculatedRank: 1 });
+    expect(rankings[0].reason).toContain("official results");
   });
 
   test("surfaces lineage vacancy and unconfirmed-result warnings", () => {

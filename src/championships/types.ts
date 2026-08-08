@@ -6,7 +6,7 @@ export type ChampionshipStatus = "Active" | "Inactive" | "Vacant";
 export type ChampionshipReignStatus = "Active" | "Ended" | "Vacated";
 export type RankingEligibility = "Eligible" | "Ineligible" | "Unavailable";
 export type ChampionshipMatchPurpose = "" | "Defense" | "Vacant Title" | "Tournament Final" | "Unification" | "Other";
-export type TitleResultDecision = "" | "Retained" | "Changed Hands" | "Vacated" | "Unresolved";
+export type TitleResultDecision = "" | "Retained" | "Changed Hands" | "Vacated" | "No Contest" | "Unresolved";
 
 export interface ChampionshipCompetitor {
   id: string;
@@ -43,6 +43,33 @@ export interface ContenderRanking {
   movement: number;
   locked: boolean;
   updatedAt: string;
+  calculatedRank?: number;
+  calculatedPoints?: number;
+  tied?: boolean;
+  overrideReason?: string;
+}
+
+export interface ChampionshipResultEvent {
+  id: string;
+  sourceResultId: string;
+  showId: string;
+  segmentId: string;
+  showDate: string;
+  runningOrderPosition: number;
+  decision: Exclude<TitleResultDecision, "" | "Unresolved">;
+  winners: ChampionshipCompetitor[];
+  previousChampions: ChampionshipCompetitor[];
+  activityOnly: boolean;
+  confirmedAt: string;
+}
+
+export interface ChampionshipActivityBaseline {
+  status: ChampionshipStatus;
+  currentChampions: ChampionshipCompetitor[];
+  previousChampions: ChampionshipCompetitor[];
+  dateWon: string;
+  defenses: number;
+  reigns: ChampionshipReign[];
 }
 
 export interface ChampionshipProgram {
@@ -77,6 +104,9 @@ export interface Championship {
   reigns: ChampionshipReign[];
   rankings: ContenderRanking[];
   legacyNames: string[];
+  resultEvents: ChampionshipResultEvent[];
+  activityBaseline?: ChampionshipActivityBaseline;
+  lastTitleActivityDate: string;
   createdAt: string;
   updatedAt: string;
 }

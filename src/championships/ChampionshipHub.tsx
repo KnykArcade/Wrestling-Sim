@@ -8,6 +8,7 @@ import type { TrackerStoryline } from "../storylines/types";
 import type { TewSnapshot } from "../tew/types";
 import { loadWorkerUniverse } from "../workers/storage";
 import type { WorkerUniverse } from "../workers/types";
+import { loadResultConsequenceUniverse } from "../consequences/storage";
 import {
   applyTitleResult,
   buildChampionshipTimeline,
@@ -69,6 +70,8 @@ function RankingEditor({
         <select aria-label={`Rank ${ranking.rank} eligibility`} value={ranking.eligibility} onChange={(event) => onChange({ ...ranking, eligibility: event.target.value as ContenderRanking["eligibility"], updatedAt: new Date().toISOString() })}><option>Eligible</option><option>Ineligible</option><option>Unavailable</option></select>
       </div>
       <textarea aria-label={`Rank ${ranking.rank} reason`} rows={2} value={ranking.reason} placeholder="Explain why this contender is ranked here" onChange={(event) => onChange({ ...ranking, reason: event.target.value, updatedAt: new Date().toISOString() })} />
+      {ranking.calculatedRank ? <small>Calculated: {ranking.tied ? "T" : ""}#{ranking.calculatedRank} · {ranking.calculatedPoints?.toFixed(2) ?? "0.00"} points</small> : null}
+      {ranking.locked ? <input aria-label={`Rank ${ranking.rank} override reason`} value={ranking.overrideReason ?? ""} placeholder="Committee override reason" onChange={(event) => onChange({ ...ranking, overrideReason: event.target.value, updatedAt: new Date().toISOString() })} /> : null}
     </div>
     <div className="ranking-actions">
       <label><input type="checkbox" checked={ranking.locked} onChange={(event) => onChange({ ...ranking, locked: event.target.checked, updatedAt: new Date().toISOString() })} />Lock</label>
@@ -93,6 +96,7 @@ export default function ChampionshipHub({
   const [storylines] = useState<TrackerStoryline[]>(() => loadTrackerStorylines(window.localStorage));
   const [workers] = useState<WorkerUniverse>(() => loadWorkerUniverse(window.localStorage));
   const [ideas] = useState<BookingIdea[]>(() => loadCreativeControlData(window.localStorage).ideas);
+  const [competitiveRecords] = useState(() => loadResultConsequenceUniverse(window.localStorage));
   const [selectedId, setSelectedId] = useState("");
   const [view, setView] = useState<HubView>("details");
   const [search, setSearch] = useState("");
@@ -172,8 +176,8 @@ export default function ChampionshipHub({
 
   function generateRankings(): void {
     if (!selected) return;
-    updateSelected((championship) => ({ ...championship, rankings: suggestRankings(championship, shows, workers, universe) }));
-    setNotice("Ranking suggestions generated from stored results. Locked entries were preserved.");
+    updateSelected((championship) => ({ ...championship, rankings: suggestRankings(championship, shows, workers, universe, competitiveRecords) }));
+    setNotice("Ranking suggestions generated from the official competitive ledger. Locked Committee entries and their override reasons were preserved.");
   }
 
   function confirmSuggestion(showId: string, segmentId: string, decision: TitleResultDecision): void {
@@ -197,9 +201,16 @@ export default function ChampionshipHub({
     updateSelected((championship) => ({ ...championship, currentProgram: { ...championship.currentProgram, [field]: competitorsFromNames(value, allWorkers).map((competitor) => competitor.name) } }));
   }
 
-  const championRecord = selected?.currentChampions[0]
-    ? buildCompetitiveRecord(selected.currentChampions[0].name, shows, universe)
-    : null;
+  const officialChampionRecord = selected?.currentChampions[0] ? competitiveRecords.workerRecords.find((record) => record.workerName.toLowerCase() === selected.currentChampions[0].name.toLowerCase()) : null;
+  const championRecord = officialChampionRecord ? {
+    workerName: officialChampionRecord.workerName,
+    wins: officialChampionRecord.wins,
+    losses: officialChampionRecord.losses,
+    draws: officialChampionRecord.draws,
+    unresolved: 0,
+    championshipMatches: selected?.resultEvents.filter((event) => event.winners.some((winner) => winner.id === officialChampionRecord.workerId || winner.name.toLowerCase() === officialChampionRecord.workerName.toLowerCase())).length ?? 0,
+    currentStreak: officialChampionRecord.currentStreakCount ? `${officialChampionRecord.currentStreakCount}${officialChampionRecord.currentStreakType}` : "—",
+  } : selected?.currentChampions[0] ? buildCompetitiveRecord(selected.currentChampions[0].name, shows, universe) : null;
 
   return <section className="championship-hub">
     <header className="championship-toolbar">
@@ -243,6 +254,7 @@ export default function ChampionshipHub({
             <label className="field"><span>Date won</span><input type="date" value={selected.dateWon} onChange={(event) => updateSelected((championship) => ({ ...championship, dateWon: event.target.value }))} /></label>
             <label className="field field--wide"><span>Current champions</span><input list={`champions-${selected.id}`} value={competitorNames(selected.currentChampions)} placeholder="Enter one name or a team separated by &" onChange={(event) => setCurrentChampions(event.target.value)} /><datalist id={`champions-${selected.id}`}>{allWorkers.map((worker) => <option key={worker.id} value={worker.name} />)}</datalist></label>
             <label className="field"><span>Recorded defenses</span><input type="number" min={0} value={selected.defenses} onChange={(event) => updateSelected((championship) => ({ ...championship, defenses: Math.max(0, Number(event.target.value) || 0) }))} /></label>
+            <label className="field"><span>Last official title activity</span><input type="date" value={selected.lastTitleActivityDate} readOnly /></label>
             <label className="field"><span>Inactive warning days</span><input type="number" min={1} value={selected.inactivityWarningDays} onChange={(event) => updateSelected((championship) => ({ ...championship, inactivityWarningDays: Math.max(1, Number(event.target.value) || 1) }))} /></label>
             <label className="field field--wide"><span>Linked TEW title name</span><input value={selected.linkedTewTitleName} placeholder="Optional imported TEW reference" onChange={(event) => updateSelected((championship) => ({ ...championship, linkedTewTitleName: event.target.value }))} /></label>
             <label className="field field--wide"><span>Legacy or alternate names</span><input value={selected.legacyNames.join(", ")} placeholder="Names used on older saved cards" onChange={(event) => updateSelected((championship) => ({ ...championship, legacyNames: event.target.value.split(",").map((value) => value.trim()).filter(Boolean) }))} /></label>
@@ -254,11 +266,12 @@ export default function ChampionshipHub({
         {view === "lineage" && <section className="championship-panel">
           <header><div><p className="eyebrow">TITLE LINEAGE</p><h3>Reigns and defenses</h3></div><button className="primary-button" type="button" onClick={addCurrentReign}>Add Current Reign</button></header>
           {selected.reigns.length === 0 ? <div className="empty-state">No reign history has been recorded.</div> : <div className="reign-list">{selected.reigns.slice().sort((a, b) => b.startDate.localeCompare(a.startDate)).map((reign) => <article key={reign.id}><header><div><strong>{competitorNames(reign.champions) || "Unknown champion"}</strong><span>{reign.status}</span></div><b>{reign.successfulDefenses} defense{reign.successfulDefenses === 1 ? "" : "s"}</b></header><p>{dateLabel(reign.startDate)}{reign.endDate ? ` – ${dateLabel(reign.endDate)}` : " – Present"}</p><textarea aria-label={`Reign notes for ${competitorNames(reign.champions)}`} rows={2} value={reign.notes} placeholder="Lineage notes or corrections" onChange={(event) => updateSelected((championship) => ({ ...championship, reigns: championship.reigns.map((item) => item.id === reign.id ? { ...item, notes: event.target.value, updatedAt: new Date().toISOString() } : item) }))} /></article>)}</div>}
+          {selected.resultEvents.length > 0 && <div className="reign-list"><h4>Official title-result ledger</h4>{[...selected.resultEvents].sort((left, right) => right.showDate.localeCompare(left.showDate) || right.runningOrderPosition - left.runningOrderPosition).map((event) => <article key={event.id}><header><div><strong>{event.decision}</strong><span>{dateLabel(event.showDate)} · card position #{event.runningOrderPosition + 1}</span></div><b>{event.activityOnly ? "Activity only" : "Lineage event"}</b></header><p>{competitorNames(event.winners) || "No new champion"} · source {event.sourceResultId}</p></article>)}</div>}
         </section>}
 
         {view === "rankings" && <section className="championship-panel">
           <header><div><p className="eyebrow">CONTENDER RANKINGS</p><h3>Transparent and editable title picture</h3></div><div><button className="secondary-button" type="button" onClick={() => updateSelected((championship) => ({ ...championship, rankings: [...championship.rankings, createRanking(championship.rankings.length + 1)] }))}>Add Ranking</button><button className="primary-button" type="button" onClick={generateRankings}>Generate Ranking Suggestions</button></div></header>
-          <p className="championship-explainer">Suggestions use only stored wins, losses, championship appearances, and activity. Locked entries are never replaced and every generated reason is shown.</p>
+          <p className="championship-explainer">Suggestions use the official Phase 6B20 ranking-point ledger. Title-match participation gives no separate bonus. Locked Committee entries remain visible beside their calculated position and require an override reason.</p>
           {selected.rankings.length === 0 ? <div className="empty-state">No contenders are ranked.</div> : <div className="ranking-list">{selected.rankings.slice().sort((a, b) => a.rank - b.rank).map((ranking) => <RankingEditor key={ranking.id} ranking={ranking} onChange={updateRanking} onMove={(direction) => moveRanking(ranking.id, direction)} onDelete={() => updateSelected((championship) => ({ ...championship, rankings: championship.rankings.filter((item) => item.id !== ranking.id).map((item, index) => ({ ...item, rank: index + 1 })) }))} />)}</div>}
         </section>}
 
@@ -277,7 +290,7 @@ export default function ChampionshipHub({
 
         {view === "timeline" && <section className="championship-panel"><header><div><p className="eyebrow">CHAMPIONSHIP TIMELINE</p><h3>Past lineage and future title plans</h3></div></header>{timeline.length === 0 ? <div className="empty-state">No championship timeline entries are available.</div> : <div className="championship-timeline">{timeline.map((entry) => <button type="button" key={entry.id} onClick={() => entry.showId ? onOpenShow(entry.showId, entry.segmentId) : entry.storylineId ? onOpenStoryline(entry.storylineId) : undefined}><time>{dateLabel(entry.date)}</time><span>{entry.type}</span><strong>{entry.title}</strong><p>{entry.detail}</p></button>)}</div>}</section>}
 
-        {view === "results" && <section className="championship-panel"><header><div><p className="eyebrow">RESULT CONFIRMATION</p><h3>Review reconciled title matches before changing lineage</h3></div><strong>{suggestions.length}</strong></header><p className="championship-explainer">The tracker never changes a champion automatically. Confirm a retention, title change, or vacancy only after reviewing the completed TEW result.</p>{suggestions.length === 0 ? <div className="empty-state">No reconciled title results require confirmation.</div> : <div className="title-result-list">{suggestions.map((suggestion) => <article key={suggestion.id}><header><div><strong>{suggestion.segmentTitle}</strong><span>{suggestion.showName} · {dateLabel(suggestion.showDate)}</span></div><b>{suggestion.suggestedDecision}</b></header><dl><div><dt>Champion entering</dt><dd>{suggestion.championEntering || "Unavailable"}</dd></div><div><dt>Challenger</dt><dd>{suggestion.challenger || "Unavailable"}</dd></div><div><dt>Recorded winner</dt><dd>{suggestion.actualWinner || "Unavailable"}</dd></div></dl><p>{suggestion.reason}</p><div className="result-actions"><button type="button" onClick={() => onOpenShow(suggestion.showId, suggestion.segmentId)}>Open Match</button><button type="button" onClick={() => confirmSuggestion(suggestion.showId, suggestion.segmentId, "Retained")}>Confirm Retention</button><button className="primary-button" type="button" onClick={() => confirmSuggestion(suggestion.showId, suggestion.segmentId, "Changed Hands")}>Confirm Title Change</button><button type="button" onClick={() => confirmSuggestion(suggestion.showId, suggestion.segmentId, "Vacated")}>Confirm Vacancy</button><button type="button" onClick={() => confirmSuggestion(suggestion.showId, suggestion.segmentId, "Unresolved")}>Mark Unresolved</button></div></article>)}</div>}</section>}
+        {view === "results" && <section className="championship-panel"><header><div><p className="eyebrow">RESULT CONFIRMATION</p><h3>Review reconciled title matches before changing lineage</h3></div><strong>{suggestions.length}</strong></header><p className="championship-explainer">The tracker never changes a champion automatically. Confirm retention, title change, vacancy, or No Contest only after reviewing the completed result.</p>{suggestions.length === 0 ? <div className="empty-state">No reconciled title results require confirmation.</div> : <div className="title-result-list">{suggestions.map((suggestion) => <article key={suggestion.id}><header><div><strong>{suggestion.segmentTitle}</strong><span>{suggestion.showName} · {dateLabel(suggestion.showDate)}</span></div><b>{suggestion.suggestedDecision}</b></header><dl><div><dt>Champion entering</dt><dd>{suggestion.championEntering || "Unavailable"}</dd></div><div><dt>Challenger</dt><dd>{suggestion.challenger || "Unavailable"}</dd></div><div><dt>Recorded winner</dt><dd>{suggestion.actualWinner || "Unavailable"}</dd></div></dl><p>{suggestion.reason}</p><div className="result-actions"><button type="button" onClick={() => onOpenShow(suggestion.showId, suggestion.segmentId)}>Open Match</button><button type="button" onClick={() => confirmSuggestion(suggestion.showId, suggestion.segmentId, "Retained")}>Confirm Retention</button><button className="primary-button" type="button" onClick={() => confirmSuggestion(suggestion.showId, suggestion.segmentId, "Changed Hands")}>Confirm Title Change</button><button type="button" onClick={() => confirmSuggestion(suggestion.showId, suggestion.segmentId, "Vacated")}>Confirm Vacancy</button><button type="button" onClick={() => confirmSuggestion(suggestion.showId, suggestion.segmentId, "No Contest")}>Confirm No Contest</button><button type="button" onClick={() => setNotice("The title result remains unresolved. No lineage or defense change was applied.")}>Leave Unresolved</button></div></article>)}</div>}</section>}
       </div>}
     </div>
   </section>;

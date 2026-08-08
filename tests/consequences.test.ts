@@ -9,6 +9,7 @@ import {
   confirmCompetitionConsequence,
   emptyResultConsequenceUniverse,
   resolveFutureConflict,
+  recordAngleCompetitiveAdjustment,
   rollbackCoreResultConsequences,
   synchronizeWorkerRecordsFromProfiles,
 } from "../src/consequences/model";
@@ -476,7 +477,7 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(noContestPac.calculationLedger?.momentum.terms.filter((term) => term.id === "result" || term.id === "upset").every((term) => term.contribution === 0)).toBe(true);
     expect(noContestPac.calculationLedger?.popularity.terms.find((term) => term.id === "result")?.contribution).toBe(0);
     expect(applied.universe.teamRecords).toEqual([]);
-    expect(applied.universe.championshipProposals).toEqual([]);
+    expect(applied.universe.championshipProposals[0]).toMatchObject({ suggestedDecision: "No Contest", selectedDecision: "No Contest", status: "Pending" });
     expect(applied.universe.competitionProposals[0]).toMatchObject({ resultType: "No Contest", status: "Pending", proposedWinnerParticipantId: "" });
     expect(applied.shows[0].segments[0].reconciliation).toMatchObject({ happenedAsPlannedDetail: "No Contest", actualMatch: { winner: "No Contest" } });
     expect(applied.universe.prompts.some((prompt) => prompt.kind === "Winner Celebration" || prompt.kind === "Loser Reaction")).toBe(false);
@@ -485,6 +486,8 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(confirmed.competitions.competitions[0].fixtures.some((fixture) => Boolean(fixture.winnerId))).toBe(false);
     expect(championship.currentChampions[0].name).toBe("Jay White");
     expect(championship.defenses).toBe(2);
+    const titleConfirmed = confirmChampionshipConsequence({ universe: applied.universe, proposalId: applied.universe.championshipProposals[0].id, shows: applied.shows, championships: { championships: [championship] } });
+    expect(titleConfirmed.championships.championships[0]).toMatchObject({ defenses: 2, lastTitleActivityDate: show.date });
   });
 
   test("flags future booking that conflicts with the actual result and requires a manual resolution note", () => {
@@ -531,6 +534,96 @@ describe("Phase 6B3 standalone result consequences", () => {
     expect(rolled.shows[0].segments[0].reconciliation.actualMatch).toBeNull();
     expect(rolled.universe.applications[0]).toMatchObject({ status: "Rolled Back", rollbackReason: "The wrong match record was linked." });
     expect(rolled.profiles).toEqual(sourceProfiles);
+  });
+
+  test("replays out-of-order results chronologically and preserves later results when an older event is rolled back", () => {
+    const earlier = showWithMatch();
+    earlier.show.id = "show-earlier";
+    earlier.show.date = "2019-01-08";
+    earlier.segment.id = "match-earlier";
+    earlier.show.segments = [earlier.segment];
+    const later = showWithMatch();
+    later.show.id = "show-later";
+    later.show.date = "2019-01-15";
+    later.segment.id = "match-later";
+    later.show.segments = [later.segment];
+    const sourceProfiles = profiles();
+
+    const laterFirst = applyCoreResultConsequences({
+      universe: emptyResultConsequenceUniverse(), resolution: resolution(later.show.id, later.segment.id, "PAC"), shows: [later.show], profiles: sourceProfiles,
+      championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse(),
+    });
+    const outOfOrder = applyCoreResultConsequences({
+      universe: laterFirst.universe, resolution: resolution(earlier.show.id, earlier.segment.id, "Jay White"), shows: [earlier.show, ...laterFirst.shows], profiles: laterFirst.profiles,
+      championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse(),
+    });
+
+    const chronologicalFirst = applyCoreResultConsequences({
+      universe: emptyResultConsequenceUniverse(), resolution: resolution(earlier.show.id, earlier.segment.id, "Jay White"), shows: [earlier.show], profiles: sourceProfiles,
+      championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse(),
+    });
+    const chronological = applyCoreResultConsequences({
+      universe: chronologicalFirst.universe, resolution: resolution(later.show.id, later.segment.id, "PAC"), shows: [...chronologicalFirst.shows, later.show], profiles: chronologicalFirst.profiles,
+      championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse(),
+    });
+    const comparable = (result: typeof outOfOrder) => result.universe.workerRecords.map((record) => ({ workerKey: record.workerKey, wins: record.wins, losses: record.losses, rankingPoints: record.rankingPoints, momentum: record.momentum, fatigue: record.fatigue, history: record.matchHistory.map((entry) => entry.showDate) })).sort((left, right) => left.workerKey.localeCompare(right.workerKey));
+    expect(comparable(outOfOrder)).toEqual(comparable(chronological));
+    expect(outOfOrder.universe.applications.every((application) => application.replayStatus === "Replayed")).toBe(true);
+
+    const olderApplication = outOfOrder.universe.applications.find((application) => application.showId === earlier.show.id)!;
+    const rolled = rollbackCoreResultConsequences(outOfOrder.universe, olderApplication.id, "Correct the earlier official result.", outOfOrder.profiles, { shows: outOfOrder.shows, championships: outOfOrder.championships, competitions: outOfOrder.competitions });
+    const remainingPac = rolled.universe.workerRecords.find((record) => record.workerName === "PAC")!;
+    expect(remainingPac).toMatchObject({ wins: 1, losses: 0 });
+    expect(remainingPac.matchHistory.map((entry) => entry.showId)).toEqual([later.show.id]);
+    expect(rolled.universe.applications.find((application) => application.id === olderApplication.id)?.status).toBe("Rolled Back");
+  });
+
+  test("keeps the active win or loss streak through a No Contest", () => {
+    const { show, segment } = showWithMatch();
+    const first = applyCoreResultConsequences({ universe: emptyResultConsequenceUniverse(), resolution: resolution(show.id, segment.id, "PAC"), shows: [show], profiles: profiles(), championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+    const ncShow = showWithMatch();
+    ncShow.show.id = "show-nc-streak";
+    ncShow.show.date = "2019-01-15";
+    ncShow.segment.id = "match-nc-streak";
+    ncShow.show.segments = [ncShow.segment];
+    const noContest = resolution(ncShow.show.id, ncShow.segment.id, "PAC");
+    Object.assign(noContest.attempts[0].finalResult!, { winnerKey: "", winnerName: "", loserKey: "", loserName: "", winnerMemberKeys: [], winnerMemberNames: [], loserKeys: [], loserNames: [], finishType: "No Contest", upset: false });
+    const applied = applyCoreResultConsequences({ universe: first.universe, resolution: noContest, shows: [...first.shows, ncShow.show], profiles: first.profiles, championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+    expect(applied.universe.workerRecords.find((record) => record.workerName === "PAC")).toMatchObject({ wins: 1, noContests: 1, currentStreakType: "W", currentStreakCount: 1 });
+  });
+
+  test("replays angle profile changes and matches in one official chronology", () => {
+    const angleShow = createPlannedShow(1);
+    angleShow.id = "angle-show";
+    angleShow.date = "2019-01-08";
+    const angle = createPlannedSegment("angle");
+    angle.id = "angle-first";
+    angle.workers = [{ id: "pac", name: "PAC", role: "Speaking", side: "", source: "tew" }];
+    angleShow.segments = [angle];
+    const match = showWithMatch();
+    match.show.id = "match-show-later";
+    match.show.date = "2019-01-15";
+    match.segment.id = "match-after-angle";
+    match.show.segments = [match.segment];
+    const source = profiles();
+    const laterFirst = applyCoreResultConsequences({ universe: emptyResultConsequenceUniverse(), resolution: resolution(match.show.id, match.segment.id), shows: [match.show], profiles: source, championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+    const angleAfterProfiles = laterFirst.profiles.map((profile) => profile.workerName === "PAC" ? { ...profile, momentum: profile.momentum + 2, popularity: profile.popularity + 1 } : profile);
+    const replayed = recordAngleCompetitiveAdjustment({
+      universe: laterFirst.universe,
+      evaluation: { id: "angle-evaluation", showId: angleShow.id, segmentId: angle.id, appliedAt: "2019-01-08T20:00:00.000Z", participants: [{ workerKey: "tew:pac", workerName: "PAC", momentumDelta: 2, popularityDelta: 1 }] },
+      show: angleShow, profilesBefore: laterFirst.profiles, profilesAfter: angleAfterProfiles, shows: [angleShow, ...laterFirst.shows], championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse(),
+    });
+
+    const angleFirst = recordAngleCompetitiveAdjustment({
+      universe: emptyResultConsequenceUniverse(),
+      evaluation: { id: "angle-evaluation-control", showId: angleShow.id, segmentId: angle.id, appliedAt: "2019-01-08T20:00:00.000Z", participants: [{ workerKey: "tew:pac", workerName: "PAC", momentumDelta: 2, popularityDelta: 1 }] },
+      show: angleShow, profilesBefore: source, profilesAfter: source.map((profile) => profile.workerName === "PAC" ? { ...profile, momentum: profile.momentum + 2, popularity: profile.popularity + 1 } : profile), shows: [angleShow], championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse(),
+    });
+    const chronological = applyCoreResultConsequences({ universe: angleFirst.universe, resolution: resolution(match.show.id, match.segment.id), shows: [angleShow, match.show], profiles: angleFirst.profiles, championships: emptyChampionshipUniverse(), competitions: emptyCompetitionUniverse() });
+    const replayedPac = replayed.profiles.find((profile) => profile.workerName === "PAC")!;
+    const chronologicalPac = chronological.profiles.find((profile) => profile.workerName === "PAC")!;
+    expect({ momentum: replayedPac.momentum, popularity: replayedPac.popularity, health: replayedPac.health }).toEqual({ momentum: chronologicalPac.momentum, popularity: chronologicalPac.popularity, health: chronologicalPac.health });
+    expect(replayed.universe.workerRecords.find((record) => record.workerName === "PAC")?.momentum).toBe(chronological.universe.workerRecords.find((record) => record.workerName === "PAC")?.momentum);
   });
 
   test("round-trips consequence history", () => {

@@ -1,5 +1,5 @@
 export type CompetitionKind = "Tournament" | "Cup" | "League" | "Classic" | "Custom";
-export type CompetitionFormat = "Single Elimination" | "Round Robin" | "Double Round Robin";
+export type CompetitionFormat = "Single Elimination" | "Round Robin" | "Double Round Robin" | "Round Robin + Final";
 export type CompetitionParticipantType = "Singles" | "Tag Team" | "Trios" | "Custom";
 export type CompetitionStatus = "Planning" | "Active" | "Completed" | "Archived";
 export type CompetitionParticipantStatus = "Active" | "Eliminated" | "Withdrawn" | "Champion";
@@ -35,7 +35,12 @@ export interface CompetitionFixture {
   plannedSegmentId: string;
   completedAt: string;
   notes: string;
+  sourceResultId: string;
+  submissionWinnerCount: number;
+  submissionLoserCount: number;
 }
+
+export type CompetitionSubmissionTiebreak = "Unresolved" | "Submission Differential" | "Disabled";
 
 export interface CompetitionPointsRules {
   win: number;
@@ -65,6 +70,11 @@ export interface Competition {
   championParticipantId: string;
   runnerUpParticipantId: string;
   pointsRules: CompetitionPointsRules;
+  submissionTiebreak: CompetitionSubmissionTiebreak;
+  committeeDecisionParticipantId: string;
+  unresolvedTieParticipantIds: string[];
+  topAdvanceCount: number;
+  expectedParticipantCount: number;
   participants: CompetitionParticipant[];
   fixtures: CompetitionFixture[];
   notes: string;
@@ -86,6 +96,10 @@ export interface CompetitionStanding {
   noContests: number;
   points: number;
   rank: number;
+  headToHeadPoints: number;
+  submissionDifferential: number;
+  tied: boolean;
+  tiebreakExplanation: string[];
 }
 
 export interface CompetitionWarning {

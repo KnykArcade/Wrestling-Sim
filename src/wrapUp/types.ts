@@ -34,8 +34,8 @@ export interface WrapUpChampionshipDecision {
   challenger: string;
   actualWinner: string;
   resolvedChampionNames: string;
-  suggestedDecision: "Retained" | "Changed Hands" | "Vacated" | "Unresolved";
-  decision: "Retained" | "Changed Hands" | "Vacated" | "Unresolved" | "Deferred";
+  suggestedDecision: "Retained" | "Changed Hands" | "Vacated" | "No Contest" | "Unresolved";
+  decision: "Retained" | "Changed Hands" | "Vacated" | "No Contest" | "Unresolved" | "Deferred";
   status: WrapUpDecisionStatus;
   preview: string;
   reason: string;

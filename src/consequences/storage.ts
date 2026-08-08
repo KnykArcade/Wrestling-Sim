@@ -1,4 +1,5 @@
 import { emptyResultConsequenceUniverse } from "./model";
+import { COMPETITIVE_CALCULATION_SYSTEM_VERSION } from "../calculations/foundation";
 import type {
   ChampionshipConsequenceProposal,
   CompetitionConsequenceProposal,
@@ -53,12 +54,31 @@ function workerRecord(value: unknown): StandaloneWorkerRecord | null {
 
 function teamRecord(value: unknown): StandaloneTeamRecord | null {
   if (!isRecord(value) || !text(value.teamKey) || !text(value.teamName)) return null;
-  return value as unknown as StandaloneTeamRecord;
+  const currentScale = value.momentumScale === "0-100-v1";
+  const legacyMomentum = typeof value.momentum === "number" && Number.isFinite(value.momentum) ? value.momentum : 0;
+  return {
+    ...value,
+    momentum: currentScale ? Math.max(0, Math.min(100, legacyMomentum)) : Math.max(0, Math.min(100, 50 + legacyMomentum / 2)),
+    momentumScale: "0-100-v1",
+  } as unknown as StandaloneTeamRecord;
 }
 
 function application(value: unknown): ResultConsequenceApplication | null {
   if (!isRecord(value) || !text(value.id) || !text(value.resolutionAttemptId)) return null;
-  return { ...value, calculationVersion: text(value.calculationVersion, "legacy-unversioned"), idempotencyKey: text(value.idempotencyKey, `${text(value.resolutionRecordId)}:${text(value.resolutionAttemptId)}:match-consequences`) } as unknown as ResultConsequenceApplication;
+  const showDate = text(value.officialShowDate, text(value.engineAttempt && isRecord(value.engineAttempt) ? value.engineAttempt.generatedAt : ""));
+  const position = typeof value.runningOrderPosition === "number" && Number.isFinite(value.runningOrderPosition) ? Math.max(0, value.runningOrderPosition) : 0;
+  return {
+    ...value,
+    calculationVersion: text(value.calculationVersion, "legacy-unversioned"),
+    competitiveCalculationVersion: text(value.competitiveCalculationVersion, "legacy-locked"),
+    idempotencyKey: text(value.idempotencyKey, `${text(value.resolutionRecordId)}:${text(value.resolutionAttemptId)}:match-consequences`),
+    officialShowDate: showDate,
+    runningOrderPosition: position,
+    officialOrderKey: text(value.officialOrderKey, `${showDate}:${position.toString().padStart(5, "0")}:${text(value.appliedAt)}:${text(value.id)}`),
+    replayStatus: value.replayStatus === "Replayed" || value.replayStatus === "Superseded" ? value.replayStatus : "Original",
+    replayedAt: text(value.replayedAt),
+    supersededByApplicationId: text(value.supersededByApplicationId),
+  } as unknown as ResultConsequenceApplication;
 }
 
 function championshipProposal(value: unknown): ChampionshipConsequenceProposal | null {
@@ -99,6 +119,9 @@ export function parseResultConsequenceUniverse(value: unknown): ResultConsequenc
     futureConflicts: Array.isArray(value.futureConflicts) ? value.futureConflicts.map(conflict).filter((item): item is FutureBookingConflict => item !== null) : [],
     prompts: Array.isArray(value.prompts) ? value.prompts.map(prompt).filter((item): item is GroundedBookingPrompt => item !== null) : [],
     audit: Array.isArray(value.audit) ? value.audit.map(audit).filter((item): item is ConsequenceAuditEntry => item !== null).slice(0, 1000) : [],
+    competitiveProfileAdjustments: records(value.competitiveProfileAdjustments),
+    competitiveCalculationVersion: text(value.competitiveCalculationVersion, COMPETITIVE_CALCULATION_SYSTEM_VERSION),
+    competitiveBaseline: isRecord(value.competitiveBaseline) ? value.competitiveBaseline as unknown as ResultConsequenceUniverse["competitiveBaseline"] : undefined,
     settings: {
       activeTab: tabs.includes(settings.activeTab as ResultConsequenceUniverse["settings"]["activeTab"]) ? settings.activeTab as ResultConsequenceUniverse["settings"]["activeTab"] : "overview",
       selectedApplicationId: text(settings.selectedApplicationId),
