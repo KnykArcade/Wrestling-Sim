@@ -380,10 +380,11 @@ The normal backup intentionally stores the Snapshot Vault **manifest**, not ever
 ## Open in GitHub Codespaces
 
 1. Open this repository in GitHub.
-2. Choose **Code → Codespaces → Create codespace on the current branch**.
-3. Wait for dependency installation to finish.
-4. Run `npm run dev` in the Codespace terminal.
-5. Open the forwarded **TEW Story Tracker Preview** port.
+2. Make sure the branch selector says **main**.
+3. Choose **Code → Codespaces → Create codespace on main**.
+4. Wait while Wrestling Sim prepares, updates safely, and opens its preview automatically.
+
+No terminal command is required. The header displays the release phase and exact Git commit currently running. A clean Codespace on `main` updates automatically when it starts. If the Codespace contains real uncommitted work, the update is skipped and nothing is deleted.
 
 Before deleting a Codespace or moving to a different forwarded preview origin, export:
 

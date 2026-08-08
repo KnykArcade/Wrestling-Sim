@@ -71,6 +71,41 @@ button {
   font-weight: 800;
 }
 
+.topbar__status {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.build-badge {
+  min-width: 190px;
+  padding: 8px 12px;
+  border: 1px solid #91a8d5;
+  background: #142751;
+  color: #f5f7fb;
+  font-size: 0.72rem;
+}
+
+.build-badge span,
+.build-badge strong {
+  display: block;
+}
+
+.build-badge span {
+  margin-bottom: 3px;
+  color: #b9c8e7;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.build-badge strong {
+  color: #fff200;
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
+
 main {
   width: min(1460px, 100%);
   margin: 0 auto;
@@ -706,6 +741,16 @@ footer {
 
   .phase-badge,
   .secondary-button {
+    width: 100%;
+    text-align: center;
+  }
+
+  .topbar__status {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .build-badge {
     width: 100%;
     text-align: center;
   }
